@@ -125,9 +125,19 @@ public:
 	// ---- Look ----
 	UPROPERTY(EditAnywhere, Category = "Grapple|Look") FLinearColor RopeColor = FLinearColor(1.f, 0.25f, 0.04f); // orange
 
+	// ---- Testing ----
+	// When ticked, every frame of play is written to a spreadsheet file (CSV) in
+	// Saved/Tests/ when you stop playing: time, position, speed, rope lengths, gas, and
+	// what the body last bumped into. These files are the measured evidence for the
+	// tests in Docs/TESTS.md (for example, "does the rope ever stretch?").
+	UPROPERTY(EditAnywhere, Category = "Grapple|Testing") bool bRecordTelemetry = true;
+
 protected:
 	// BeginPlay runs ONCE when you press Play. We use it to find grapple rocks and controller buttons.
 	virtual void BeginPlay() override;
+
+	// EndPlay runs ONCE when you stop playing. We use it to save the test recording.
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	// ================================================================================
@@ -171,6 +181,13 @@ private:
 	bool bRespawnWasDown = false;                  // was R held last frame?
 	bool bDesktopSetupDone = false;                // have we set up the mouse-and-keyboard camera yet?
 
+	// Test recording (see bRecordTelemetry above)
+	FString Telemetry;                             // the spreadsheet rows collected so far, as text
+	float TelemetryClock = 0.f;                    // seconds since Play was pressed
+	FString LastHitName = TEXT("none");            // what the body bumped into on the latest physics step
+	bool bLastHitPenetrating = false;              // did that bump START inside the object? (a sign of a collision bug)
+	FString LastReportedPenetration;               // so the "started inside" warning is logged once per object, not every frame
+
 	// ================================================================================
 	//  ABILITIES  (each one is written out step by step in GrappleRig.cpp)
 	// ================================================================================
@@ -183,6 +200,8 @@ private:
 	void ReleaseHook(int32 Index);                    // let go of a hook
 	void Respawn();                                   // put the player back on the first island
 	void Pulse(int32 Index, float Amplitude);         // vibrate a VR controller
+	void RecordTelemetry(float DeltaSeconds);         // add this frame as one row of the test spreadsheet
+	void SaveTelemetry();                             // write the spreadsheet to Saved/Tests/
 
 	void GetAim(int32 Index, FVector& OutStart, FVector& OutDir) const;   // where a hand is pointing
 	bool FindTarget(int32 Index, FVector& OutPoint) const;               // what a hook would hit

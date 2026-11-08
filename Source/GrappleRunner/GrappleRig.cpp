@@ -41,10 +41,14 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"         // the spawn point marker
+#include "HAL/FileManager.h"                   // make folders on disk (for the test recordings)
 #include "IXRTrackingSystem.h"                 // asks "is a VR headset active?"
 #include "Kismet/GameplayStatics.h"            // handy helpers like "find all actors with this tag"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Misc/DateTime.h"                     // today's date and time (to name each recording)
+#include "Misc/FileHelper.h"                   // save text to a file
+#include "Misc/Paths.h"                        // where the project's Saved folder is
 #include "TimerManager.h"                      // "do this after 0.08 seconds" (stopping vibration)
 #include "UObject/ConstructorHelpers.h"        // load engine shapes when the object is built
 
@@ -562,6 +566,7 @@ void AGrappleRig::Tick(float DeltaSeconds)
 	LastSetLocation = Pawn->GetActorLocation();
 
 	UpdateVisuals();
+	RecordTelemetry(DeltaSeconds);   // write down this frame for the test log
 }
 
 // =====================================================================================
@@ -659,6 +664,8 @@ void AGrappleRig::MoveWithCollision(const FVector& From, const FVector& To)
 	FVector Cur = From;
 	FVector Target = To;
 	bool bHitWalkable = false;
+	LastHitName = TEXT("none");      // for the test recording: nothing bumped into yet this step
+	bLastHitPenetrating = false;
 
 	// Try up to 3 times: move, hit something, slide along it, try the rest of the move.
 	for (int32 Iter = 0; Iter < 3; ++Iter)
@@ -672,6 +679,17 @@ void AGrappleRig::MoveWithCollision(const FVector& From, const FVector& To)
 		}
 		// The "normal" = the direction the surface faces (straight up for a floor, sideways for a wall).
 		const FVector N = Hit.ImpactNormal.IsNearlyZero() ? FVector(Hit.Normal) : FVector(Hit.ImpactNormal);
+		// Remember what we bumped into, for the test recording.
+		LastHitName = Hit.GetActor() ? Hit.GetActor()->GetActorNameOrLabel() : TEXT("unknown");
+		bLastHitPenetrating = Hit.bStartPenetrating;
+		if (Hit.bStartPenetrating && LastHitName != LastReportedPenetration)
+		{
+			// Starting a move already INSIDE something is a warning sign, so say so in the
+			// Output Log (once per object, so the log doesn't fill up).
+			UE_LOG(LogTemp, Warning, TEXT("GrappleRig: body started inside %s (%s), pushed out %.1f cm"),
+				*LastHitName, Hit.GetComponent() ? *Hit.GetComponent()->GetName() : TEXT("?"), Hit.PenetrationDepth);
+			LastReportedPenetration = LastHitName;
+		}
 		if (Hit.bStartPenetrating)
 		{
 			// We started INSIDE something (e.g. spawned in the ground): push out and try again.
@@ -768,4 +786,75 @@ void AGrappleRig::UpdateVisuals()
 			FString::Printf(TEXT("Speed %.0f km/h   Gas %.0f%%   %s   |  LMB/RMB hooks  Shift reel  Space jump/boost  R respawn"),
 				Velocity.Size() * 0.036f, 100.f * Gas / FMath::Max(1.f, GasMax), bGrounded ? TEXT("ground") : TEXT("air")));
 	}
+}
+
+// =====================================================================================
+//  TEST RECORDING ("telemetry" = measurements sent from a machine while it runs)
+//  Every frame we add one row to a spreadsheet. When you stop playing, the
+//  spreadsheet is saved as a .csv file (opens in Excel or Google Sheets) in
+//  Saved/Tests/. Each test in Docs/TESTS.md uses these files as its measured evidence.
+// =====================================================================================
+void AGrappleRig::RecordTelemetry(float DeltaSeconds)
+{
+	if (!bRecordTelemetry)
+	{
+		return;   // recording switched off in the Details panel
+	}
+	if (Telemetry.IsEmpty())
+	{
+		// First frame: write the settings at the top (lines starting with # are notes),
+		// so anyone reading the file knows exactly what was tested. Then the column names.
+		Telemetry.Reserve(4 * 1024 * 1024);   // set aside room for ~4 million letters up front (about 5 minutes of play) so the text doesn't keep resizing
+		Telemetry += FString::Printf(TEXT("# Grapple Runner telemetry, recorded %s\n"), *FDateTime::Now().ToString());
+		Telemetry += FString::Printf(TEXT("# Gravity=%.1f cm/s2, AirDragPerSecond=%.3f, MaxSpeed=%.0f cm/s, ReelSpeed=%.0f cm/s, ReelPullAccel=%.0f, BoostAccel=%.0f, MaxFireRange=%.0f cm, MinRopeLength=%.0f cm, Body radius %.0f / half-height %.0f cm, VR=%d\n"),
+			Gravity, AirDragPerSecond, MaxSpeed, ReelSpeed, ReelPullAccel, BoostAccel, MaxFireRange, MinRopeLength, BodyRadius, BodyHalfHeight, bVR ? 1 : 0);
+		Telemetry += TEXT("time_s,frame_ms,x_cm,y_cm,z_cm,vx,vy,vz,speed_cms,grounded,hookL,ropeL_len,ropeL_dist,hookR,ropeR_len,ropeR_dist,reel,boost,gas,last_hit,hit_started_inside\n");
+	}
+	TelemetryClock += DeltaSeconds;
+	const FVector C = BodyCenter();
+
+	// For each hook: is it attached, how long is the rope, and how far is the body
+	// actually from the anchor? If the rope works, distance is never more than length.
+	float Len[2] = {0.f, 0.f}, Dist[2] = {0.f, 0.f};
+	for (int32 i = 0; i < 2; ++i)
+	{
+		if (Hooks[i].bAttached)
+		{
+			Len[i] = Hooks[i].Length;
+			Dist[i] = static_cast<float>(FVector::Dist(C, Hooks[i].Anchor));
+		}
+	}
+
+	// One row: the numbers, separated by commas, in the same order as the column names.
+	Telemetry += FString::Printf(TEXT("%.4f,%.2f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d,%.1f,%.1f,%d,%.1f,%.1f,%d,%d,%.1f,%s,%d\n"),
+		TelemetryClock, DeltaSeconds * 1000.f, BodyPos.X, BodyPos.Y, BodyPos.Z,
+		Velocity.X, Velocity.Y, Velocity.Z, Velocity.Size(), bGrounded ? 1 : 0,
+		Hooks[0].bAttached ? 1 : 0, Len[0], Dist[0], Hooks[1].bAttached ? 1 : 0, Len[1], Dist[1],
+		(bReel[0] || bReel[1]) ? 1 : 0, bBoost ? 1 : 0, Gas, *LastHitName, bLastHitPenetrating ? 1 : 0);
+}
+
+void AGrappleRig::SaveTelemetry()
+{
+	if (Telemetry.IsEmpty())
+	{
+		return;   // nothing recorded
+	}
+	// Saved/Tests/telemetry_2026.11.08-16.30.00.csv  (date and time in the name, so files never overwrite)
+	const FString Folder = FPaths::ProjectSavedDir() / TEXT("Tests");
+	IFileManager::Get().MakeDirectory(*Folder, true);   // make the folder if it isn't there yet
+	const FString File = Folder / FString::Printf(TEXT("telemetry_%s.csv"), *FDateTime::Now().ToString());
+	if (FFileHelper::SaveStringToFile(Telemetry, *File))
+	{
+		UE_LOG(LogTemp, Log, TEXT("GrappleRig: test recording saved to %s"), *FPaths::ConvertRelativePathToFull(File));
+	}
+	Telemetry.Empty();
+}
+
+// =====================================================================================
+//  EndPlay: runs once when you stop playing. Save the test recording.
+// =====================================================================================
+void AGrappleRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	SaveTelemetry();
+	Super::EndPlay(EndPlayReason);   // then let Unreal do its own shutdown
 }

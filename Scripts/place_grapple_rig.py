@@ -24,13 +24,24 @@ else:
         unreal.log("Grapple Runner: GrappleRig already in level")
 
 # mist cards, sky dome and waterfalls must not block the player or the hooks
-n = 0
+# (Test T-02 found the sky dome still solid after this was first run, so now we:
+#  1. call modify() so Unreal knows the object changed and really saves it,
+#  2. switch collision off two ways, and
+#  3. read it back to PROVE it is off, warning if not.)
+n, still_solid = 0, []
 for a in actors.get_all_level_actors():
     label = a.get_actor_label()
     if label.startswith(("Mist_", "SkyDome", "Waterfall_")):
+        a.modify()                                              # "this actor is about to change: save it"
         for c in a.get_components_by_class(unreal.PrimitiveComponent):
-            c.set_collision_profile_name("NoCollision")
+            c.modify()
+            c.set_collision_profile_name("NoCollision")         # the named preset...
+            c.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)  # ...and the switch itself
+            if c.get_collision_enabled() != unreal.CollisionEnabled.NO_COLLISION:
+                still_solid.append(label)                       # the check: did it actually work?
             n += 1
 unreal.log("Grapple Runner: {} non-solid components".format(n))
+if still_solid:
+    unreal.log_warning("Grapple Runner: still solid: " + ", ".join(sorted(set(still_solid))))
 unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
 unreal.log("Grapple Runner: rig setup done")

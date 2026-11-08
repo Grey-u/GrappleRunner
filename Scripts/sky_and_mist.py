@@ -91,6 +91,10 @@ if dome_mesh:
     if mi:
         smc.set_material(0, mi)
     try_set(smc, ["cast_shadow"], False)
+    # The dome surrounds the whole world, so it must never be solid: if it is, the
+    # player starts "inside" it and gets pushed 3.6 km out (found in test T-02).
+    smc.set_collision_profile_name("NoCollision")
+    smc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
     log("sky dome placed, scale {:.1f}".format(s))
 else:
     unreal.log_warning("Grapple Runner sky: Brushify S_Skydome not found")

@@ -1,0 +1,23 @@
+Recording: telemetry_2026.11.08-16.30.51.csv | 11326 frames, 138.1 s
+
+FRAME TIME  median 10.54 ms (94.9 fps), 95th pct 11.43 ms, 99th pct 13.74 ms, frames over 11.1 ms (90 Hz budget): 9.6%
+  chart: T08_frame_time_histogram.png
+
+ROPE CONSTRAINT  687 frames hooked (7.3 s): largest stretch beyond rope length 0.00 cm
+  chart: T04_rope_constraint.png
+
+REEL SPEED  measured 900.04 cm/s vs setting 900 cm/s (error 0.005%), over 1.99 s
+  chart: T05_reel_rate.png
+
+FREE FALL  3.54 s, 289 frames, 65.2 m drop
+  gravity measured 979.77 cm/s2 vs setting 980 (error 0.024%)
+  drag measured 0.0600 /s (vertical), 0.0600 /s (horizontal) vs setting 0.060
+  model-vs-game position: max difference 20.2 cm (0.31% of the drop)
+  chart: T06_free_fall_model_vs_game.png
+
+COLLISION with an object (not caught by the last-step log) at 123.796 s: speed 2529 -> 1821 cm/s in one frame (28% lost)
+
+COLLISION with Landing_01 at 124.284 s: speed 1758 -> 502 cm/s in one frame (71% lost)
+
+ROPE SNAP at 126.338 s: speed 1695 -> 453 cm/s in one frame (73% lost)
+  chart: F1_rope_snap_speed.png

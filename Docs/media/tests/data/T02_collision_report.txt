@@ -1,0 +1,32 @@
+14 landing islands found
+--- Landing_00 (BP_FloatingIsland_02_C) top of bounds z=0
+   StaticMeshComponent0               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_01 | simple shapes 15 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent1               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_FloatingMountain_02 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+   StaticMeshComponent2               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Roots_03 | simple shapes 64 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent3               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_02 | simple shapes 20 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent4               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_01 | simple shapes 15 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent5               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_01 | simple shapes 15 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent6               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Roots_01 | simple shapes 35 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent7               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Roots_01 | simple shapes 35 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent8               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Roots_02 | simple shapes 29 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent9               enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_02 | simple shapes 20 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent10              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Roots_01 | simple shapes 35 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent11              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_01 | simple shapes 15 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent12              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_01 | simple shapes 15 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent13              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_01 | simple shapes 15 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent14              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_01 | simple shapes 15 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent15              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Roots_01 | simple shapes 35 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent16              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Overgrowth_02 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+   StaticMeshComponent17              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Overgrowth_01 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+   StaticMeshComponent18              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Overgrowth_02 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+   StaticMeshComponent19              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Overgrowth_02 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+   StaticMeshComponent20              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Stalagtite_01 | simple shapes 15 | trace flag <CollisionTraceFlag.CTF_USE_DEFAULT: 0>
+   StaticMeshComponent21              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Cliff_Spiky_02 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+   StaticMeshComponent22              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Cliff_Spiky_01 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+   StaticMeshComponent23              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Cliff_Spiky_01 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+   StaticMeshComponent24              enabled=<CollisionEnabled.QUERY_AND_PHYSICS: 3> profile=BlockAll pawn=<CollisionResponseType.ECR_BLOCK: 2> S_Cliff_Spiky_01 | simple shapes 1 | trace flag <CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE: 3>
+PlayerStart at z=200
+ray down (Visibility): hit Landing_00 / StaticMeshComponent1 at z=-180, 380 cm below the start
+ray down (Camera): hit Landing_00 / StaticMeshComponent1 at z=-180, 380 cm below the start
+capsule sweep from z=200: hit Landing_00 / StaticMeshComponent1 at z=-180 (start inside something: False)
+capsule sweep from z=800: hit Landing_00 / StaticMeshComponent1 at z=-180 (start inside something: False)

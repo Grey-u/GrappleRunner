@@ -1,0 +1,18 @@
+  Intel(r) Implicit SPMD Program Compiler (Intel(r) ISPC), 1.24.0 (build commit  @ 20250404, LLVM 18.1.2) 
+Using Visual Studio 14.44.35229 toolchain (C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+===== End Toolchain Information =====
+Using Unreal Build Accelerator local executor to run 5 action(s)
+  CPU 12 physical cores, 20 logical cores
+  Memory 31.82 GB physical, 33.37 GB/40.82 GB committed
+  UBA Storage capacity 40 GB
+[1/5] Compile [x64] GrappleRig.cpp
+[2/5] Compile [x64] Module.GrappleRunner.gen.cpp
+[3/5] Link [x64] UnrealEditor-GrappleRunner.lib
+[4/5] Link [x64] UnrealEditor-GrappleRunner.dll
+[5/5] WriteMetadata GrappleRunnerEditor.target [NoUba]
+
+Total time in Unreal Build Accelerator local executor: 13.51 seconds
+Output binary: C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
+
+Result: Succeeded
+Total execution time: 15.96 seconds

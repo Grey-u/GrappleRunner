@@ -41,3 +41,18 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - Compile and place the rig, then test-swing on desktop.
 - VR test once the headset is back.
 - Attach the weapons to the player, add a speed vignette for comfort, and tune the feel.
+
+## 8 Nov 2026 (afternoon): First compile, first swing, first test log
+- **Compiled.** The C++ grapple built first time on UE 5.8: 0 errors, 0 warnings, 89 s. Placed the rig in the level and played on desktop.
+- **Bug: the player fell through the world.**
+  - Tested three possible causes one at a time with a new tool, `Scripts/diagnose_collision.py`. It found the islands' collision was fine.
+  - Added frame-by-frame **telemetry** to the C++. It writes a CSV of position, velocity, rope length, distance to anchor, gas and collisions to `Saved/Tests/`.
+  - Telemetry showed the real cause: the sky dome was still solid, so the player was "pushed out" 3.6 km through it. Fixed it, and made the scripts check their own changes.
+- **Measured the physics against its settings** with `Tools/analyse_telemetry.py`:
+  - the rope never stretched: 0.00 cm over 687 frames;
+  - reel speed 900.04 vs 900 cm/s;
+  - gravity 979.8 vs 980 cm/s²;
+  - drag 0.0600 vs 0.060.
+- **Found a comfort problem (F1).** When a slack rope snaps tight, the player loses about 73% of their speed in one frame. A sudden deceleration like that is a known motion-sickness trigger, and it's the first thing to fix in feel tuning.
+- Full write-up with charts, screenshots and raw data: `Docs/TESTS.md` (T-01 to T-08).
+- **Design decision:** first person is the main view. An optional third person may come later, with all aiming and visibility traced from the character's eyes so it can't give an advantage.
