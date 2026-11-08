@@ -1,0 +1,31 @@
+# Unreal Engine: folders Unreal rebuilds itself. Never commit these.
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Build/
+.vs/
+.vscode/
+.idea/
+
+# Visual Studio / Xcode project files Unreal regenerates
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+
+# OS clutter
+.DS_Store
+Thumbs.db
+
+# Marketplace / Fab content is licensed to Naomi only - never commit it
+Content/Brushify/
+Content/XRFramework/
+Content/LevelPrototyping/
+Content/XRMannequins/
+Content/VRSpectator/
+Content/Weapons/
+Content/Collections/
+Content/Developers/
+*.blend1
+__pycache__/

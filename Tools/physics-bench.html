@@ -1,0 +1,324 @@
+<title>Grapple Runner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Saira+Condensed:wght@500;700&display=swap">
+<style>
+/* Layout: game canvas on top, a "physics bench" of live readouts and sliders below. One deliberate dark dusk world. */
+:root {
+  --sky: #0f1a24;
+  --sky-2: #1d3346;
+  --ink: #e8eef2;
+  --muted: #8fa3b0;
+  --rope: #f2a541;
+  --hook: #7fd6c2;
+  --line: #24394a;
+  --display: "Saira Condensed", "Arial Narrow", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--sky); color: var(--ink); }
+body {
+  font-family: var(--mono);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 5vw, 46px); letter-spacing: .03em; margin: 0; text-transform: uppercase; line-height: 1; text-wrap: balance; }
+h1 span { color: var(--rope); }
+.how { color: var(--muted); font-size: 13px; margin: 0; max-width: 60ch; }
+kbd { font-family: var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--ink); }
+.stage { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--sky); }
+canvas { display: block; width: 100%; touch-action: none; cursor: crosshair; }
+.overlay { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 6px; pointer-events: none; background: color-mix(in srgb, var(--sky) 45%, transparent); }
+.overlay strong { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 4vw, 38px); text-transform: uppercase; letter-spacing: .05em; }
+.overlay span { color: var(--muted); font-size: 13px; }
+.bench { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.panel { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.panel h2 { font-family: var(--display); font-weight: 500; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.read { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.read div { display: grid; gap: 2px; }
+.read b { font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.read small { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+label { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 13px; }
+label output { font-variant-numeric: tabular-nums; color: var(--rope); }
+input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--rope); }
+.note { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0; }
+button { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; justify-self: start; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--hook); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Grapple <span>Runner</span></h1>
+    <p class="how">Hold <kbd>Space</kbd>, click or touch to fire the grapple at the furthest hook in reach. Holding also reels you in. Let go to fly. Don't touch the ground.</p>
+  </header>
+
+  <div class="stage">
+    <canvas id="game" tabindex="0" aria-label="Grapple Runner game"></canvas>
+    <div class="overlay" id="overlay">
+      <strong id="ovTitle">Hold to grapple</strong>
+      <span id="ovSub">Swing hook to hook. Distance is your score.</span>
+    </div>
+  </div>
+
+  <div class="bench">
+    <section class="panel">
+      <h2>Live readout</h2>
+      <div class="read">
+        <div><b id="rDist">0</b><small>Distance (m)</small></div>
+        <div><b id="rBest">0</b><small>Best (m)</small></div>
+        <div><b id="rSpeed">0.0</b><small>Speed (m/s)</small></div>
+        <div><b id="rTension">0</b><small>Rope tension (N)</small></div>
+      </div>
+      <p class="note">Rope tension for a 70 kg runner: T = m(v²/L + g·cosθ). It peaks at the bottom of each swing, which is what a real grapple line, harness or haptic suit would have to survive.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Physics bench</h2>
+      <label for="sG">Gravity <output id="oG" for="sG"></output>
+        <input type="range" id="sG" min="1.6" max="20" step="0.01" value="9.81"></label>
+      <label for="sRope">Max rope length <output id="oRope" for="sRope"></output>
+        <input type="range" id="sRope" min="8" max="30" step="1" value="18"></label>
+      <label for="sReel">Reel-in speed <output id="oReel" for="sReel"></output>
+        <input type="range" id="sReel" min="0" max="6" step="0.5" value="2"></label>
+      <label for="sDrag">Air drag <output id="oDrag" for="sDrag"></output>
+        <input type="range" id="sDrag" min="0" max="0.05" step="0.002" value="0.01"></label>
+      <button id="reset" type="button">Reset to Earth defaults</button>
+    </section>
+  </div>
+</div>
+
+<script>
+/*
+  GRAPPLE RUNNER: the core swing mechanic for the VR swing game.
+  Units are real: metres, seconds, kilograms. y points UP; the ground is y = 0.
+  Want to change something? Search this file for "TRY:" to find the best knobs.
+*/
+(() => {
+  const MASS = 70;          // kg, the runner's mass (used for rope tension)
+  const VIEW_HEIGHT = 30;   // metres of world visible top to bottom. TRY: 40 to zoom out
+  const P = { g: 9.81, ropeMax: 18, reel: 2, drag: 0.01 };  // live physics settings (sliders change these)
+  const DEFAULTS = { ...P };
+
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const tok = n => css.getPropertyValue(n).trim();
+  const COL = { sky: tok('--sky'), sky2: tok('--sky-2'), ink: tok('--ink'), muted: tok('--muted'),
+                rope: tok('--rope'), hook: tok('--hook'), line: tok('--line') };
+
+  // ---------- screen sizing ----------
+  let W = 0, H = 0, S = 20;   // S = pixels per metre
+  function resize() {
+    const w = cv.parentElement.clientWidth;
+    const h = Math.max(260, Math.round(Math.min(innerHeight * 0.62, w * 0.56, 560)));
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    W = w; H = h; S = (H - 28) / VIEW_HEIGHT;
+  }
+
+  // ---------- game state ----------
+  let anchors, lastX, p, rope, trail, holding, running, dead, dist, tension = 0, best = 0;
+  try { best = Number(localStorage.getItem('grapple-best')) || 0; } catch (e) {}
+
+  // Endless world: keep adding hooks (tops of tall pillars) ahead of the runner.
+  function spawnUntil(x) {
+    while (lastX < x) {
+      lastX += 7 + Math.random() * 9;                       // TRY: 9 + Math.random() * 12 for wider, harder gaps
+      anchors.push({ x: lastX, y: 11 + Math.random() * 10 }); // hook height 11–21 m
+    }
+    while (anchors.length && anchors[0].x < p.x - 60) anchors.shift();
+  }
+
+  function reset() {
+    anchors = []; lastX = -2; trail = [];
+    p = { x: 0, y: 12, vx: 7, vy: 0 };   // start 12 m up, moving forward at 7 m/s
+    rope = null; holding = false; running = false; dead = false; dist = 0; tension = 0;
+    spawnUntil(80);
+  }
+
+  // Pick the furthest-forward hook within rope range that isn't below you.
+  function target() {
+    let pick = null;
+    for (const a of anchors) {
+      const d = Math.hypot(a.x - p.x, a.y - p.y);
+      if (d <= P.ropeMax && a.y > p.y - 1 && a.x > p.x - 3 && (!pick || a.x > pick.x)) pick = a;
+    }
+    return pick;
+  }
+  function attach() {
+    const a = target();
+    if (a) rope = { x: a.x, y: a.y, L: Math.hypot(a.x - p.x, a.y - p.y) };
+  }
+
+  // ---------- physics: one fixed step of 1/120 s ----------
+  const DT = 1 / 120;
+  function step() {
+    p.vy -= P.g * DT;                                   // gravity
+    const v = Math.hypot(p.vx, p.vy);                   // quadratic air drag
+    p.vx -= P.drag * v * p.vx * DT;
+    p.vy -= P.drag * v * p.vy * DT;
+    if (rope && holding) rope.L = Math.max(3, rope.L - P.reel * DT);  // reel in (like ODM gear)
+
+    p.x += p.vx * DT; p.y += p.vy * DT;
+
+    tension = 0;
+    if (rope) {
+      // A rope can pull but never push: only correct when it is stretched past its length.
+      const dx = p.x - rope.x, dy = p.y - rope.y, d = Math.hypot(dx, dy);
+      if (d >= rope.L) {
+        const nx = dx / d, ny = dy / d;                 // unit vector, hook to runner
+        p.x = rope.x + nx * rope.L; p.y = rope.y + ny * rope.L;
+        const vr = p.vx * nx + p.vy * ny;               // outward speed along the rope
+        if (vr > 0) { p.vx -= vr * nx; p.vy -= vr * ny; }
+        const v2 = p.vx * p.vx + p.vy * p.vy;
+        tension = Math.max(0, MASS * (v2 / rope.L - P.g * ny));  // T = m(v²/L + g·cosθ)
+      }
+    }
+    if (p.y <= 0.45) { p.y = 0.45; die(); }
+    dist = Math.max(dist, p.x);
+  }
+
+  function die() {
+    dead = true; running = false; rope = null; holding = false; tension = 0;
+    if (dist > best) { best = dist; try { localStorage.setItem('grapple-best', String(Math.floor(best))); } catch (e) {} }
+    showOverlay('Down at ' + Math.floor(dist) + ' m', 'Hold to run again.');
+  }
+
+  // ---------- drawing ----------
+  function draw() {
+    const camX = p.x - (W / S) * 0.3;
+    const camY = Math.max(0, p.y - VIEW_HEIGHT * 0.75);
+    const sx = x => (x - camX) * S;
+    const sy = y => H - 28 - (y - camY) * S;
+
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, COL.sky2); sky.addColorStop(1, COL.sky);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    // far ridges move slower than the world (parallax)
+    ctx.globalAlpha = 0.5; ctx.fillStyle = COL.line; ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W + 8; x += 8) {
+      const wx = x / S + camX * 0.35;
+      ctx.lineTo(x, sy(0) - (7 + 3 * Math.sin(wx * 0.13) + 2 * Math.sin(wx * 0.37)) * S * 0.6);
+    }
+    ctx.lineTo(W, H); ctx.fill(); ctx.globalAlpha = 1;
+
+    // pillars with hooks on top
+    const tgt = !dead && !rope ? target() : null;
+    for (const a of anchors) {
+      const x = sx(a.x);
+      if (x < -40 || x > W + 40) continue;
+      ctx.fillStyle = COL.line;
+      ctx.fillRect(x - 0.5 * S, sy(a.y), 1.0 * S, sy(0) - sy(a.y));
+      ctx.fillStyle = COL.hook;
+      ctx.beginPath(); ctx.arc(x, sy(a.y), Math.max(3, 0.22 * S), 0, Math.PI * 2); ctx.fill();
+      if (a === tgt) {
+        ctx.strokeStyle = COL.hook; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, sy(a.y), Math.max(8, 0.6 * S), 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // ground
+    ctx.fillStyle = COL.sky; ctx.fillRect(0, sy(0), W, H - sy(0));
+    ctx.strokeStyle = COL.muted; ctx.globalAlpha = 0.4; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, sy(0)); ctx.lineTo(W, sy(0)); ctx.stroke(); ctx.globalAlpha = 1;
+
+    // motion trail
+    if (trail.length > 1) {
+      ctx.strokeStyle = COL.rope; ctx.globalAlpha = 0.3; ctx.lineWidth = 2; ctx.beginPath();
+      trail.forEach((t, i) => i ? ctx.lineTo(sx(t.x), sy(t.y)) : ctx.moveTo(sx(t.x), sy(t.y)));
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+
+    // rope
+    if (rope) {
+      ctx.strokeStyle = COL.rope; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sx(p.x), sy(p.y)); ctx.lineTo(sx(rope.x), sy(rope.y)); ctx.stroke();
+    }
+
+    // runner: a body plus a cape that streams opposite to the velocity
+    const px = sx(p.x), py = sy(p.y), r = Math.max(5, 0.45 * S);
+    const sp = Math.hypot(p.vx, p.vy) || 1, ux = -p.vx / sp, uy = p.vy / sp;
+    ctx.fillStyle = COL.rope; ctx.beginPath();
+    ctx.moveTo(px - uy * r * 0.7, py - ux * r * 0.7);
+    ctx.lineTo(px + ux * r * 2.6, py + uy * r * 2.6);
+    ctx.lineTo(px + uy * r * 0.7, py + ux * r * 0.7);
+    ctx.fill();
+    ctx.fillStyle = COL.ink; ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ---------- readouts and overlay ----------
+  const $ = id => document.getElementById(id);
+  function readouts() {
+    $('rDist').textContent = Math.floor(dist);
+    $('rBest').textContent = Math.floor(Math.max(best, dist));
+    $('rSpeed').textContent = Math.hypot(p.vx, p.vy).toFixed(1);
+    $('rTension').textContent = Math.round(tension).toLocaleString();
+  }
+  function showOverlay(t, s) { $('ovTitle').textContent = t; $('ovSub').textContent = s; $('overlay').hidden = false; }
+  function hideOverlay() { $('overlay').hidden = true; }
+
+  // ---------- input ----------
+  function press() {
+    if (holding) return;
+    if (dead) reset();
+    if (!running) { running = true; hideOverlay(); last = performance.now(); acc = 0; }
+    holding = true; attach();
+  }
+  function release() { holding = false; rope = null; }
+
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.focus({ preventScroll: true }); press(); });
+  addEventListener('pointerup', release);
+  addEventListener('pointercancel', release);
+  addEventListener('keydown', e => {
+    if (e.code !== 'Space' || e.repeat) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement) return;
+    e.preventDefault(); press();
+  });
+  addEventListener('keyup', e => { if (e.code === 'Space') release(); });
+
+  // ---------- sliders ----------
+  const planets = [[1.62, 'Moon'], [3.71, 'Mars'], [9.81, 'Earth']];
+  const fmt = {
+    sG: v => v.toFixed(2) + ' m/s²' + (planets.find(([g]) => Math.abs(g - v) < 0.06)?.[1] ? ' · ' + planets.find(([g]) => Math.abs(g - v) < 0.06)[1] : ''),
+    sRope: v => v + ' m',
+    sReel: v => v.toFixed(1) + ' m/s',
+    sDrag: v => v.toFixed(3),
+  };
+  const keys = { sG: 'g', sRope: 'ropeMax', sReel: 'reel', sDrag: 'drag' };
+  const outs = { sG: 'oG', sRope: 'oRope', sReel: 'oReel', sDrag: 'oDrag' };
+  function syncSlider(id) {
+    const v = Number($(id).value); P[keys[id]] = v; $(outs[id]).textContent = fmt[id](v);
+  }
+  Object.keys(keys).forEach(id => { $(id).addEventListener('input', () => syncSlider(id)); syncSlider(id); });
+  $('reset').addEventListener('click', () => {
+    Object.keys(keys).forEach(id => { $(id).value = DEFAULTS[keys[id]]; syncSlider(id); });
+  });
+
+  // ---------- main loop ----------
+  let acc = 0, last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (running) {
+      acc += dt;
+      while (acc >= DT && running) { step(); acc -= DT; }
+      trail.push({ x: p.x, y: p.y }); if (trail.length > 45) trail.shift();
+      spawnUntil(p.x + 80);
+    }
+    draw(); readouts();
+    requestAnimationFrame(frame);
+  }
+
+  reset();
+  resize();
+  addEventListener('resize', () => { resize(); draw(); });
+  requestAnimationFrame(frame);
+})();
+</script>
