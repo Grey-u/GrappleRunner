@@ -39,7 +39,13 @@ Read NOW.md first, every session.
 1. **Swing:** grey-box level, the trigger fires the grapple from the controller, swing, release.
 2. **Run:** level chunks spawn ahead endlessly, distance score.
 3. **Feel:** controller vibration when the hook lands, then Exit Suit and tendon-finger haptics.
-- **Later:** enemies, slicing, weapons with weight, multiplayer, high-end graphics.
+- **Later:** enemies, slicing, weapons with weight, multiplayer, high-end graphics, optional third-person camera.
+
+## Camera rule (decided 8 Nov 2026)
+- First person is the main way to play. Third person will be an option, but it must give **no advantage** over first person.
+- So every gameplay check (aiming, what a hook can reach, which anchors glow, what you can see or hit) is traced from the character's own eyes or hands, never from the camera. The camera only shows the picture.
+- Third-person camera: short over-the-shoulder distance, same field of view as first person, and it can't pass through walls.
+- Multiplayer: other players are only drawn if your character's eyes could see them, so the camera can't peek round corners.
 
 ## Session routine
 1. Read NOW.md.

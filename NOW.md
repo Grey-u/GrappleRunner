@@ -6,12 +6,18 @@
 - Weapon kit v1 imported: blade, handle, hip grapple gear, sidearm.
 - `GrappleRig` C++ written: twin hooks, rope constraint, reel, gas, VR and desktop input.
 
+- C++ module compiles cleanly on UE 5.8: 0 errors, 0 warnings, 89 s (test T-01 in `Docs/TESTS.md`).
+- Scientific test log started: `Docs/TESTS.md`, evidence in `Docs/media/tests/`.
+
 ## Half done
-- C++ module can't compile until the MSVC v14.42 build tools are installed (UE 5.8 bans 14.44).
+- Grapple rig not yet placed in the level (place_grapple_rig.py hasn't run yet).
+
+## Decided
+- First person is the main view. Optional third person comes later with no advantage: see "Camera rule" in CLAUDE.md.
 
 ## Next
-1. Install MSVC 14.42, reopen the project and accept the rebuild. Fix any compile errors.
-2. Run `Scripts/place_grapple_rig.py`, press Play, and test-swing with the mouse.
+1. Run `Scripts/place_grapple_rig.py`, press Play, and test-swing with the mouse.
+2. Record the swing tests (T-02 onward) with screenshots and recordings.
 3. Tune the feel. Add the speed vignette (comfort rule).
 
 ## Tried and dropped
