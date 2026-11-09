@@ -40,6 +40,8 @@ A test PASSES when the result matches the acceptance criteria written in advance
 | T-10 | 2026-11-09 | Frame-time cost of 805 plants | +0.32 ms median, flagged for VR |
 | T-11 | 2026-11-09 | Flexible rope and soft rope in a real swing | Rope visuals PASS; new problem found (F6) |
 | T-12 | 2026-11-09 | Auto-pull (Attack on Titan style) | PASS |
+| T-13 | 2026-11-09 | F6 fix: progressive soft rope in the short-rope "catch" case | PASS (271.6 g down to 22.7 g, inside the stretch limit) |
+| T-14 | 2026-11-09 | Swing exaggeration: faster arcs without breaking the physics | PASS (+17% speed at the bottom, as predicted) |
 
 **How measurements are taken (from T-02 on).** The grapple code records every frame of play to a spreadsheet (CSV) in `Saved/Tests/`: time, frame length, position, velocity, rope length, actual distance to each anchor, gas, and what the body last touched. `Tools/analyse_telemetry.py` reads a recording, compares it with the settings written at the top of the file, prints the results and draws the charts. Both the raw recordings and the script output are kept in `Docs/media/tests/`, so every number below can be checked and the analysis re-run.
 
@@ -342,6 +344,52 @@ Screenshots: [start](media/tests/T12_auto_pull_start.jpg), [arrived](media/tests
 
 **Conclusion.** PASS.
 
+---
+
+## T-13: Progressive soft rope (fix for F6)
+
+**Question.** Can the soft rope handle T-11's hard case (a slack 13.3 m rope caught at 22 m/s) without hitting its 150 cm safety limit, while staying gentle in the T-09 snap?
+
+**Prediction (Tools/rope_model.py).**
+- A grid search tried 100 combinations of stiffness, damping and "progressive" stiffening (the rope gets stiffer the more it stretches).
+- It kept only settings where both cases stay under 130 cm of stretch.
+- The best balance was stiffness 64, damping 0.6, progressive at 100 cm. Predicted: **catch 22.7 g / 118 cm, snap 17.5 g / 97 cm**.
+
+**Method.** New scripted case `gr.Test catch stiff|soft`: the T-11 situation set up exactly, 300 m up, with every physics step recorded. Also re-ran `gr.Test snap soft` with the new settings.
+
+**Results.**
+
+| Test | Game: peak felt | Game: max stretch | Model | Largest step-by-step difference |
+|---|---|---|---|---|
+| Catch, stiff rope | 272.7 g | 0 cm | 271.6 g / 0 cm | 1.09 g |
+| Catch, soft rope (new) | **22.8 g** | **118 cm** | 22.7 g / 118 cm | 0.17 g |
+| Snap, soft rope (new) | 17.5 g | 97 cm | 17.5 g / 97 cm | 0.13 g |
+
+**Conclusion.** PASS. The case that broke the old soft rope now stays 32 cm inside the limit, with a jolt 12 times smaller than the stiff rope's. The cost: the T-09 snap rises from 14.7 g to 17.5 g, a trade-off chosen on purpose so that *no* case hits the limit. Data: [`T13_scripted_tests.csv`](media/tests/data/T13_scripted_tests.csv), [analysis](media/tests/T13_analysis_output.txt).
+
+---
+
+## T-14: Swing exaggeration
+
+**Question.** Naomi asked to "exaggerate the swinging slightly". Can the swing be made faster without the rope behaving unrealistically, for example stretching more?
+
+**Design.** While a rope is tight, add extra gravity **only along the swing**, never along the rope (`SwingExaggeration`, default 1.35). Energy then grows by the same factor, so the speed at the bottom should grow by √1.35 = **1.16 times**.
+
+**Method.**
+- `gr.Test swingreal stiff`: a 15 m pendulum let go from level with the anchor, exaggeration off (real physics).
+- `gr.Test swing stiff` and `swing soft`: the same pendulum with exaggeration on.
+- Compare the fastest speed with theory: √(2gL) = 17.1 m/s without air drag. With the game's air drag, the model predicts 16.0 m/s real and 18.75 m/s exaggerated.
+
+**Results.**
+
+| Test | Fastest speed | Model (with drag) | Peak felt | Rope stretch |
+|---|---|---|---|---|
+| Real physics, stiff | 16.00 m/s | 16.00 m/s | 2.8 g | 0 cm |
+| Exaggerated, stiff | 18.74 m/s | 18.75 m/s | 3.4 g | 0 cm |
+| Exaggerated, soft | 18.73 m/s | 18.75 m/s | 3.4 g | 42 cm |
+
+**Conclusion.** PASS. The swing is **17% faster** at the bottom, against 16% predicted. The difference comes from air drag acting over a slightly shorter time. Felt g rises from 2.8 to 3.4, about what a roller coaster gives. The game matched the model to within 0.03 g at every step.
+
 ## Findings to act on
 
 | ID | Finding | Why it matters | Plan |
@@ -351,8 +399,8 @@ Screenshots: [start](media/tests/T12_auto_pull_start.jpg), [arrived](media/tests
 | F3 | ~~The rope is grey, not orange~~ | Readability | **Fixed 9 Nov:** `M_Rope` material (T-11) |
 | F4 | ~~Telemetry only logs the last physics step's collision~~ | Gaps in evidence | **Fixed 9 Nov:** collisions are now kept for the whole frame |
 | F5 | Hitting an island at speed also stops you within one step (about 156 g in T-04's data) | Same sickness trigger as F1 | Soften collisions: slide more, absorb speed over a few frames |
-| F6 | The soft rope is too soft for short, fast swings: it reaches its 150 cm limit and jolts (27 times body weight) | It undoes the comfort fix in real play | Progressive spring or length-scaled stiffness; add a `gr.Test swing` case |
-| F7 | Rope pull (newtons) left out the reel motor's pull | Haptics would feel too weak while reeling | **Fixed in code 9 Nov:** reel and spring pull are added up per step (compiles next session) |
+| F6 | ~~The soft rope is too soft for short, fast swings~~ | It undid the comfort fix in real play | **Fixed 9 Nov (T-13):** progressive spring; the catch case stays 32 cm inside the limit |
+| F7 | ~~Rope pull (newtons) left out the reel motor's pull~~ | Haptics would feel too weak while reeling | **Fixed 9 Nov:** reel and spring pull are added up per step |
 | F8 | Plants cost about 0.3 ms per frame and push most editor frames over 11.1 ms | VR frame-rate budget | Instancing, cull distances and LODs; re-measure in a packaged build |
 
 ## Planned: motion-sickness study (when the headset is back)

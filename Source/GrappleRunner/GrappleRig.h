@@ -119,13 +119,27 @@ public:
 	// spread over roughly 1/8 of a second.)
 	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeStiffness = 64.f;
 	// Stops the rope bouncing like a bungee. 0 = bouncy forever, 1 = no bounce at all.
-	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeDampingRatio = 0.5f;
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeDampingRatio = 0.6f;
+	// Progressive spring (fix for F6): the rope gets stiffer the more it stretches, so a hard
+	// catch on a short rope never reaches the safety limit. At this many cm of stretch it is
+	// twice as stiff; at double this, five times. 0 = off (plain spring).
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeProgressiveStretch = 100.f;
 	// Safety limit: the rope can never stretch more than this (cm), however hard you fall.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float MaxRopeStretch = 150.f;
 	// While reeling in with the soft rope, the reel "stalls" (waits for you to catch up) once
 	// the rope is stretched this much (cm). Without this the reel winds faster than you move,
 	// the rope stretches like a catapult and flings you (found in the offline model, Tools/rope_model.py).
 	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float ReelStallStretch = 20.f;
+
+	// ---- Swing feel ----
+	// Exaggerates the swing slightly, like a superhero game: while a rope is tight, gravity
+	// pulls a bit harder ALONG the swing (never along the rope), so you swing faster and
+	// further. 1.0 = real physics; 1.35 = about 16% more speed at the bottom of each arc.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Swing Feel") float SwingExaggeration = 1.35f;
+	// Wind: a rushing-air sound that gets louder and higher the faster you go.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Swing Feel") float WindStartSpeed = 300.f;  // cm/s: wind starts at 11 km/h...
+	UPROPERTY(EditAnywhere, Category = "Grapple|Swing Feel") float WindFullSpeed = 3500.f;  // ...and is loudest at 126 km/h
+	UPROPERTY(EditAnywhere, Category = "Grapple|Swing Feel") float WindMaxVolume = 0.9f;    // 1.0 = full volume
 
 	// ---- Physics ----
 	UPROPERTY(EditAnywhere, Category = "Grapple|Physics") float Gravity = 980.f;          // real Earth gravity is 980 cm/s^2
@@ -176,6 +190,9 @@ public:
 	// so the result can be compared exactly with the offline model (Tools/rope_model.py).
 	// Start it from the in-game console (press ` while playing):  gr.Test snap stiff
 	//   Name: "snap" = hook fired while falling away at 17 m/s; "reel" = hang, then reel in;
+	//         "catch" = slack 13.3 m rope caught at 22 m/s (the F6 case from test T-11);
+	//         "swing" = let go from level with the anchor on a 15 m rope (a pendulum);
+	//         "swingreal" = the same pendulum with SwingExaggeration switched off (real physics);
 	//         "perf" = stand at the start looking down the route for 10 s and time every frame.
 	//   SoftRope: 0 = stiff rope, 1 = soft rope, -1 = keep the current setting.
 	void StartTest(const FString& Name, int32 SoftRope);
@@ -199,7 +216,9 @@ private:
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> HeadL;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> HeadR;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> RopeMaterial;   // the orange colour
-	UPROPERTY() TObjectPtr<UStaticMesh> CylinderAsset;              // the cylinder shape each rope link is drawn with
+	UPROPERTY() TObjectPtr<UStaticMesh> CylinderAsset;
+	UPROPERTY() TObjectPtr<class UAudioComponent> WindAudio;      // plays the wind sound (see UpdateWind)
+	float WindLevel = 0.f;                                          // 0..1, smoothed, how windy it is right now              // the cylinder shape each rope link is drawn with
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> RopeLinkMeshes; // left rope's links, then right rope's links
 
 	// The flexible rope: the corners of each link, now and one frame ago (see SimulateRopeShape).
@@ -250,6 +269,7 @@ private:
 	float TestTimeLeft = 0.f;                      // seconds until the test ends
 	bool bTestReel = false;                        // does this test hold the reel button?
 	bool bSoftRopeBeforeTest = true;               // so the rope setting can be put back afterwards
+	float SwingExaggerationBeforeTest = 1.f;       // likewise for the swing exaggeration
 	float TestPeakFeltG = 0.f;                     // biggest jolt during the test, in g
 	float TestMaxStretch = 0.f;                    // most the rope stretched during the test, in cm
 	TArray<float> TestFrameTimes;                  // perf test: how long each frame took (seconds)
@@ -269,6 +289,7 @@ private:
 	void Pulse(int32 Index, float Amplitude);         // vibrate a VR controller
 	void SimulateRopeShape(int32 Index, float DeltaSeconds); // move the rope's links (sag, swing, whip)
 	void FeelRopeTension();                           // vibrate each controller by how hard its rope pulls
+	void UpdateWind(float DeltaSeconds);              // wind sound louder / higher the faster you move
 	void RecordTelemetry(float DeltaSeconds);         // add this frame as one row of the test spreadsheet
 	void SaveTelemetry();                             // write the spreadsheet to Saved/Tests/
 

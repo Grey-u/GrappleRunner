@@ -24,8 +24,11 @@ MAX_SPEED = 4500.0      # speed limit (MaxSpeed), same as the game
 
 
 def simulate(start_pos, start_vel, rope, soft, reel=0.0, k=64.0, zeta=0.5,
-             max_stretch=150.0, stall=20.0, seconds=3.0, history=False):
+             max_stretch=150.0, stall=20.0, seconds=3.0, history=False, prog=0.0, swing=1.0):
     """Run the rope physics for a few seconds. The anchor is at (0, 0, 0).
+    prog  = progressive spring: the rope gets stiffer as it stretches; at 'prog' cm of
+            stretch it is twice as stiff, at 2x 'prog' five times (0 = off).
+    swing = swing exaggeration: extra gravity along the swing direction only (1 = real).
     Returns: peak felt acceleration (g), largest stretch (cm), speed at the end (cm/s).
     With history=True it also returns the felt acceleration and stretch for every step."""
     p = np.array(start_pos, float)
@@ -40,6 +43,11 @@ def simulate(start_pos, start_vel, rope, soft, reel=0.0, k=64.0, zeta=0.5,
         # STEP 1: gravity and drag
         v[2] -= G * STEP
         v -= v * DRAG * STEP
+        # swing exaggeration: extra gravity, but only the part along the swing (not along the rope)
+        if swing != 1.0 and dist >= length - 5.0:
+            n = p / dist
+            extra = np.array([0.0, 0.0, -G * (swing - 1.0)])
+            v += (extra - n * np.dot(extra, n)) * STEP
         # Reeling in (with the soft rope the reel stalls once the rope is stretched 'stall' cm)
         if reel:
             length = max(250.0, length - reel * STEP)
@@ -49,7 +57,9 @@ def simulate(start_pos, start_vel, rope, soft, reel=0.0, k=64.0, zeta=0.5,
         # STEP 2b: soft rope pulls back like a spring + damper (pull only, never push)
         if soft and dist > length:
             n = p / dist
-            pull = k * (dist - length) + damping * np.dot(v, n)
+            s_ = dist - length
+            stiff = k * (1.0 + (s_ / prog) ** 2) if prog > 0 else k   # progressive: stiffer the more it stretches
+            pull = stiff * s_ + damping * np.dot(v, n)
             if pull > 0:
                 v -= n * pull * STEP
         # STEP 2 + 3: obey the speed limit, move, then the hard limit

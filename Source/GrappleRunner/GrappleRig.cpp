@@ -37,6 +37,8 @@
 
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
+#include "Components/AudioComponent.h"         // plays a sound (the wind)
+#include "Sound/SoundBase.h"
 #include "Components/StaticMeshComponent.h"    // visible 3D shapes
 #include "DrawDebugHelpers.h"                  // quick on-screen dots for aiming
 #include "Engine/Engine.h"                     // GEngine: global engine access (on-screen text, VR check)
@@ -207,6 +209,18 @@ void AGrappleRig::BeginPlay()
 			C->SetMaterial(0, RopeMaterial);
 		}
 	}
+	// ---- 7. Wind sound (made by Tools/make_wind_sound.py, imported by Scripts/import_sfx.py) ----
+	if (USoundBase* Wind = LoadObject<USoundBase>(nullptr, TEXT("/Game/GrappleRunner/SFX/SFX_Wind.SFX_Wind")))
+	{
+		WindAudio = NewObject<UAudioComponent>(this);
+		WindAudio->SetSound(Wind);
+		WindAudio->bAllowSpatialization = false;   // heard "in your ears", not from a point in the world
+		WindAudio->SetupAttachment(RootComponent);
+		WindAudio->RegisterComponent();
+		WindAudio->SetVolumeMultiplier(0.001f);    // silent until you move
+		WindAudio->Play();
+	}
+
 	Gas = GasMax;   // start with a full tank
 
 	// Write a note in the Output Log so we can check the rig found everything.
@@ -648,6 +662,7 @@ void AGrappleRig::Tick(float DeltaSeconds)
 
 	UpdateVisuals();
 	FeelRopeTension();                   // VR: vibrate the controllers by how hard each rope pulls
+	UpdateWind(DeltaSeconds);            // wind sound follows your speed
 	if (TestName.StartsWith(TEXT("perf")))
 	{
 		TestFrameTimes.Add(DeltaSeconds);    // perf test: remember how long this frame took
@@ -684,6 +699,26 @@ void AGrappleRig::Simulate(float Dt)
 		Velocity.Z -= Gravity * Dt;                  // STEP 1a: gravity pulls you down
 		Velocity -= Velocity * AirDragPerSecond * Dt; // STEP 1b: air drag slows you slightly
 		Velocity += MoveInput * 300.f * Dt;          // a little steering with WASD (desktop)
+
+		// SWING EXAGGERATION: while a rope is tight, add a little extra gravity, but only the
+		// part that points ALONG the swing (sideways to the rope). Pulling along the rope would
+		// just stretch it; pulling along the swing makes each arc faster and bigger.
+		if (SwingExaggeration != 1.f)
+		{
+			for (int32 i = 0; i < 2; ++i)
+			{
+				const FGrappleHook& H = Hooks[i];
+				const FVector D = C - H.Anchor;
+				const float Dist = D.Size();
+				if (H.bAttached && Dist >= H.Length - 5.f && Dist > KINDA_SMALL_NUMBER)   // rope tight
+				{
+					const FVector N = D / Dist;                                                  // along the rope
+					const FVector Extra(0.f, 0.f, -Gravity * (SwingExaggeration - 1.f));         // the extra gravity
+					Velocity += (Extra - N * FVector::DotProduct(Extra, N)) * Dt;               // keep only the sideways part
+					break;                                                                       // once, even with two hooks
+				}
+			}
+		}
 	}
 
 	// Gas boost: push in the direction the camera is looking, while there's gas left.
@@ -735,7 +770,11 @@ void AGrappleRig::Simulate(float Dt)
 			{
 				const FVector N = D / Dist;                                         // direction away from the anchor
 				const float Outward = FVector::DotProduct(Velocity, N);            // speed away from the anchor
-				const float Pull = RopeStiffness * Stretch + Damping * Outward;    // spring + damper
+				// Progressive spring: stiffness grows with the square of the stretch (F6 fix).
+				const float Stiff = RopeProgressiveStretch > 0.f
+					? RopeStiffness * (1.f + FMath::Square(Stretch / RopeProgressiveStretch))
+					: RopeStiffness;
+				const float Pull = Stiff * Stretch + Damping * Outward;            // spring + damper
 				if (Pull > 0.f)                                                     // a rope can pull, never push
 				{
 					Velocity -= N * Pull * Dt;
@@ -962,8 +1001,8 @@ void AGrappleRig::RecordTelemetry(float DeltaSeconds)
 		Telemetry += FString::Printf(TEXT("# Grapple Runner telemetry, recorded %s\n"), *FDateTime::Now().ToString());
 		Telemetry += FString::Printf(TEXT("# Gravity=%.1f cm/s2, AirDragPerSecond=%.3f, MaxSpeed=%.0f cm/s, ReelSpeed=%.0f cm/s, ReelPullAccel=%.0f, BoostAccel=%.0f, MaxFireRange=%.0f cm, MinRopeLength=%.0f cm, Body radius %.0f / half-height %.0f cm, VR=%d\n"),
 			Gravity, AirDragPerSecond, MaxSpeed, ReelSpeed, ReelPullAccel, BoostAccel, MaxFireRange, MinRopeLength, BodyRadius, BodyHalfHeight, bVR ? 1 : 0);
-		Telemetry += FString::Printf(TEXT("# SoftRope=%d, RopeStiffness=%.1f, RopeDampingRatio=%.2f, MaxRopeStretch=%.0f cm, ReelStallStretch=%.0f cm\n"),
-			bSoftRope ? 1 : 0, RopeStiffness, RopeDampingRatio, MaxRopeStretch, ReelStallStretch);
+		Telemetry += FString::Printf(TEXT("# SoftRope=%d, RopeStiffness=%.1f, RopeDampingRatio=%.2f, MaxRopeStretch=%.0f cm, ReelStallStretch=%.0f cm, RopeProgressiveStretch=%.0f cm, SwingExaggeration=%.2f, AutoPull=%d\n"),
+			bSoftRope ? 1 : 0, RopeStiffness, RopeDampingRatio, MaxRopeStretch, ReelStallStretch, RopeProgressiveStretch, SwingExaggeration, bAutoPull ? 1 : 0);
 		Telemetry += TEXT("time_s,frame_ms,x_cm,y_cm,z_cm,vx,vy,vz,speed_cms,grounded,hookL,ropeL_len,ropeL_dist,hookR,ropeR_len,ropeR_dist,reel,boost,gas,last_hit,hit_started_inside,test,tensionL_N,tensionR_N\n");
 	}
 	TelemetryClock += DeltaSeconds;
@@ -1125,6 +1164,24 @@ void AGrappleRig::FeelRopeTension()
 }
 
 // =====================================================================================
+//  UpdateWind: the faster you move, the louder and higher-pitched the rushing air.
+//  "Level" goes from 0 (below WindStartSpeed) to 1 (at WindFullSpeed) and is smoothed so
+//  the sound swells and fades rather than jumping. Hearing speed helps your brain make
+//  sense of the motion you see, which is also good for comfort.
+// =====================================================================================
+void AGrappleRig::UpdateWind(float DeltaSeconds)
+{
+	if (!WindAudio)
+	{
+		return;   // no wind sound imported yet
+	}
+	const float Target = FMath::Clamp((Velocity.Size() - WindStartSpeed) / FMath::Max(1.f, WindFullSpeed - WindStartSpeed), 0.f, 1.f);
+	WindLevel = FMath::FInterpTo(WindLevel, Target, DeltaSeconds, 3.f);   // ease toward the target
+	WindAudio->SetVolumeMultiplier(FMath::Max(0.001f, WindMaxVolume * FMath::Pow(WindLevel, 1.5f)));
+	WindAudio->SetPitchMultiplier(0.8f + 0.6f * WindLevel);              // 0.8 when slow, 1.4 when fast
+}
+
+// =====================================================================================
 //  SCRIPTED TESTS
 //  Playing by hand is never exactly the same twice. These tests set up an exact
 //  situation (same position, speed and rope every time), high in the empty sky so
@@ -1138,6 +1195,11 @@ void AGrappleRig::StartTest(const FString& Name, int32 SoftRope)
 		return;   // not playing yet
 	}
 	bSoftRopeBeforeTest = bSoftRope;
+	SwingExaggerationBeforeTest = SwingExaggeration;
+	if (Name == TEXT("swingreal"))
+	{
+		SwingExaggeration = 1.f;   // real physics for this test only
+	}
 	if (SoftRope >= 0)
 	{
 		bSoftRope = (SoftRope == 1);   // the test chooses stiff or soft rope
@@ -1163,7 +1225,24 @@ void AGrappleRig::StartTest(const FString& Name, int32 SoftRope)
 	// The anchor floats 300 m up, straight above wherever the player is: open sky.
 	const FVector Anchor(BodyPos.X, BodyPos.Y, 30000.f);
 	FVector Center;
-	if (Name == TEXT("reel"))
+	if (Name == TEXT("catch"))
+	{
+		// The F6 case from test T-11: a 13.3 m rope, slack, caught while flying outward at 22 m/s.
+		Center = Anchor + FVector(0.f, 0.f, -1300.f);
+		Velocity = FVector(500.f, 0.f, -2200.f);
+		Hooks[0].Length = 1330.f;
+		bTestReel = false;
+	}
+	else if (Name == TEXT("swing") || Name == TEXT("swingreal"))
+	{
+		// A pendulum: let go from level with the anchor, on a 15 m rope, starting still.
+		// Real physics predicts a bottom speed of sqrt(2 x g x L) = 17.1 m/s (more with exaggeration).
+		Center = Anchor + FVector(1500.f, 0.f, 0.f);
+		Velocity = FVector::ZeroVector;
+		Hooks[0].Length = 1500.f;
+		bTestReel = false;
+	}
+	else if (Name == TEXT("reel"))
 	{
 		Center = Anchor + FVector(0.f, 0.f, -3730.f);   // hanging still on a 37.3 m rope
 		Velocity = FVector::ZeroVector;
@@ -1226,6 +1305,7 @@ void AGrappleRig::EndTest()
 	TestTimeLeft = 0.f;
 	bTestReel = false;
 	bSoftRope = bSoftRopeBeforeTest;   // put the rope setting back how it was
+	SwingExaggeration = SwingExaggerationBeforeTest;
 	Hooks[0].bWasDown = Hooks[1].bWasDown = false;
 	Respawn();                         // back to the first island
 }

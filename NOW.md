@@ -1,4 +1,4 @@
-# NOW (updated 9 Nov 2026, evening)
+# NOW (updated 9 Nov 2026, late)
 
 ## Works
 - UE 5.8.4 project (VR / OpenXR template) with Brushify Floating Islands.
@@ -19,8 +19,12 @@
   - `Tools/analyse_telemetry.py` and `Tools/rope_model.py`
   - T-01 to T-12 written up in `Docs/TESTS.md`.
 
+- Swing exaggeration (x1.35, +17% speed) and a speed-driven wind sound. The progressive soft rope fixed F6.
+- Packs in the project: Paragon Kwang, Infinity Blade Grass Lands, Infinity Blade Adversaries, Realistic Starter VFX Pack Vol 2, Paragon Grux.
+
 ## Half done
-- F7: the rope pull now adds the reel's pull plus the spring's per step. That code is on the PC but **not compiled yet**. It compiles on the next open: if Unreal asks to rebuild, say Yes.
+- Downloading: European Beech, Paragon Agora & Monolith (queued in the launcher; check they finished).
+- New packs aren't placed in the level yet. Older UE4 packs may need a fix-up pass on first open.
 
 ## Decided
 - First person is the main view. Optional third person comes later with no advantage: see "Camera rule" in CLAUDE.md.
@@ -30,10 +34,12 @@
 - The harness (grapple gear) goes on the avatar's hips, not floating on the display rack.
 
 ## Next
-1. Confirm the owned character (the Fab library shows "Paragon: Minions"). Add it to the project with Naomi's OK.
+1. Wind: listen in game and tune volume / pitch.
 2. First-person body: show your own legs and hands, and put the grapple gear on the hips. Redesign the harness from real ODM-gear cosplay and climbing-harness references.
-3. F6: stop the soft rope reaching its limit in fast short-rope swings (progressive spring), plus a `gr.Test swing` case.
-4. F8: cheaper plants (instancing, LODs). Then water and jungle dressing.
+3. Level: place Grass Lands ruins and Agora/Monolith structures on the islands for cover and retreats; trees; water.
+4. PvE: one Adversaries monster that chases you and can be killed, then blood (VFX pack), then slicing.
+5. F8: cheaper plants (instancing, LODs).
+- Modes (design): 1v1, 2v2, 3v3, PvE. Realistic gore means an 18+ age rating.
 
 ## Tried and dropped
 - Physical Sky Atmosphere: it renders black below the horizon in this forward-shaded VR setup, so we use Brushify's sky dome instead.

@@ -253,7 +253,7 @@ if "test" in d_all.columns:
         kind, rope = name.split("_")
         # Each test starts from a known speed (set by StartTest in GrappleRig.cpp). Put it in
         # front of the first recorded step, so the jolt in the very first step is measured too.
-        v0 = (300.0, 0.0, -1700.0) if kind == "snap" else (0.0, 0.0, 0.0)
+        v0 = {"snap": (300.0, 0.0, -1700.0), "catch": (500.0, 0.0, -2200.0)}.get(kind, (0.0, 0.0, 0.0))
         vx = np.r_[v0[0], seg.vx.values]
         vy = np.r_[v0[1], seg.vy.values]
         vz = np.r_[v0[2], seg.vz.values]
@@ -264,8 +264,21 @@ if "test" in d_all.columns:
         stretch = (seg.ropeL_dist - seg.ropeL_len).clip(lower=0).values
         soft = rope == "soft"
         kw = dict(soft=soft, k=S.get("RopeStiffness", 64), zeta=S.get("RopeDampingRatio", 0.5),
-                  max_stretch=S.get("MaxRopeStretch", 150), stall=S.get("ReelStallStretch", 20), history=True)
-        if kind == "reel":
+                  max_stretch=S.get("MaxRopeStretch", 150), stall=S.get("ReelStallStretch", 20), history=True,
+                  prog=S.get("RopeProgressiveStretch", 0.0), swing=S.get("SwingExaggeration", 1.0))
+        if kind == "catch":
+            m = simulate([0, 0, -1300], [500, 0, -2200], 1330, **kw)
+        elif kind in ("swing", "swingreal"):
+            if kind == "swingreal":
+                kw["swing"] = 1.0                    # this test switches the exaggeration off
+            m = simulate([1500, 0, 0], [0, 0, 0], 1500, **kw)
+            bottom = seg.speed_cms.max()
+            g = S.get("Gravity", 980)
+            print("\nSWING %s: fastest %.0f cm/s (%.1f m/s); real-physics prediction without drag "
+                  "sqrt(2gL) = %.0f cm/s, with exaggeration x%.2f: %.0f cm/s"
+                  % (name, bottom, bottom / 100, np.sqrt(2 * g * 1500), kw["swing"],
+                     np.sqrt(2 * kw["swing"] * g * 1500)))
+        elif kind == "reel":
             m = simulate([0, 0, -3730], [0, 0, 0], 3730, reel=S.get("ReelSpeed", 900), **kw)
         else:
             m = simulate([1200, 0, -3330], [300, 0, -1700], 3530, **kw)

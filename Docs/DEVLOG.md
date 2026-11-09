@@ -72,3 +72,20 @@ One entry per work session: what was built, what broke, and what was learned. Ne
   - While Naomi was typing, the Claude window took keyboard focus. A "select all + backspace" meant for Unreal's command box went to the level instead, and deleted 988 actors in the editor.
   - Nothing had been saved, so Edit, then Undo, restored everything. A check afterwards confirmed the level was intact.
   - New rule for editor automation: never send select-all or delete keys; paste commands from the clipboard instead.
+
+## 9 Nov 2026 (evening): Bigger swings, wind, and new content packs
+- **Swing exaggeration.** While the rope is tight, extra gravity acts only along the swing, so arcs are 17% faster at the bottom, exactly as theory predicts (T-14).
+- **Wind.**
+  - Made a 16-second seamless wind loop from scratch in Python (`Tools/make_wind_sound.py`: filtered noise plus gusts that loop cleanly). No recording, no licence.
+  - In game it gets louder and higher-pitched with speed (`UpdateWind`).
+- **F6 fixed.**
+  - The soft rope now stiffens the more it stretches.
+  - A grid search in the model picked the settings, and a new `gr.Test catch` case reproduced the T-11 hard case. It now stays 32 cm inside the stretch limit, at 22.8 g against 272.7 g for the stiff rope (T-13).
+- **Content from Naomi's Fab library**, all free and already owned:
+  - Paragon: Kwang (the base avatar)
+  - Infinity Blade: Grass Lands (ruins)
+  - Infinity Blade: Adversaries and Paragon: Grux (monsters)
+  - Realistic Starter VFX Pack (blood and impacts)
+  - European Beech (trees) and Paragon: Agora & Monolith (ancient structures), queued.
+  - Older Unreal 4 packs were added using the closest engine version offered (5.4 or 5.6). MAE Oak Forest wouldn't add to a 5.8 project, so it was skipped.
+- **Design notes from Naomi.** Game modes: 1v1, 2v2, 3v3 and PvE against monsters, with realistic gore.

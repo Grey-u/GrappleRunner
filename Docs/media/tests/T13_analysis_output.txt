@@ -1,0 +1,23 @@
+Recording: T13_scripted_tests.csv | 4645 frames, 62.3 s | rope: soft (k=64, damping 0.6)
+
+FRAME TIME  median 8.38 ms (119.3 fps), 95th pct 11.29 ms, 99th pct 12.02 ms, frames over 11.1 ms (90 Hz budget): 5.9%
+  chart: T08_frame_time_histogram_T13.png
+
+TEST catch_stiff game: peak felt  272.7 g, max stretch     0 cm | model:  271.6 g,     0 cm | 360 steps, largest step-by-step difference 1.088 g
+
+TEST catch_soft  game: peak felt   22.8 g, max stretch   118 cm | model:   22.7 g,   118 cm | 360 steps, largest step-by-step difference 0.174 g
+
+TEST snap_soft   game: peak felt   17.5 g, max stretch    97 cm | model:   17.5 g,    97 cm | 360 steps, largest step-by-step difference 0.132 g
+
+SWING swingreal_stiff: fastest 1600 cm/s (16.0 m/s); real-physics prediction without drag sqrt(2gL) = 1715 cm/s, with exaggeration x1.00: 1715 cm/s
+
+TEST swingreal_stiff game: peak felt    2.8 g, max stretch     0 cm | model:    2.7 g,     0 cm | 360 steps, largest step-by-step difference 0.023 g
+
+SWING swing_stiff: fastest 1874 cm/s (18.7 m/s); real-physics prediction without drag sqrt(2gL) = 1715 cm/s, with exaggeration x1.35: 1992 cm/s
+
+TEST swing_stiff game: peak felt    3.4 g, max stretch     0 cm | model:    3.4 g,     0 cm | 360 steps, largest step-by-step difference 0.029 g
+
+SWING swing_soft: fastest 1873 cm/s (18.7 m/s); real-physics prediction without drag sqrt(2gL) = 1715 cm/s, with exaggeration x1.35: 1992 cm/s
+
+TEST swing_soft  game: peak felt    3.4 g, max stretch    42 cm | model:    3.4 g,    41 cm | 360 steps, largest step-by-step difference 0.027 g
+  chart: T09_snap_stiff_vs_soft_T13.png
