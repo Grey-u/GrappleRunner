@@ -1,4 +1,4 @@
-# NOW (updated 9 Nov 2026, late)
+# NOW (updated 9 Nov 2026, night)
 
 ## Works
 - UE 5.8.4 project (VR / OpenXR template) with Brushify Floating Islands.
@@ -23,6 +23,7 @@
 - Packs in the project: Paragon Kwang, Infinity Blade Grass Lands, Infinity Blade Adversaries, Realistic Starter VFX Pack Vol 2, Paragon Grux.
 
 ## Half done
+- Visible body and hip harness (Kwang, idle/run/air animations, harness on `pelvis`): written and reviewed, **not yet compiled or played**. On branch `body-and-harness`. Next: rebuild in Unreal, check from the first-person view, tune `HarnessOffset`/`HarnessRotation`/`BodyScale`, then merge to `main`.
 - Downloading: European Beech, Paragon Agora & Monolith (queued in the launcher; check they finished).
 - New packs aren't placed in the level yet. Older UE4 packs may need a fix-up pass on first open.
 
@@ -35,7 +36,7 @@
 
 ## Next
 1. Wind: listen in game and tune volume / pitch.
-2. First-person body: show your own legs and hands, and put the grapple gear on the hips. Redesign the harness from real ODM-gear cosplay and climbing-harness references.
+2. First-person body: compile and check it (see Half done). Hands still need IK later. Redesign the harness from real ODM-gear cosplay and climbing-harness references.
 3. Level: place Grass Lands ruins and Agora/Monolith structures on the islands for cover and retreats; trees; water.
 4. PvE: one Adversaries monster that chases you and can be killed, then blood (VFX pack), then slicing.
 5. F8: cheaper plants (instancing, LODs).

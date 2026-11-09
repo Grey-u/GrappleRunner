@@ -89,3 +89,10 @@ One entry per work session: what was built, what broke, and what was learned. Ne
   - European Beech (trees) and Paragon: Agora & Monolith (ancient structures), queued.
   - Older Unreal 4 packs were added using the closest engine version offered (5.4 or 5.6). MAE Oak Forest wouldn't add to a 5.8 project, so it was skipped.
 - **Design notes from Naomi.** Game modes: 1v1, 2v2, 3v3 and PvE against monsters, with realistic gore.
+
+## 9 Nov 2026 (night): Visible body and hip harness (not yet compiled)
+- **What was added.** Kwang (Paragon) now stands under your eyes in first person. His head is hidden so the camera is never inside it. He switches between idle, run and in-air animations by speed and whether he's on the ground.
+- **Harness.** The grapple gear (`SM_GrappleGear`) is strapped to the hip bone (`pelvis`), and the ropes leave from its left and right launchers (`RopeStart`).
+- **Fix made while reviewing the code.** Parts made while the game runs were attached with `SetupAttachment`, which only works for parts built in the constructor. The body and harness now use `AttachToComponent`, and the harness is bound to the hip bone. Both are listed under the actor (`AddInstanceComponent`) so they show in the Outliner.
+- **Status.** Code written and reviewed, but not compiled or played yet. Next: rebuild in Unreal, check legs, hands and harness position from the first-person view, then tune `HarnessOffset`, `HarnessRotation` and `BodyScale`.
+- **Why it's on a branch.** The code is on the `body-and-harness` branch until it compiles, so `main` stays a version that works.

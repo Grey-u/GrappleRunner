@@ -38,6 +38,9 @@
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
 #include "Components/AudioComponent.h"         // plays a sound (the wind)
+#include "Components/SkeletalMeshComponent.h"  // a character body with bones and animation
+#include "Animation/AnimSequence.h"
+#include "Engine/SkeletalMesh.h"
 #include "Sound/SoundBase.h"
 #include "Components/StaticMeshComponent.h"    // visible 3D shapes
 #include "DrawDebugHelpers.h"                  // quick on-screen dots for aiming
@@ -209,7 +212,10 @@ void AGrappleRig::BeginPlay()
 			C->SetMaterial(0, RopeMaterial);
 		}
 	}
-	// ---- 7. Wind sound (made by Tools/make_wind_sound.py, imported by Scripts/import_sfx.py) ----
+	// ---- 7. Visible body and hip harness ----
+	SetUpBody();
+
+	// ---- 8. Wind sound (made by Tools/make_wind_sound.py, imported by Scripts/import_sfx.py) ----
 	if (USoundBase* Wind = LoadObject<USoundBase>(nullptr, TEXT("/Game/GrappleRunner/SFX/SFX_Wind.SFX_Wind")))
 	{
 		WindAudio = NewObject<UAudioComponent>(this);
@@ -660,6 +666,7 @@ void AGrappleRig::Tick(float DeltaSeconds)
 	Pawn->SetActorLocation(BodyPos, false, nullptr, ETeleportType::TeleportPhysics);
 	LastSetLocation = Pawn->GetActorLocation();
 
+	UpdateBody();                        // body follows your eyes, plays idle / run / air
 	UpdateVisuals();
 	FeelRopeTension();                   // VR: vibrate the controllers by how hard each rope pulls
 	UpdateWind(DeltaSeconds);            // wind sound follows your speed
@@ -1072,7 +1079,7 @@ void AGrappleRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
 // =====================================================================================
 void AGrappleRig::SimulateRopeShape(int32 Index, float DeltaSeconds)
 {
-	const FVector S = HandPosition(Index);      // rope start: your hand
+	const FVector S = RopeStart(Index);         // rope start: the hip launcher (or your hand)
 	const FVector E = Hooks[Index].Anchor;      // rope end: where the hook bit
 	const int32 N = RopeLinks;                  // number of links (points = links + 1)
 	TArray<FVector>& P = RopePoints[Index];
@@ -1179,6 +1186,102 @@ void AGrappleRig::UpdateWind(float DeltaSeconds)
 	WindLevel = FMath::FInterpTo(WindLevel, Target, DeltaSeconds, 3.f);   // ease toward the target
 	WindAudio->SetVolumeMultiplier(FMath::Max(0.001f, WindMaxVolume * FMath::Pow(WindLevel, 1.5f)));
 	WindAudio->SetPitchMultiplier(0.8f + 0.6f * WindLevel);              // 0.8 when slow, 1.4 when fast
+}
+
+// =====================================================================================
+//  THE VISIBLE BODY
+//  SetUpBody makes a character (Kwang for now) and straps the grapple harness to its hip
+//  bone. UpdateBody runs every frame: it stands the body on your feet position, turned the
+//  way your head faces, a little BEHIND your eyes, and hides the head bone so the camera
+//  is never inside it. It also picks an animation: idle, running, or the in-air pose.
+//  (VR arm tracking - hands following the controllers - comes later with IK.)
+// =====================================================================================
+void AGrappleRig::SetUpBody()
+{
+	if (!bShowBody)
+	{
+		return;
+	}
+	USkeletalMesh* Mesh = BodyMeshAsset.LoadSynchronous();
+	if (!Mesh)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("GrappleRig: body mesh not found (%s)"), *BodyMeshAsset.ToString());
+		return;
+	}
+	Body = NewObject<USkeletalMeshComponent>(this);
+	Body->SetSkeletalMeshAsset(Mesh);
+	Body->SetUsingAbsoluteScale(true);
+	Body->SetWorldScale3D(FVector(BodyScale));                    // resize so the shoulders sit below your eyes
+	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // the body never blocks anything (physics uses the capsule)
+	Body->SetUsingAbsoluteLocation(true);
+	Body->SetUsingAbsoluteRotation(true);
+	Body->RegisterComponent();
+	// AttachToComponent (not SetupAttachment) is the call that works for parts made while the game runs.
+	Body->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepWorldTransform);
+	AddInstanceComponent(Body);                                   // lists the body under this actor, so it shows in the Outliner
+	Body->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);  // no head in your own view
+	Body->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+
+	if (UStaticMesh* Gear = HarnessAsset.LoadSynchronous())
+	{
+		Harness = NewObject<UStaticMeshComponent>(this);
+		Harness->SetStaticMesh(Gear);
+		Harness->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Harness->RegisterComponent();
+		// Strap the harness to the hip bone (HarnessBone): it moves with the hips, like real gear.
+		Harness->AttachToComponent(Body, FAttachmentTransformRules::KeepRelativeTransform, HarnessBone);
+		Harness->SetRelativeLocationAndRotation(HarnessOffset, HarnessRotation);
+		Harness->SetRelativeScale3D(FVector(HarnessScale));
+		AddInstanceComponent(Harness);
+	}
+}
+
+void AGrappleRig::UpdateBody()
+{
+	if (!Body)
+	{
+		return;
+	}
+	// Which way is the head facing (left / right only)?
+	const FRotator View = Camera.IsValid() ? Camera->GetComponentRotation() : FRotator(0.f, DesktopYaw, 0.f);
+	const FRotator Facing(0.f, View.Yaw, 0.f);
+	const FVector Eyes = Camera.IsValid() ? Camera->GetComponentLocation() : BodyCenter();
+	// Feet under the eyes, nudged back so the camera sits just in front of the (hidden) face.
+	const FVector Feet(Eyes.X, Eyes.Y, BodyPos.Z);
+	Body->SetWorldLocationAndRotation(Feet - Facing.Vector() * BodyBehindEyes,
+		FRotator(0.f, View.Yaw - 90.f, 0.f));                        // Paragon meshes face +Y, so turn by -90
+
+	// Pick the animation: in the air, running, or standing.
+	UAnimSequence* Want = nullptr;
+	if (!bGrounded)
+	{
+		Want = AirAnim.LoadSynchronous();
+	}
+	else if (FVector(Velocity.X, Velocity.Y, 0.f).Size() > 60.f)
+	{
+		Want = RunAnim.LoadSynchronous();
+	}
+	else
+	{
+		Want = IdleAnim.LoadSynchronous();
+	}
+	if (Want && Want != BodyAnimPlaying)
+	{
+		Body->PlayAnimation(Want, true);   // true = loop
+		BodyAnimPlaying = Want;
+	}
+}
+
+// Ropes leave from the harness's left / right launchers (like Attack on Titan gear);
+// with no harness they come from your hands.
+FVector AGrappleRig::RopeStart(int32 Index) const
+{
+	if (Harness && Body)
+	{
+		const FVector Side = FRotationMatrix(Body->GetComponentRotation()).GetUnitAxis(EAxis::X);  // the body's left-right axis
+		return Harness->GetComponentLocation() + Side * (Index == 0 ? LauncherSpacing : -LauncherSpacing);
+	}
+	return HandPosition(Index);
 }
 
 // =====================================================================================

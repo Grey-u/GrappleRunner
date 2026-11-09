@@ -55,6 +55,9 @@
 
 // "Forward declarations": we promise these types exist, without loading their full files yet.
 // It keeps compiling fast. The .cpp file includes the real files.
+class USkeletalMesh;          // a 3D character with bones (the visible body)
+class UAnimSequence;          // one animation (idle, run, in the air)
+class USkeletalMeshComponent; // the body placed in the world
 class UStaticMesh;            // a 3D shape asset (we use the engine's cylinder for rope links)
 class UStaticMeshComponent;   // a visible 3D shape (we use cylinders for ropes, spheres for hook heads)
 class UCameraComponent;       // the player's eyes
@@ -178,6 +181,30 @@ public:
 	// Your mass in kg. Used to turn the rope's pull into a real force (newtons), which sets
 	// how hard the controllers vibrate: the harder the rope pulls, the more you feel it.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float PlayerMass = 70.f;
+	// Your visible body (first person): look down and you see your legs, the harness and your
+	// arms. Starts as Paragon's Kwang; swap in your own Blender version later.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") bool bShowBody = true;
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<USkeletalMesh> BodyMeshAsset =
+		TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Meshes/Kwang_GDC.Kwang_GDC")));
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UAnimSequence> IdleAnim =
+		TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Idle.Idle")));
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UAnimSequence> RunAnim =
+		TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jog_Fwd.Jog_Fwd")));
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UAnimSequence> AirAnim =
+		TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jump_Apex.Jump_Apex")));
+	// How far the body sits BEHIND your eyes (cm), so the camera never ends up inside the head.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float BodyBehindEyes = 18.f;
+	// Size of the body (1 = as made). Kwang is very tall, so he's scaled down to match a
+	// 165 cm eye height; adjust if your shoulders show in front of the camera.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float BodyScale = 0.85f;
+	// The grapple harness (ODM-style gear) worn at the hips. The ropes leave from its launchers.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UStaticMesh> HarnessAsset =
+		TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Weapons/SM_GrappleGear.SM_GrappleGear")));
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FName HarnessBone = TEXT("pelvis");   // the hip bone it's strapped to
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FVector HarnessOffset = FVector::ZeroVector;     // nudge it (cm, in the bone's own directions)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FRotator HarnessRotation = FRotator::ZeroRotator; // turn it to sit right
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float HarnessScale = 1.f;
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherSpacing = 22.f;  // cm from the middle to each rope launcher (left / right hip)
 
 	// ---- Testing ----
 	// When ticked, every frame of play is written to a spreadsheet file (CSV) in
@@ -218,6 +245,9 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> RopeMaterial;   // the orange colour
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderAsset;
 	UPROPERTY() TObjectPtr<class UAudioComponent> WindAudio;      // plays the wind sound (see UpdateWind)
+	UPROPERTY() TObjectPtr<USkeletalMeshComponent> Body;          // your visible body (see UpdateBody)
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> Harness;         // the grapple gear on your hips
+	UPROPERTY() TObjectPtr<UAnimSequence> BodyAnimPlaying;        // which animation the body is playing now
 	float WindLevel = 0.f;                                          // 0..1, smoothed, how windy it is right now              // the cylinder shape each rope link is drawn with
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> RopeLinkMeshes; // left rope's links, then right rope's links
 
@@ -290,6 +320,9 @@ private:
 	void SimulateRopeShape(int32 Index, float DeltaSeconds); // move the rope's links (sag, swing, whip)
 	void FeelRopeTension();                           // vibrate each controller by how hard its rope pulls
 	void UpdateWind(float DeltaSeconds);              // wind sound louder / higher the faster you move
+	void SetUpBody();                                 // create the visible body and harness (once)
+	void UpdateBody();                                // keep the body under your eyes and pick its animation
+	FVector RopeStart(int32 Index) const;             // where a rope leaves the body (harness launcher, or hand)
 	void RecordTelemetry(float DeltaSeconds);         // add this frame as one row of the test spreadsheet
 	void SaveTelemetry();                             // write the spreadsheet to Saved/Tests/
 
