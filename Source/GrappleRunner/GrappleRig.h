@@ -16,18 +16,23 @@
 //  You place ONE "GrappleRig" object anywhere in the level. When the game starts it
 //  finds the player and takes over how the player moves through the air:
 //    - fire a hook from each hand (two hooks, like Attack on Titan gear)
-//    - swing on the rope like a pendulum
+//    - swing on the rope like a pendulum (the rope has a little give, so it doesn't jolt)
+//    - draw each rope as a flexible chain that sags, swings and whips
+//    - measure how hard the rope pulls on your 70 kg body (in newtons) and let you
+//      FEEL it as controller vibration (later: the EXIT SUIT)
 //    - reel the rope in to pull yourself up
 //    - use gas to boost in the direction you are looking
 //    - land on islands and walk, or respawn if you fall into the mist
 //
 //  CONTROLS
 //  --------
-//  VR:      Trigger = fire hook / keep holding to stay attached   Grip = reel that hook in
+//  VR:      Trigger = fire hook / keep holding to stay attached
+//           The hook pulls you in by itself (auto-pull); hold Grip to stop pulling and swing
 //           A / X / trackpad click = gas boost toward where you look
-//  Desktop: Left / right mouse = left / right hook     Shift = reel both hooks in
+//  Desktop: Left / right mouse = left / right hook     Shift = stop pulling (swing)
 //           Space = jump on the ground, gas boost in the air
 //           W A S D = walk     R = respawn on the first island
+//  Tests:   press ` while playing, then type  gr.Test snap stiff  (or soft / reel)
 //  (Desktop mode exists so the game can be tested without a VR headset.)
 //
 //  HOW TO TWEAK THE FEEL WITHOUT CODING
@@ -50,6 +55,7 @@
 
 // "Forward declarations": we promise these types exist, without loading their full files yet.
 // It keeps compiling fast. The .cpp file includes the real files.
+class UStaticMesh;            // a 3D shape asset (we use the engine's cylinder for rope links)
 class UStaticMeshComponent;   // a visible 3D shape (we use cylinders for ropes, spheres for hook heads)
 class UCameraComponent;       // the player's eyes
 class USceneComponent;        // anything with a position (we use it for the VR hand controllers)
@@ -94,8 +100,32 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float MinRopeLength = 250.f;     // reeling stops at 2.5 m so you don't crash into the rock
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float ReelSpeed = 900.f;         // how fast the rope shortens when reeling (9 m/s)
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float ReelPullAccel = 1400.f;    // extra tug toward the hook while reeling
+	// Auto-pull (Attack on Titan style): once a hook bites, it reels you toward it by itself.
+	// Hold grip (VR) or Shift (desktop) to STOP pulling and swing freely instead.
+	// Untick for the old way: swing by default, hold grip / Shift to reel in.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") bool bAutoPull = true;
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float DesktopHookSpread = 0.08f; // desktop only: left/right hooks aim slightly apart
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float RopeThickness = 2.5f;      // how thick the rope looks (cm)
+
+	// ---- Rope feel (comfort) ----
+	// Test T-04 showed a perfectly stiff rope stops you dead when it snaps tight: about 73% of
+	// your speed vanishes in one frame. Sudden jolts your inner ear can't feel are a big cause
+	// of VR motion sickness. A "soft" rope has a little give, like a spring-loaded reel: it
+	// stretches slightly and takes the jolt over a fraction of a second instead.
+	// Untick bSoftRope to get the old stiff rope back, so the two can be compared in tests.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") bool bSoftRope = true;
+	// How strongly the rope pulls back for each cm it is stretched. Higher = stiffer, snappier.
+	// (The square root of this is how fast the rope "springs": sqrt(64) = 8, so the jolt is
+	// spread over roughly 1/8 of a second.)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeStiffness = 64.f;
+	// Stops the rope bouncing like a bungee. 0 = bouncy forever, 1 = no bounce at all.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeDampingRatio = 0.5f;
+	// Safety limit: the rope can never stretch more than this (cm), however hard you fall.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float MaxRopeStretch = 150.f;
+	// While reeling in with the soft rope, the reel "stalls" (waits for you to catch up) once
+	// the rope is stretched this much (cm). Without this the reel winds faster than you move,
+	// the rope stretches like a catapult and flings you (found in the offline model, Tools/rope_model.py).
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float ReelStallStretch = 20.f;
 
 	// ---- Physics ----
 	UPROPERTY(EditAnywhere, Category = "Grapple|Physics") float Gravity = 980.f;          // real Earth gravity is 980 cm/s^2
@@ -124,6 +154,16 @@ public:
 
 	// ---- Look ----
 	UPROPERTY(EditAnywhere, Category = "Grapple|Look") FLinearColor RopeColor = FLinearColor(1.f, 0.25f, 0.04f); // orange
+	// The rope is drawn as a chain of this many short links, each moving with its own physics,
+	// so it sags when slack, whips when you swing, and snaps straight when pulled tight.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Look") int32 RopeLinks = 24;
+	// How quickly the rope's wobble dies away (0 = wobbles forever, 0.1 = settles fast).
+	UPROPERTY(EditAnywhere, Category = "Grapple|Look") float RopeWobbleDamping = 0.02f;
+
+	// ---- Body ----
+	// Your mass in kg. Used to turn the rope's pull into a real force (newtons), which sets
+	// how hard the controllers vibrate: the harder the rope pulls, the more you feel it.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float PlayerMass = 70.f;
 
 	// ---- Testing ----
 	// When ticked, every frame of play is written to a spreadsheet file (CSV) in
@@ -131,6 +171,14 @@ public:
 	// what the body last bumped into. These files are the measured evidence for the
 	// tests in Docs/TESTS.md (for example, "does the rope ever stretch?").
 	UPROPERTY(EditAnywhere, Category = "Grapple|Testing") bool bRecordTelemetry = true;
+
+	// Runs a scripted, repeatable physics test high in the empty sky, with no player input,
+	// so the result can be compared exactly with the offline model (Tools/rope_model.py).
+	// Start it from the in-game console (press ` while playing):  gr.Test snap stiff
+	//   Name: "snap" = hook fired while falling away at 17 m/s; "reel" = hang, then reel in;
+	//         "perf" = stand at the start looking down the route for 10 s and time every frame.
+	//   SoftRope: 0 = stiff rope, 1 = soft rope, -1 = keep the current setting.
+	void StartTest(const FString& Name, int32 SoftRope);
 
 protected:
 	// BeginPlay runs ONCE when you press Play. We use it to find grapple rocks and controller buttons.
@@ -151,6 +199,15 @@ private:
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> HeadL;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> HeadR;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> RopeMaterial;   // the orange colour
+	UPROPERTY() TObjectPtr<UStaticMesh> CylinderAsset;              // the cylinder shape each rope link is drawn with
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> RopeLinkMeshes; // left rope's links, then right rope's links
+
+	// The flexible rope: the corners of each link, now and one frame ago (see SimulateRopeShape).
+	TArray<FVector> RopePoints[2];
+	TArray<FVector> RopePointsBefore[2];
+	bool bRopeShapeReady[2] = {false, false};      // has this rope's chain been laid out since it was fired?
+	float RopeTension[2] = {0.f, 0.f};             // how hard each rope is pulling you this frame (newtons)
+	float PulseUntil[2] = {0.f, 0.f};              // game time until which a short "hook bit" buzz is playing
 
 	// "Weak" pointers = "I'm looking at this object, but if it disappears, don't crash, just tell me".
 	TWeakObjectPtr<APlayerController> PC;       // reads the player's buttons
@@ -188,6 +245,16 @@ private:
 	bool bLastHitPenetrating = false;              // did that bump START inside the object? (a sign of a collision bug)
 	FString LastReportedPenetration;               // so the "started inside" warning is logged once per object, not every frame
 
+	// Scripted test in progress (see StartTest)
+	FString TestName = TEXT("none");               // which test is running ("none" = normal play)
+	float TestTimeLeft = 0.f;                      // seconds until the test ends
+	bool bTestReel = false;                        // does this test hold the reel button?
+	bool bSoftRopeBeforeTest = true;               // so the rope setting can be put back afterwards
+	float TestPeakFeltG = 0.f;                     // biggest jolt during the test, in g
+	float TestMaxStretch = 0.f;                    // most the rope stretched during the test, in cm
+	TArray<float> TestFrameTimes;                  // perf test: how long each frame took (seconds)
+	void EndTest();                                // finish the test, report, and respawn
+
 	// ================================================================================
 	//  ABILITIES  (each one is written out step by step in GrappleRig.cpp)
 	// ================================================================================
@@ -200,6 +267,8 @@ private:
 	void ReleaseHook(int32 Index);                    // let go of a hook
 	void Respawn();                                   // put the player back on the first island
 	void Pulse(int32 Index, float Amplitude);         // vibrate a VR controller
+	void SimulateRopeShape(int32 Index, float DeltaSeconds); // move the rope's links (sag, swing, whip)
+	void FeelRopeTension();                           // vibrate each controller by how hard its rope pulls
 	void RecordTelemetry(float DeltaSeconds);         // add this frame as one row of the test spreadsheet
 	void SaveTelemetry();                             // write the spreadsheet to Saved/Tests/
 

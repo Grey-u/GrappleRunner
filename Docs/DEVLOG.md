@@ -56,3 +56,19 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - **Found a comfort problem (F1).** When a slack rope snaps tight, the player loses about 73% of their speed in one frame. A sudden deceleration like that is a known motion-sickness trigger, and it's the first thing to fix in feel tuning.
 - Full write-up with charts, screenshots and raw data: `Docs/TESTS.md` (T-01 to T-08).
 - **Design decision:** first person is the main view. An optional third person may come later, with all aiming and visibility traced from the character's eyes so it can't give an advantage.
+
+## 9 Nov 2026: Rope comfort, flexible rope, auto-pull, plants and music
+- **Soft rope (comfort).**
+  - Predicted with an offline Python model first (`Tools/rope_model.py`), then tested in Unreal with a new repeatable console test (`gr.Test`).
+  - The rope-snap jolt fell from 209 g to 14.7 g. The game and the model agreed to within 0.12 g on every one of 360 physics steps (T-09).
+  - The model also caught a problem before it reached the game: with a soft rope, reeling in would catapult you. Fixed with a "reel stall".
+- **Flexible rope.** The rope is now a 24-link chain that sags, swings and whips, in orange. Rope pull is measured in newtons from a 70 kg body and drives VR controller vibration, so you feel your weight on the rope.
+- **Auto-pull (Naomi's request).** Hooks reel you in by themselves, like Attack on Titan's gear. Hold grip or Shift to stop pulling and swing (T-12).
+- **Honest result (F6).** In a real, hand-played swing, the soft rope was too soft for a short rope and hit its safety limit (27 times body weight). The scripted test hadn't covered that case. Next: a progressive spring, then add that case to `gr.Test`.
+- **Level.**
+  - 805 plants (grass, clover, flowers, heather, bushes) scattered on the islands' tops: no collision, no shadows. Measured cost: +0.3 ms per frame (T-10).
+  - The **Aeloria** music by a friend is in the level on a loop. The tracks are kept out of the public repo unless the composer agrees.
+- **Mistake and lesson.**
+  - While Naomi was typing, the Claude window took keyboard focus. A "select all + backspace" meant for Unreal's command box went to the level instead, and deleted 988 actors in the editor.
+  - Nothing had been saved, so Edit, then Undo, restored everything. A check afterwards confirmed the level was intact.
+  - New rule for editor automation: never send select-all or delete keys; paste commands from the clipboard instead.

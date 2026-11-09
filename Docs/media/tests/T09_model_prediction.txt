@@ -1,0 +1,18 @@
+                                      peak felt (g) stretch (cm) end speed (m/s)
+A. Hook fired while falling away from it at 17 m/s
+  stiff rope (before)                         209.3            0            5.7
+  soft rope k=64, damping 0.5 (new)            14.7          121            5.7
+  soft rope k=64, damping 0.7                  20.3          100            5.8
+  soft rope k=36 (softer)                      62.3          150            5.8
+  soft rope k=144 (stiffer)                    22.4           78            5.7
+B. Hanging still, then reeling in at 9 m/s
+  stiff rope (before)                           1.4            0           11.5
+  soft rope, no reel stall                      5.1          131           13.8
+  soft rope, reel stalls at 20 cm (new)            2.6           20           12.3
+
+Gentlest settings for A that keep the stretch under 130 cm:
+  k=64   damping 0.5 -> peak 14.7 g, stretch 121 cm
+  k=100  damping 0.3 -> peak 15.0 g, stretch 118 cm
+  k=49   damping 0.6 -> peak 15.2 g, stretch 126 cm
+  k=100  damping 0.4 -> peak 15.9 g, stretch 106 cm
+  k=64   damping 0.6 -> peak 17.5 g, stretch 110 cm

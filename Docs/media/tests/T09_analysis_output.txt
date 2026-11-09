@@ -1,0 +1,16 @@
+Recording: T09_scripted_tests.csv | 3159 frames, 44.5 s | rope: soft (k=64, damping 0.5)
+
+FRAME TIME  median 9.98 ms (100.2 fps), 95th pct 10.95 ms, 99th pct 11.52 ms, frames over 11.1 ms (90 Hz budget): 3.0%
+  chart: T08_frame_time_histogram_T09.png
+
+ROPE CONSTRAINT  18 frames hooked (0.1 s): largest stretch beyond rope length 0.30 cm (limit 150 cm, soft rope)
+  chart: T04_rope_constraint_T09.png
+
+TEST snap_stiff  game: peak felt  209.3 g, max stretch     0 cm | model:  209.3 g,     0 cm | 360 steps, largest step-by-step difference 0.012 g
+
+TEST snap_soft   game: peak felt   14.7 g, max stretch   121 cm | model:   14.7 g,   121 cm | 360 steps, largest step-by-step difference 0.114 g
+
+TEST reel_stiff  game: peak felt    1.4 g, max stretch     0 cm | model:    1.4 g,     0 cm | 360 steps, largest step-by-step difference 0.014 g
+
+TEST reel_soft   game: peak felt    2.6 g, max stretch    20 cm | model:    2.6 g,    20 cm | 360 steps, largest step-by-step difference 0.017 g
+  chart: T09_snap_stiff_vs_soft_T09.png

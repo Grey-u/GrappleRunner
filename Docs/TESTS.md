@@ -36,6 +36,10 @@ A test PASSES when the result matches the acceptance criteria written in advance
 | T-06 | 2026-11-08 | Gravity and air drag match the physics model | PASS (g within 0.03%) |
 | T-07 | 2026-11-08 | Falling off the world respawns you safely | PASS |
 | T-08 | 2026-11-08 | Frame time baseline (desktop editor) | BASELINE recorded |
+| T-09 | 2026-11-09 | Soft rope: does it reduce the snap jolt? (model vs game) | PASS (209 g down to 14.7 g; game matches model) |
+| T-10 | 2026-11-09 | Frame-time cost of 805 plants | +0.32 ms median, flagged for VR |
+| T-11 | 2026-11-09 | Flexible rope and soft rope in a real swing | Rope visuals PASS; new problem found (F6) |
+| T-12 | 2026-11-09 | Auto-pull (Attack on Titan style) | PASS |
 
 **How measurements are taken (from T-02 on).** The grapple code records every frame of play to a spreadsheet (CSV) in `Saved/Tests/`: time, frame length, position, velocity, rope length, actual distance to each anchor, gas, and what the body last touched. `Tools/analyse_telemetry.py` reads a recording, compares it with the settings written at the top of the file, prints the results and draws the charts. Both the raw recordings and the script output are kept in `Docs/media/tests/`, so every number below can be checked and the analysis re-run.
 
@@ -234,14 +238,122 @@ A second group of frames sits at exactly 8.33 ms (120 fps), mostly between 18 an
 
 ---
 
+---
+
+## T-09: Soft rope (comfort fix for F1)
+
+**Question.** If the rope has a little give, does the jolt when it snaps tight get smaller?
+
+**Background.** F1 showed the stiff rope stops you within one physics step (1/120 s). The soft rope adds a spring and damper, like a spring-loaded reel (`bSoftRope`, `RopeStiffness`, `RopeDampingRatio`, `MaxRopeStretch` in `GrappleRig.h`). "Felt" acceleration leaves out gravity, because your inner ear can't feel it while you fall. It's measured in g.
+
+**Hypothesis (predicted before testing in Unreal).** `Tools/rope_model.py` copies the game's rope maths into Python. It predicted the following, and also chose the softest settings that stay under 130 cm of stretch: stiffness 64, damping 0.5 ([prediction](media/tests/T09_model_prediction.txt)).
+- A hook fired while falling away at 17 m/s: the jolt drops from **209.3 g to 14.7 g**, with 121 cm of stretch.
+- Reeling in with the soft rope and no safeguard catapults the player. The model found this first, so a "reel stall" (`ReelStallStretch`, 20 cm) was added before the game test.
+
+**Method.** A new console command, `gr.Test`, sets up the exact same situation every time, 300 m up in empty sky, with no player input. It runs for 3 s and records **every physics step**. Four runs: `gr.Test snap stiff`, `snap soft`, `reel stiff`, `reel soft`. Then `Tools/analyse_telemetry.py` replays the model alongside the recording.
+
+**Results.**
+
+| Test | Game: peak felt | Game: max stretch | Model: peak felt | Model: max stretch | Largest step-by-step difference (360 steps) |
+|---|---|---|---|---|---|
+| Snap, stiff rope | 209.3 g | 0 cm | 209.3 g | 0 cm | 0.012 g |
+| Snap, soft rope | **14.7 g** | 121 cm | 14.7 g | 121 cm | 0.114 g |
+| Reel, stiff rope | 1.4 g | 0 cm | 1.4 g | 0 cm | 0.014 g |
+| Reel, soft rope | 2.6 g | 20 cm | 2.6 g | 20 cm | 0.017 g |
+
+![Snap jolt: stiff vs soft, game vs model](media/tests/T09_snap_stiff_vs_soft.png)
+
+In-game readouts: [stiff](media/tests/T09_ingame_result_stiff.jpg), [soft](media/tests/T09_ingame_result_soft.jpg), [reel](media/tests/T09_ingame_result_reel.jpg). Data: [`T09_scripted_tests.csv`](media/tests/data/T09_scripted_tests.csv). Analysis: [`T09_analysis_output.txt`](media/tests/T09_analysis_output.txt).
+
+**What the curve shows.**
+- The soft rope spreads the jolt over about 0.3 s instead of one step.
+- It then goes slack for about 0.7 s as the player rebounds, and catches again at 2.7 g: one gentle bounce.
+- When reeling, the soft rope is a little harsher (2.6 g against 1.4 g), because the spring adds to the reel's pull.
+
+**Conclusion.** PASS. The jolt fell **14 times**, and the game matched the model step for step. That match also checks the physics code: two independent copies of the maths agree. Whether 14.7 g for a third of a second *feels* acceptable needs people in headsets (see the motion-sickness study plan below).
+
+---
+
+## T-10: How much frame time do 805 plants cost?
+
+**Question.** Does scattering grass, clover, flowers, heather and bushes on the 14 islands slow the frame rate?
+
+**Method.**
+- `Scripts/scatter_foliage.py` planted 805 plants on the islands' tops. They have no collision and no shadows.
+- A new test, `gr.Test perf`, stands at the spawn looking down the route, always the same view, and times every frame for 10 s.
+- It was run with the plants shown and hidden. Nothing else changed: same session, same view, plants toggled without saving.
+
+**Results.**
+
+| | Frames | Median | 95th pct | 99th pct | Over 11.1 ms |
+|---|---|---|---|---|---|
+| Plants hidden | 899 | 11.12 ms (90 fps) | 11.62 ms | 11.97 ms | 50.7% |
+| Plants shown | 870 | 11.44 ms (87 fps) | 12.10 ms | 12.65 ms | 88.4% |
+
+![View with plants](media/tests/T10_view_with_plants.jpg)
+
+**Caveat.** Both runs sit right around 90 fps. Removing Unreal's frame cap (`t.MaxFPS 0`) didn't change that (11.16 ms), so the PC may be held at 90 fps by v-sync or the graphics card. That means the true cost could be hidden at the top end.
+
+**Conclusion.** The plants cost about **0.3 ms per frame (+3%)**. That is small, but enough to push most frames over a 90 Hz headset's budget in the editor. **F8:** before VR testing, make the plants cheaper (instancing, cull distance, LODs) and re-measure in a packaged build.
+
+---
+
+## T-11: Flexible rope and soft rope in a real swing
+
+**Question.** Does the new flexible rope look right, and does the soft rope behave in a real, hand-played swing as well as in the scripted test?
+
+**What changed in the code.**
+- The rope is drawn as a chain of 24 links with its own physics (`SimulateRopeShape`, a "Verlet rope"), so it sags when slack and straightens when tight.
+- It uses a new orange material (`M_Rope`, fixing F3).
+- Rope pull is now measured in **newtons** from Newton's second law (F = ma, with a 70 kg player). It shows on screen and sets how hard the VR controllers vibrate (`FeelRopeTension`), so you feel your body's weight on the rope.
+
+**Results.**
+- Rope visuals: PASS. The rope [sags in a curve](media/tests/T11_flexible_rope_sagging.jpg) when slack and [goes straight and orange](media/tests/T11_flexible_rope_taut_orange.jpg) when pulled tight.
+- Soft rope in a fast swing on a 13 m rope: **problem found**.
+  - The player swung in to 5.3 m from the anchor, so the rope went slack.
+  - On the way back out, the rope stretched all the way to its 150 cm safety limit.
+  - That limit stops you instantly: a spike of **18,838 N (27 times body weight)** and a 65 g peak.
+
+![Rope length vs distance in a real swing](media/tests/T11_rope_stretch_in_real_swing.png)
+
+**Conclusion.** The scripted test (T-09) used a long 37 m rope at 17 m/s. Real play produced a case it didn't cover: a short rope and a fast swing. **F6:** at stiffness 64, the soft rope is too soft for short ropes. Possible fixes:
+- a progressive spring that gets stiffer the more it stretches;
+- stiffness that scales with rope length.
+
+This case also needs adding to `gr.Test` so it can be re-run exactly. Data: [`T11_swing_soft_rope.csv`](media/tests/data/T11_swing_soft_rope.csv), [analysis](media/tests/T11_analysis_output.txt).
+
+---
+
+## T-12: Auto-pull (Attack on Titan style)
+
+**Question.** Naomi reported: "the rope physics work but it doesn't pull the character towards the point". Should the hook pull you in by itself, as Attack on Titan's gear does?
+
+**Change.** New setting `bAutoPull`, on by default: once a hook bites, it reels you in by itself. Holding Shift (desktop) or grip (VR) now means "stop pulling and swing". Unticking it gives the old behaviour.
+
+**Method.** Fired the left hook at an island's underside and held only the mouse button, no other keys.
+
+**Results.**
+- The rope reeled in from 17.1 m to 2.9 m in 2.6 s.
+- 2.9 m is the minimum rope length (2.5 m) plus the reel's stall margin.
+- The player rose toward the hook at up to 9.9 m/s.
+- The reel was on for 100% of hooked frames without any key pressed.
+
+Screenshots: [start](media/tests/T12_auto_pull_start.jpg), [arrived](media/tests/T12_auto_pull_arrived.jpg). Data: [`T12_auto_pull.csv`](media/tests/data/T12_auto_pull.csv).
+
+**Conclusion.** PASS.
+
 ## Findings to act on
 
 | ID | Finding | Why it matters | Plan |
 |---|---|---|---|
-| F1 | When a slack rope snaps tight, the player loses about 73% of their speed in one frame (61 to 16 km/h). Hitting an island removes 28 to 71%. ([chart](media/tests/F1_rope_snap_speed.png)) | Sudden changes in speed that your inner ear doesn't feel are a major cause of VR motion sickness. In real life a rope stretches slightly and takes the load over a moment. | Day 2: soften the snap (short elastic "give", or turn more of the speed into swing instead of deleting it). Re-run this analysis and compare peak deceleration before and after. |
+| F1 | **Improved 9 Nov (T-09):** when a slack rope snaps tight, the player loses about 73% of their speed in one frame (61 to 16 km/h). Hitting an island removes 28 to 71%. ([chart](media/tests/F1_rope_snap_speed.png)) | Sudden changes in speed that your inner ear doesn't feel are a major cause of VR motion sickness. In real life a rope stretches slightly and takes the load over a moment. | Day 2: soften the snap (short elastic "give", or turn more of the speed into swing instead of deleting it). Re-run this analysis and compare peak deceleration before and after. |
 | F2 | Hook range is 60 m; the design brief says the maximum rope length is 18 m | Range changes how the level must be laid out | Decide on a value on Day 2 |
-| F3 | The rope is grey, not orange | Readability: hooks and ropes should stand out | Make a small rope material with a Color setting |
-| F4 | Telemetry only logs what was hit in the last physics step of each frame, so one collision (at 123.8 s) was missed | Gaps in evidence | Record any hit during the frame |
+| F3 | ~~The rope is grey, not orange~~ | Readability | **Fixed 9 Nov:** `M_Rope` material (T-11) |
+| F4 | ~~Telemetry only logs the last physics step's collision~~ | Gaps in evidence | **Fixed 9 Nov:** collisions are now kept for the whole frame |
+| F5 | Hitting an island at speed also stops you within one step (about 156 g in T-04's data) | Same sickness trigger as F1 | Soften collisions: slide more, absorb speed over a few frames |
+| F6 | The soft rope is too soft for short, fast swings: it reaches its 150 cm limit and jolts (27 times body weight) | It undoes the comfort fix in real play | Progressive spring or length-scaled stiffness; add a `gr.Test swing` case |
+| F7 | Rope pull (newtons) left out the reel motor's pull | Haptics would feel too weak while reeling | **Fixed in code 9 Nov:** reel and spring pull are added up per step (compiles next session) |
+| F8 | Plants cost about 0.3 ms per frame and push most editor frames over 11.1 ms | VR frame-rate budget | Instancing, cull distances and LODs; re-measure in a packaged build |
 
 ## Planned: motion-sickness study (when the headset is back)
 

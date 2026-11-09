@@ -1,0 +1,20 @@
+Recording: T11_swing_soft_rope.csv | 5130 frames, 60.3 s | rope: soft (k=64, damping 0.5)
+
+FELT ACCELERATION while hooked and in the air: peak 65.1 g, 99th pct 22.6 g, frames above 3 g: 29 of 330
+
+FRAME TIME  median 11.00 ms (90.9 fps), 95th pct 12.69 ms, 99th pct 13.10 ms, frames over 11.1 ms (90 Hz budget): 45.4%
+  chart: T08_frame_time_histogram_T11.png
+
+ROPE CONSTRAINT  669 frames hooked (15.3 s): largest stretch beyond rope length 150.00 cm (limit 150 cm, soft rope)
+  chart: T04_rope_constraint_T11.png
+
+REEL SPEED  measured 725.28 cm/s vs setting 900 cm/s (error 19.413%), over 1.74 s
+  chart: T05_reel_rate_T11.png
+
+FREE FALL  4.08 s, 307 frames, 65.8 m drop
+  gravity measured 985.67 cm/s2 vs setting 980 (error 0.579%)
+  drag measured 0.0641 /s (vertical), 0.0599 /s (horizontal) vs setting 0.060
+  model-vs-game position: max difference 841.9 cm (12.79% of the drop)
+  chart: T06_free_fall_model_vs_game_T11.png
+
+COLLISION with an object (not caught by the last-step log) at 58.661 s: speed 804 -> 8 cm/s in one frame (99% lost), felt nan g

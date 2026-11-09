@@ -25,6 +25,10 @@
 //       the rope's circle and cancel the part of their speed that was stretching the rope.
 //       Step 3 is all a rope is: "you can't go further than L from the anchor".
 //       Doing that over and over automatically produces a realistic pendulum swing.
+//       COMFORT VERSION (bSoftRope, on by default since 9 Nov): before step 2, a rope
+//       that is stretched past its length pulls back like a stiff spring, so the jolt
+//       of it snapping tight is spread over ~1/8 s instead of one frame. Step 3 then
+//       only acts as a safety limit (MaxRopeStretch). See test T-09 in Docs/TESTS.md.
 //    4. Check they didn't go through a rock (if they did, stop them at its surface).
 //  This is the same model as the 2D physics test bench (Tools/physics-bench.html).
 // =====================================================================================
@@ -38,10 +42,12 @@
 #include "Engine/Engine.h"                     // GEngine: global engine access (on-screen text, VR check)
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"                      // the level: lets us ray-trace and sweep
+#include "EngineUtils.h"                       // TActorIterator: "go through every actor of this type"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"         // the spawn point marker
 #include "HAL/FileManager.h"                   // make folders on disk (for the test recordings)
+#include "HAL/IConsoleManager.h"               // add our own console command (gr.Test)
 #include "IXRTrackingSystem.h"                 // asks "is a VR headset active?"
 #include "Kismet/GameplayStatics.h"            // handy helpers like "find all actors with this tag"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -87,6 +93,7 @@ AGrappleRig::AGrappleRig()
 		C->SetHiddenInGame(true);                               // invisible until a hook is fired
 		return C;
 	};
+	CylinderAsset = CylinderMesh.Object;   // kept so BeginPlay can build the rope's links from it
 	RopeL = MakeMesh(TEXT("RopeLeft"), CylinderMesh.Object);
 	RopeR = MakeMesh(TEXT("RopeRight"), CylinderMesh.Object);
 	HeadL = MakeMesh(TEXT("HookLeft"), SphereMesh.Object);
@@ -161,13 +168,41 @@ void AGrappleRig::BeginPlay()
 		RespawnPoint = Start->GetActorLocation();
 	}
 
-	// ---- 5. Colour the ropes orange ----
-	// We copy the shapes' default material and change its "Color" setting.
-	if (UMaterialInterface* Base = RopeL ? RopeL->GetMaterial(0) : nullptr)
+	// ---- 5. Build the flexible ropes: a chain of short cylinder "links" per hand ----
+	// (The single straight cylinders RopeL / RopeR are kept only as a fallback and stay hidden.)
+	RopeLinks = FMath::Clamp(RopeLinks, 2, 64);
+	for (int32 k = 0; k < 2 * RopeLinks; ++k)
+	{
+		UStaticMeshComponent* Link = NewObject<UStaticMeshComponent>(this);
+		Link->SetStaticMesh(CylinderAsset);
+		Link->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // ropes never block anything
+		Link->SetCastShadow(false);
+		Link->SetUsingAbsoluteLocation(true);
+		Link->SetUsingAbsoluteRotation(true);
+		Link->SetUsingAbsoluteScale(true);
+		Link->SetupAttachment(RootComponent);
+		Link->RegisterComponent();                                    // make it part of the world
+		Link->SetHiddenInGame(true);
+		RopeLinkMeshes.Add(Link);
+	}
+
+	// ---- 6. Colour the ropes orange ----
+	// Test T-03 found the engine's default shape material has no "Color" setting, so the
+	// ropes came out grey. Scripts/make_rope_material.py makes M_Rope, which does have one.
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/GrappleRunner/Materials/M_Rope.M_Rope"));
+	if (!Base && RopeL)
+	{
+		Base = RopeL->GetMaterial(0);   // fallback: the grey default
+	}
+	if (Base)
 	{
 		RopeMaterial = UMaterialInstanceDynamic::Create(Base, this);
 		RopeMaterial->SetVectorParameterValue(TEXT("Color"), RopeColor);
 		for (UStaticMeshComponent* C : {RopeL.Get(), RopeR.Get(), HeadL.Get(), HeadR.Get()})
+		{
+			C->SetMaterial(0, RopeMaterial);
+		}
+		for (UStaticMeshComponent* C : RopeLinkMeshes)
 		{
 			C->SetMaterial(0, RopeMaterial);
 		}
@@ -290,7 +325,10 @@ void AGrappleRig::ReadInput(float DeltaSeconds)
 		for (int32 i = 0; i < 2; ++i)
 		{
 			bHookDown[i] = AnyDown(TriggerKeys[i]) || AnyAxis(TriggerAxes[i], 0.6f); // trigger more than 60% squeezed
-			bReel[i] = AnyDown(GripKeys[i]) || AnyAxis(GripAxes[i], 0.6f);
+			const bool bGrip = AnyDown(GripKeys[i]) || AnyAxis(GripAxes[i], 0.6f);
+			// Auto-pull (AoT style): the hook reels you in by itself; squeeze grip to STOP
+			// pulling and swing freely. With auto-pull off, it's the other way round.
+			bReel[i] = bAutoPull ? !bGrip : bGrip;
 		}
 		bBoost = AnyDown(BoostKeys);
 		MoveInput = FVector::ZeroVector;   // in VR you move with the grapple (and the template's teleport)
@@ -301,7 +339,9 @@ void AGrappleRig::ReadInput(float DeltaSeconds)
 		bHookDown[0] = P->IsInputKeyDown(EKeys::LeftMouseButton);
 		bHookDown[1] = P->IsInputKeyDown(EKeys::RightMouseButton);
 		const bool bShift = P->IsInputKeyDown(EKeys::LeftShift);
-		bReel[0] = bReel[1] = bShift;   // Shift reels in both hooks
+		// Auto-pull on: hooks reel you in by themselves, Shift = stop pulling and swing.
+		// Auto-pull off: Shift = reel in.
+		bReel[0] = bReel[1] = bAutoPull ? !bShift : bShift;
 
 		// Mouse look: how far did the mouse move since last frame?
 		float Dx = 0.f, Dy = 0.f;
@@ -497,6 +537,7 @@ void AGrappleRig::Pulse(int32 Index, float Amplitude)
 	}
 	const EControllerHand Hand = Index == 0 ? EControllerHand::Left : EControllerHand::Right;
 	P->SetHapticsByValue(0.6f, Amplitude, Hand);   // start vibrating
+	PulseUntil[Index] = GetWorld()->GetTimeSeconds() + 0.08f;   // FeelRopeTension leaves this hand alone until then
 	// Set a timer to switch the vibration off again after 0.08 seconds.
 	FTimerHandle Handle;
 	TWeakObjectPtr<APlayerController> WeakPC = P;
@@ -542,7 +583,18 @@ void AGrappleRig::Tick(float DeltaSeconds)
 		Hooks[0].bAttached = Hooks[1].bAttached = false;
 	}
 
-	ReadInput(DeltaSeconds);
+	if (TestTimeLeft > 0.f)
+	{
+		// A scripted test is running: ignore the controllers/mouse so every run is identical.
+		MoveInput = FVector::ZeroVector;
+		bBoost = false;
+		bReel[0] = bTestReel;
+		bReel[1] = false;
+	}
+	else
+	{
+		ReadInput(DeltaSeconds);
+	}
 
 	// FIXED-STEP PHYSICS
 	// Frames can be uneven (11 ms, then 14 ms...). Physics is more stable if it always moves
@@ -553,8 +605,37 @@ void AGrappleRig::Tick(float DeltaSeconds)
 	Accumulator = FMath::Min(Accumulator + DeltaSeconds, 0.1f);
 	while (Accumulator >= Step)
 	{
+		const FVector VelocityBefore = Velocity;
 		Simulate(Step);
 		Accumulator -= Step;
+		if (TestTimeLeft > 0.f && TestName.StartsWith(TEXT("perf")))
+		{
+			TestTimeLeft -= Step;            // perf test: just count down (frames are recorded below)
+			if (TestTimeLeft <= 0.f)
+			{
+				EndTest();
+			}
+		}
+		else if (TestTimeLeft > 0.f)
+		{
+			// During a test, record EVERY physics step (not every frame), so the data lines up
+			// step-for-step with the offline model. "Felt" acceleration = the change in velocity
+			// minus gravity's share, because your inner ear can't feel gravity while falling.
+			const FVector Felt = (Velocity - VelocityBefore) / Step + FVector(0.f, 0.f, Gravity);
+			TestPeakFeltG = FMath::Max(TestPeakFeltG, static_cast<float>(Felt.Size() / Gravity));
+			if (Hooks[0].bAttached)
+			{
+				TestMaxStretch = FMath::Max(TestMaxStretch,
+					static_cast<float>(FVector::Dist(BodyCenter(), Hooks[0].Anchor)) - Hooks[0].Length);
+			}
+			RecordTelemetry(Step);
+			RopeTension[0] = RopeTension[1] = 0.f;   // each recorded step shows only its own pull
+			TestTimeLeft -= Step;
+			if (TestTimeLeft <= 0.f)
+			{
+				EndTest();
+			}
+		}
 	}
 
 	if (BodyPos.Z < KillZ)
@@ -566,7 +647,16 @@ void AGrappleRig::Tick(float DeltaSeconds)
 	LastSetLocation = Pawn->GetActorLocation();
 
 	UpdateVisuals();
-	RecordTelemetry(DeltaSeconds);   // write down this frame for the test log
+	FeelRopeTension();                   // VR: vibrate the controllers by how hard each rope pulls
+	if (TestName.StartsWith(TEXT("perf")))
+	{
+		TestFrameTimes.Add(DeltaSeconds);    // perf test: remember how long this frame took
+	}
+	if (TestTimeLeft <= 0.f || TestName.StartsWith(TEXT("perf")))
+	{
+		RecordTelemetry(DeltaSeconds);   // normal play: write down this frame for the test log
+	}
+	RopeTension[0] = RopeTension[1] = 0.f;   // measured afresh every frame
 }
 
 // =====================================================================================
@@ -576,6 +666,7 @@ void AGrappleRig::Simulate(float Dt)
 {
 	const bool bAnyHook = Hooks[0].bAttached || Hooks[1].bAttached;
 	const FVector C = BodyCenter();   // where the body is right now
+	float StepTension[2] = {0.f, 0.f};   // how hard each rope pulls during THIS step (newtons), added up below
 
 	if (bGrounded && !bAnyHook)
 	{
@@ -610,14 +701,59 @@ void AGrappleRig::Simulate(float Dt)
 		if (H.bAttached && bReel[i])
 		{
 			H.Length = FMath::Max(MinRopeLength, H.Length - ReelSpeed * Dt);
+			if (bSoftRope)
+			{
+				// Soft rope: don't wind the rope more than ReelStallStretch shorter than the
+				// player's actual distance, or the stretched rope would act like a catapult.
+				H.Length = FMath::Max(H.Length, static_cast<float>(FVector::Dist(C, H.Anchor)) - ReelStallStretch);
+			}
 			Velocity += (H.Anchor - C).GetSafeNormal() * ReelPullAccel * Dt;   // GetSafeNormal = direction only, length 1
+			// The reel's tug travels through the rope too, so it counts as rope pull (newtons).
+			StepTension[i] += PlayerMass * ReelPullAccel / 100.f;
+		}
+	}
+
+	// STEP 2b: SOFT ROPE (comfort). If the rope is stretched past its length, it pulls back
+	// like a spring: the more it's stretched, the harder it pulls. The "damping" part also
+	// pulls harder the faster you're moving away, which stops it bouncing like a bungee.
+	// This spreads the jolt of the rope snapping tight over about 1/8 of a second.
+	if (bSoftRope)
+	{
+		const float Omega = FMath::Sqrt(FMath::Max(RopeStiffness, 0.f));   // how fast the rope "springs"
+		const float Damping = 2.f * RopeDampingRatio * Omega;               // standard spring-damper formula
+		for (int32 i = 0; i < 2; ++i)
+		{
+			const FGrappleHook& H = Hooks[i];
+			if (!H.bAttached)
+			{
+				continue;
+			}
+			const FVector D = C - H.Anchor;                 // arrow from the anchor to the player
+			const float Dist = D.Size();
+			const float Stretch = Dist - H.Length;          // how far past the rope's length we are
+			if (Stretch > 0.f && Dist > KINDA_SMALL_NUMBER)
+			{
+				const FVector N = D / Dist;                                         // direction away from the anchor
+				const float Outward = FVector::DotProduct(Velocity, N);            // speed away from the anchor
+				const float Pull = RopeStiffness * Stretch + Damping * Outward;    // spring + damper
+				if (Pull > 0.f)                                                     // a rope can pull, never push
+				{
+					Velocity -= N * Pull * Dt;
+					// Force = mass x acceleration (Newton's second law). Pull is in cm/s^2, so
+					// divide by 100 for m/s^2. Keep the biggest pull this frame, per rope.
+					StepTension[i] += PlayerMass * Pull / 100.f;
+				}
+			}
 		}
 	}
 
 	Velocity = Velocity.GetClampedToMaxSize(MaxSpeed);   // obey the speed limit
 	FVector NewC = C + Velocity * Dt;                    // STEP 2: where we'd end up if nothing stopped us
 
-	// STEP 3: THE ROPE. A rope can't stretch: you can't be further than Length from the anchor.
+	// STEP 3: THE ROPE'S HARD LIMIT. You can never be further than Length from the anchor
+	// (plus MaxRopeStretch when the soft rope is on). Normally the soft rope stops you well
+	// before this; it's a safety net for very hard falls.
+	const float Give = bSoftRope ? MaxRopeStretch : 0.f;
 	for (int32 i = 0; i < 2; ++i)
 	{
 		const FGrappleHook& H = Hooks[i];
@@ -627,19 +763,26 @@ void AGrappleRig::Simulate(float Dt)
 		}
 		const FVector D = NewC - H.Anchor;   // arrow from the anchor to the player
 		const float Dist = D.Size();
-		if (Dist > H.Length && Dist > KINDA_SMALL_NUMBER)   // too far: the rope is pulled tight
+		const float Limit = H.Length + Give;
+		if (Dist > Limit && Dist > KINDA_SMALL_NUMBER)   // too far: the rope is at its absolute limit
 		{
 			const FVector N = D / Dist;              // direction from anchor to player (length 1)
-			NewC = H.Anchor + N * H.Length;          // put the player back on the rope's circle
+			NewC = H.Anchor + N * Limit;             // put the player back on the limit circle
 			// Remove the part of the speed that was pulling AWAY from the anchor (stretching the rope).
 			// What's left is the sideways part, and that sideways motion IS the swing.
 			const float Outward = FVector::DotProduct(Velocity, N);
 			if (Outward > 0.f)
 			{
 				Velocity -= N * Outward;
+				// The rope stopped that outward speed within one step: force = mass x (speed / time).
+				StepTension[i] += PlayerMass * (Outward / Dt) / 100.f;
 			}
 		}
 	}
+
+	// Keep the biggest total pull of this frame for each rope (shown on screen, felt as vibration).
+	RopeTension[0] = FMath::Max(RopeTension[0], StepTension[0]);
+	RopeTension[1] = FMath::Max(RopeTension[1], StepTension[1]);
 
 	// A hook pulling you upward lifts you off the ground.
 	if (bGrounded && bAnyHook && Velocity.Z > 30.f)
@@ -664,8 +807,6 @@ void AGrappleRig::MoveWithCollision(const FVector& From, const FVector& To)
 	FVector Cur = From;
 	FVector Target = To;
 	bool bHitWalkable = false;
-	LastHitName = TEXT("none");      // for the test recording: nothing bumped into yet this step
-	bLastHitPenetrating = false;
 
 	// Try up to 3 times: move, hit something, slide along it, try the rest of the move.
 	for (int32 Iter = 0; Iter < 3; ++Iter)
@@ -681,7 +822,7 @@ void AGrappleRig::MoveWithCollision(const FVector& From, const FVector& To)
 		const FVector N = Hit.ImpactNormal.IsNearlyZero() ? FVector(Hit.Normal) : FVector(Hit.ImpactNormal);
 		// Remember what we bumped into, for the test recording.
 		LastHitName = Hit.GetActor() ? Hit.GetActor()->GetActorNameOrLabel() : TEXT("unknown");
-		bLastHitPenetrating = Hit.bStartPenetrating;
+		bLastHitPenetrating |= Hit.bStartPenetrating;   // |= : stays true if ANY step this frame started inside
 		if (Hit.bStartPenetrating && LastHitName != LastReportedPenetration)
 		{
 			// Starting a move already INSIDE something is a warning sign, so say so in the
@@ -746,25 +887,36 @@ void AGrappleRig::UpdateVisuals()
 		}
 		if (H.bAttached)
 		{
-			// Stretch a cylinder from the hand (S) to the anchor (E).
-			const FVector S = HandPosition(i);
-			const FVector E = H.Anchor;
-			const FVector D = E - S;
-			const float Len = D.Size();
-			if (Len > 1.f)
+			// Move the rope's links with their own little physics, then draw each link as a
+			// short cylinder between two neighbouring points of the chain.
+			SimulateRopeShape(i, World ? World->GetDeltaSeconds() : 1.f / 90.f);
+			const TArray<FVector>& P = RopePoints[i];
+			for (int32 k = 0; k + 1 < P.Num() && i * RopeLinks + k < RopeLinkMeshes.Num(); ++k)
 			{
-				// Put the cylinder halfway between the two points, pointing from one to the other...
-				Ropes[i]->SetWorldLocationAndRotation((S + E) * 0.5f, FRotationMatrix::MakeFromZ(D / Len).Rotator());
-				// ...and scale it: Unreal's cylinder is 100 cm tall and 100 cm wide, so divide by 100.
-				Ropes[i]->SetWorldScale3D(FVector(RopeThickness / 100.f, RopeThickness / 100.f, Len / 100.f));
+				UStaticMeshComponent* Link = RopeLinkMeshes[i * RopeLinks + k];
+				const FVector D = P[k + 1] - P[k];
+				const float Len = D.Size();
+				if (Len > 0.1f)
+				{
+					// Put the cylinder halfway between the two points, pointing from one to the other...
+					Link->SetWorldLocationAndRotation((P[k] + P[k + 1]) * 0.5f, FRotationMatrix::MakeFromZ(D / Len).Rotator());
+					// ...and scale it: Unreal's cylinder is 100 cm tall and 100 cm wide, so divide by 100.
+					Link->SetWorldScale3D(FVector(RopeThickness / 100.f, RopeThickness / 100.f, Len / 100.f));
+				}
+				Link->SetHiddenInGame(false);
 			}
-			Heads[i]->SetWorldLocation(E);
+			Heads[i]->SetWorldLocation(H.Anchor);
 			Heads[i]->SetWorldScale3D(FVector(0.12f));   // a 12 cm ball where the hook bit
-			Ropes[i]->SetHiddenInGame(false);
+			Ropes[i]->SetHiddenInGame(true);              // the old single straight rope is no longer used
 			Heads[i]->SetHiddenInGame(false);
 		}
 		else
 		{
+			bRopeShapeReady[i] = false;                   // next time this hook fires, lay the chain out fresh
+			for (int32 k = 0; k < RopeLinks && i * RopeLinks + k < RopeLinkMeshes.Num(); ++k)
+			{
+				RopeLinkMeshes[i * RopeLinks + k]->SetHiddenInGame(true);
+			}
 			Ropes[i]->SetHiddenInGame(true);
 			Heads[i]->SetHiddenInGame(true);
 			// Not attached: show a dot where this hook WOULD land (green = left, blue = right).
@@ -783,8 +935,10 @@ void AGrappleRig::UpdateVisuals()
 		DrawDebugPoint(World, Camera.IsValid() ? Camera->GetComponentLocation() + Camera->GetForwardVector() * 200.f : BodyCenter(), 4.f, FColor::White, false, -1.f, SDPG_Foreground);
 		// Speed in cm/s x 0.036 = km/h.
 		GEngine->AddOnScreenDebugMessage(9001, 0.f, FColor::White,
-			FString::Printf(TEXT("Speed %.0f km/h   Gas %.0f%%   %s   |  LMB/RMB hooks  Shift reel  Space jump/boost  R respawn"),
-				Velocity.Size() * 0.036f, 100.f * Gas / FMath::Max(1.f, GasMax), bGrounded ? TEXT("ground") : TEXT("air")));
+			FString::Printf(TEXT("Speed %.0f km/h   Gas %.0f%%   %s   Rope pull %.0f N (%.1fx body weight)   |  LMB/RMB hooks  Shift %s  Space jump/boost  R respawn"),
+				Velocity.Size() * 0.036f, 100.f * Gas / FMath::Max(1.f, GasMax), bGrounded ? TEXT("ground") : TEXT("air"),
+				RopeTension[0] + RopeTension[1], (RopeTension[0] + RopeTension[1]) / FMath::Max(1.f, PlayerMass * 9.8f),
+				bAutoPull ? TEXT("stop pulling") : TEXT("reel in")));
 	}
 }
 
@@ -808,7 +962,9 @@ void AGrappleRig::RecordTelemetry(float DeltaSeconds)
 		Telemetry += FString::Printf(TEXT("# Grapple Runner telemetry, recorded %s\n"), *FDateTime::Now().ToString());
 		Telemetry += FString::Printf(TEXT("# Gravity=%.1f cm/s2, AirDragPerSecond=%.3f, MaxSpeed=%.0f cm/s, ReelSpeed=%.0f cm/s, ReelPullAccel=%.0f, BoostAccel=%.0f, MaxFireRange=%.0f cm, MinRopeLength=%.0f cm, Body radius %.0f / half-height %.0f cm, VR=%d\n"),
 			Gravity, AirDragPerSecond, MaxSpeed, ReelSpeed, ReelPullAccel, BoostAccel, MaxFireRange, MinRopeLength, BodyRadius, BodyHalfHeight, bVR ? 1 : 0);
-		Telemetry += TEXT("time_s,frame_ms,x_cm,y_cm,z_cm,vx,vy,vz,speed_cms,grounded,hookL,ropeL_len,ropeL_dist,hookR,ropeR_len,ropeR_dist,reel,boost,gas,last_hit,hit_started_inside\n");
+		Telemetry += FString::Printf(TEXT("# SoftRope=%d, RopeStiffness=%.1f, RopeDampingRatio=%.2f, MaxRopeStretch=%.0f cm, ReelStallStretch=%.0f cm\n"),
+			bSoftRope ? 1 : 0, RopeStiffness, RopeDampingRatio, MaxRopeStretch, ReelStallStretch);
+		Telemetry += TEXT("time_s,frame_ms,x_cm,y_cm,z_cm,vx,vy,vz,speed_cms,grounded,hookL,ropeL_len,ropeL_dist,hookR,ropeR_len,ropeR_dist,reel,boost,gas,last_hit,hit_started_inside,test,tensionL_N,tensionR_N\n");
 	}
 	TelemetryClock += DeltaSeconds;
 	const FVector C = BodyCenter();
@@ -826,11 +982,16 @@ void AGrappleRig::RecordTelemetry(float DeltaSeconds)
 	}
 
 	// One row: the numbers, separated by commas, in the same order as the column names.
-	Telemetry += FString::Printf(TEXT("%.4f,%.2f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d,%.1f,%.1f,%d,%.1f,%.1f,%d,%d,%.1f,%s,%d\n"),
+	Telemetry += FString::Printf(TEXT("%.4f,%.2f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d,%.1f,%.1f,%d,%.1f,%.1f,%d,%d,%.1f,%s,%d,%s,%.0f,%.0f\n"),
 		TelemetryClock, DeltaSeconds * 1000.f, BodyPos.X, BodyPos.Y, BodyPos.Z,
 		Velocity.X, Velocity.Y, Velocity.Z, Velocity.Size(), bGrounded ? 1 : 0,
 		Hooks[0].bAttached ? 1 : 0, Len[0], Dist[0], Hooks[1].bAttached ? 1 : 0, Len[1], Dist[1],
-		(bReel[0] || bReel[1]) ? 1 : 0, bBoost ? 1 : 0, Gas, *LastHitName, bLastHitPenetrating ? 1 : 0);
+		(bReel[0] || bReel[1]) ? 1 : 0, bBoost ? 1 : 0, Gas, *LastHitName, bLastHitPenetrating ? 1 : 0, *TestName, RopeTension[0], RopeTension[1]);
+
+	// Clear the collision notes, ready for the next frame. (They are only reset here, once a
+	// frame, so a bump in ANY of this frame's physics steps gets recorded, not just the last.)
+	LastHitName = TEXT("none");
+	bLastHitPenetrating = false;
 }
 
 void AGrappleRig::SaveTelemetry()
@@ -858,3 +1019,240 @@ void AGrappleRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	SaveTelemetry();
 	Super::EndPlay(EndPlayReason);   // then let Unreal do its own shutdown
 }
+
+// =====================================================================================
+//  SimulateRopeShape: the rope as a chain of links ("Verlet" rope, a standard game technique).
+//  Each point remembers where it was last frame; the difference is its speed. Every frame:
+//    1. each point keeps moving (with a little damping) and falls with gravity;
+//    2. the two ends are pinned: one to your hand, one to the hook;
+//    3. we nudge neighbouring points back to the right spacing, many times over, so the
+//       chain behaves like a rope that can bend but not stretch.
+//  If the rope is longer than the gap (slack), the chain hangs and sags; when it's pulled
+//  tight, the spacing forces it straight. Moving your hand sends waves along it.
+//  This only changes how the rope LOOKS; how you swing is still decided in Simulate().
+// =====================================================================================
+void AGrappleRig::SimulateRopeShape(int32 Index, float DeltaSeconds)
+{
+	const FVector S = HandPosition(Index);      // rope start: your hand
+	const FVector E = Hooks[Index].Anchor;      // rope end: where the hook bit
+	const int32 N = RopeLinks;                  // number of links (points = links + 1)
+	TArray<FVector>& P = RopePoints[Index];
+	TArray<FVector>& Old = RopePointsBefore[Index];
+
+	if (!bRopeShapeReady[Index] || P.Num() != N + 1)
+	{
+		// Just fired: lay the points out in a straight line from hand to hook.
+		P.SetNum(N + 1);
+		Old.SetNum(N + 1);
+		for (int32 k = 0; k <= N; ++k)
+		{
+			P[k] = Old[k] = FMath::Lerp(S, E, static_cast<float>(k) / N);
+		}
+		bRopeShapeReady[Index] = true;
+	}
+
+	// How long each link should be. The rope's length comes from the physics (Hooks.Length);
+	// if the soft rope is stretched past that, use the real gap so the drawn rope stays straight.
+	const float Gap = FVector::Dist(S, E);
+	const float Total = FMath::Max(Hooks[Index].Length, Gap);
+	const float LinkLen = Total / N;
+
+	// 1. Keep moving + gravity (positions only: "where I was" -> "where I am" -> "where I'll be").
+	const float Dt = FMath::Clamp(DeltaSeconds, 1.f / 240.f, 1.f / 30.f);
+	const FVector Fall(0.f, 0.f, -Gravity * Dt * Dt);
+	for (int32 k = 1; k < N; ++k)
+	{
+		const FVector Speed = (P[k] - Old[k]) * (1.f - RopeWobbleDamping);
+		Old[k] = P[k];
+		P[k] += Speed + Fall;
+	}
+
+	// 2 + 3. Pin the ends, then fix the spacing between neighbours (20 rounds = firm rope).
+	for (int32 Round = 0; Round < 20; ++Round)
+	{
+		P[0] = S;
+		P[N] = E;
+		for (int32 k = 0; k < N; ++k)
+		{
+			const FVector D = P[k + 1] - P[k];
+			const float Len = D.Size();
+			if (Len < KINDA_SMALL_NUMBER)
+			{
+				continue;
+			}
+			const FVector Fix = D * (0.5f * (Len - LinkLen) / Len);   // half the error goes to each point
+			if (k > 0)
+			{
+				P[k] += Fix;
+			}
+			if (k + 1 < N)
+			{
+				P[k + 1] -= Fix;
+			}
+		}
+	}
+	P[0] = S;
+	P[N] = E;
+	Old[0] = S;
+	Old[N] = E;
+}
+
+// =====================================================================================
+//  FeelRopeTension: "feel the weight of your body". The harder a rope is pulling you
+//  (measured in newtons in Simulate), the harder that hand's controller vibrates.
+//  Hanging still = 1x your body weight = a light buzz; a hard swing or snap = strong.
+//  Later the same number will drive the EXIT SUIT's haptics.
+// =====================================================================================
+void AGrappleRig::FeelRopeTension()
+{
+	APlayerController* P = PC.Get();
+	if (!bVR || !P)
+	{
+		return;   // desktop: shown as "Rope pull" on screen instead
+	}
+	const float BodyWeight = FMath::Max(1.f, PlayerMass * 9.8f);   // your weight in newtons
+	for (int32 i = 0; i < 2; ++i)
+	{
+		if (GetWorld()->GetTimeSeconds() < PulseUntil[i])
+		{
+			continue;   // a short "hook bit" buzz is playing on this hand: don't interrupt it
+		}
+		const EControllerHand Hand = i == 0 ? EControllerHand::Left : EControllerHand::Right;
+		// 0 at no pull, 0.25 when hanging still (1x body weight), full strength at 4x body weight.
+		const float Strength = Hooks[i].bAttached ? FMath::Clamp(RopeTension[i] / (4.f * BodyWeight), 0.f, 1.f) : 0.f;
+		P->SetHapticsByValue(0.3f, Strength, Hand);
+	}
+}
+
+// =====================================================================================
+//  SCRIPTED TESTS
+//  Playing by hand is never exactly the same twice. These tests set up an exact
+//  situation (same position, speed and rope every time), high in the empty sky so
+//  nothing gets in the way, and let the physics run for 3 seconds with no input.
+//  That makes them repeatable, and comparable step-for-step with Tools/rope_model.py.
+// =====================================================================================
+void AGrappleRig::StartTest(const FString& Name, int32 SoftRope)
+{
+	if (!Pawn.IsValid())
+	{
+		return;   // not playing yet
+	}
+	bSoftRopeBeforeTest = bSoftRope;
+	if (SoftRope >= 0)
+	{
+		bSoftRope = (SoftRope == 1);   // the test chooses stiff or soft rope
+	}
+	if (Name == TEXT("perf"))
+	{
+		// Frame-rate test: same spot and same view every time, so results can be compared
+		// before and after a change (e.g. adding plants). No hooks, no input, 10 seconds.
+		Respawn();
+		DesktopYaw = 0.f;                                   // face +X: down the route
+		DesktopPitch = -5.f;                                // looking very slightly down
+		Pawn->SetActorRotation(FRotator(0.f, DesktopYaw, 0.f));
+		if (!bVR && Camera.IsValid())
+		{
+			Camera->SetRelativeRotation(FRotator(DesktopPitch, 0.f, 0.f));
+		}
+		TestName = TEXT("perf");
+		TestTimeLeft = 10.f;
+		TestFrameTimes.Reset();
+		UE_LOG(LogTemp, Log, TEXT("GrappleRig: test perf started"));
+		return;
+	}
+	// The anchor floats 300 m up, straight above wherever the player is: open sky.
+	const FVector Anchor(BodyPos.X, BodyPos.Y, 30000.f);
+	FVector Center;
+	if (Name == TEXT("reel"))
+	{
+		Center = Anchor + FVector(0.f, 0.f, -3730.f);   // hanging still on a 37.3 m rope
+		Velocity = FVector::ZeroVector;
+		Hooks[0].Length = 3730.f;
+		bTestReel = true;                              // and reel in for the whole test
+	}
+	else   // "snap"
+	{
+		Center = Anchor + FVector(1200.f, 0.f, -3330.f);   // 4 m inside the rope's reach...
+		Velocity = FVector(300.f, 0.f, -1700.f);            // ...falling away at about 17 m/s
+		Hooks[0].Length = 3530.f;
+		bTestReel = false;
+	}
+	BodyPos = Center - FVector(0.f, 0.f, BodyHalfHeight);   // BodyPos is the feet; Center is the middle
+	Hooks[0].bAttached = true;
+	Hooks[0].Anchor = Anchor;
+	Hooks[1].bAttached = false;
+	bGrounded = false;
+	Accumulator = 0.f;
+	TestName = FString::Printf(TEXT("%s_%s"), *Name, bSoftRope ? TEXT("soft") : TEXT("stiff"));
+	TestTimeLeft = 3.f;
+	TestPeakFeltG = 0.f;
+	TestMaxStretch = 0.f;
+	UE_LOG(LogTemp, Log, TEXT("GrappleRig: test %s started"), *TestName);
+}
+
+void AGrappleRig::EndTest()
+{
+	if (TestName == TEXT("perf"))
+	{
+		// Sort the frame times and read off the middle (median) and the slow end (95th / 99th).
+		TestFrameTimes.Sort();
+		const int32 Num = TestFrameTimes.Num();
+		auto At = [this, Num](float Fraction) { return Num ? 1000.f * TestFrameTimes[FMath::Min(Num - 1, static_cast<int32>(Fraction * Num))] : 0.f; };
+		int32 Over = 0;
+		for (float T : TestFrameTimes)
+		{
+			Over += T > 1.f / 90.f ? 1 : 0;      // slower than a 90 Hz headset allows
+		}
+		const FString Msg = FString::Printf(TEXT("Test perf: %d frames, median %.2f ms (%.0f fps), 95th %.2f ms, 99th %.2f ms, over 11.1 ms: %.1f%%"),
+			Num, At(0.5f), At(0.5f) > 0.f ? 1000.f / At(0.5f) : 0.f, At(0.95f), At(0.99f), Num ? 100.f * Over / Num : 0.f);
+		UE_LOG(LogTemp, Log, TEXT("GrappleRig: %s"), *Msg);
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 8.f, FColor::Cyan, Msg);
+		}
+		TestName = TEXT("none");
+		TestTimeLeft = 0.f;
+		return;
+	}
+	// Report the headline numbers straight away (the full data is in the recording).
+	UE_LOG(LogTemp, Log, TEXT("GrappleRig: test %s finished: peak felt %.1f g, max stretch %.0f cm"),
+		*TestName, TestPeakFeltG, TestMaxStretch);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 8.f, FColor::Cyan, FString::Printf(
+			TEXT("Test %s: peak felt %.1f g, max stretch %.0f cm"), *TestName, TestPeakFeltG, TestMaxStretch));
+	}
+	TestName = TEXT("none");
+	TestTimeLeft = 0.f;
+	bTestReel = false;
+	bSoftRope = bSoftRopeBeforeTest;   // put the rope setting back how it was
+	Hooks[0].bWasDown = Hooks[1].bWasDown = false;
+	Respawn();                         // back to the first island
+}
+
+// The console command "gr.Test". Typing it in the game's console runs this function,
+// which finds the GrappleRig in the level and starts the test.
+static void RunGrappleTest(const TArray<FString>& Args, UWorld* World)
+{
+	if (!World)
+	{
+		return;
+	}
+	const FString Name = Args.Num() > 0 ? Args[0].ToLower() : FString(TEXT("snap"));
+	int32 Soft = -1;                                   // -1 = use the current setting
+	if (Args.Num() > 1)
+	{
+		Soft = Args[1].Equals(TEXT("stiff"), ESearchCase::IgnoreCase) ? 0 : 1;
+	}
+	for (TActorIterator<AGrappleRig> It(World); It; ++It)
+	{
+		It->StartTest(Name, Soft);
+		return;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("gr.Test: no GrappleRig in this level"));
+}
+
+static FAutoConsoleCommandWithWorldAndArgs GGrappleTestCommand(
+	TEXT("gr.Test"),
+	TEXT("Grapple Runner scripted physics test. Usage: gr.Test snap|reel [stiff|soft]"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&RunGrappleTest));
