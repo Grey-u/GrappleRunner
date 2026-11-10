@@ -57,7 +57,9 @@ void AGRVine::OnConstruction(const FTransform& Transform)
 
 		USplineMeshComponent* Piece = NewObject<USplineMeshComponent>(this);
 		Piece->CreationMethod = EComponentCreationMethod::UserConstructionScript;   // rebuilt with the vine
-		Piece->SetMobility(EComponentMobility::Static);
+		// Movable: the pieces must be able to bend while playing (snapping), and they hang from a
+		// movable root. (Static pieces can't be attached to a movable root: they'd lose their place.)
+		Piece->SetMobility(EComponentMobility::Movable);
 		Piece->SetStaticMesh(Mesh);
 		Piece->SetForwardAxis(LengthAxis, false);
 		Piece->SetStartAndEnd(P0, D0, P1, D1, false);
@@ -115,13 +117,6 @@ bool AGRVine::TrySnap(const FVector& From, const FVector& To, float Radius, cons
 		}
 		bSnapped = true;
 		SnapAge = 0.f;
-		for (USplineMeshComponent* Piece : Pieces)
-		{
-			if (IsValid(Piece))
-			{
-				Piece->SetMobility(EComponentMobility::Movable);   // static pieces can't be re-bent while playing
-			}
-		}
 		SetActorTickEnabled(true);
 		PoseHalves();
 		return true;
