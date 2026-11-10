@@ -96,3 +96,15 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - **Fix made while reviewing the code.** Parts made while the game runs were attached with `SetupAttachment`, which only works for parts built in the constructor. The body and harness now use `AttachToComponent`, and the harness is bound to the hip bone. Both are listed under the actor (`AddInstanceComponent`) so they show in the Outliner.
 - **Status.** Code written and reviewed, but not compiled or played yet. Next: rebuild in Unreal, check legs, hands and harness position from the first-person view, then tune `HarnessOffset`, `HarnessRotation` and `BodyScale`.
 - **Why it's on a branch.** The code is on the `body-and-harness` branch until it compiles, so `main` stays a version that works.
+
+## 10 Nov 2026: Real ODM gear, ruins and trees, colour pass, start menu
+- **Body check.** Naomi played and saw Kwang's legs. Hand and leg tracking will come from real sensors later.
+- **Harness, three versions in one day (the design process).**
+  - **v2:** all-in-one harness generated in code (`Art/Harness/make_harness.py`), designed from Attack on Titan ODM-gear cosplay builds and climbing-harness anatomy: padded waist belt, belay loop, gear loops, leg loops, plus blade boxes, gas tanks and launchers. Three pieces (hips + each thigh) so the leg parts move with the legs. Renders in `Docs/media/harness/`.
+  - **Feedback:** "not up to Half-Life: Alyx / Valorant standard." Fair: shapes generated in code, with flat colours, can't reach a sculpted, hand-textured look.
+  - **v3:** Naomi found a sculpted, textured ODM-gear model on Sketchfab (4K PBR textures). `Art/ThirdParty/make_odm_gear.py` splits it into the gear and two swords, sets each origin to its attach point, and drops the cables (the game draws its own ropes). The code straps keep holding it on (the script now builds straps only). The model stays out of the public repo until its licence is confirmed.
+  - In game: the gear sits on the hip bone, tilted 12° so the blade boxes hang back and down, and widened 1.2× to clear the thighs. The ropes now fire from the gear's nozzles.
+- **Level dressing** (`Scripts/dress_islands.py`): 13 ruin clusters from Infinity Blade Grass Lands (temples, wall lines for cover, gates, towers), European Beech trees and saplings, ponds, extra waterfalls, all kept 7 m clear of grapple rocks.
+  - Problem found: the beech trees ship with 8K textures, and Unreal froze for minutes building them on first use. They need smaller texture sizes for VR.
+- **Colour** (`Scripts/color_grade.py`): Naomi said the game looked colourless and dull. Golden-hour sun, cool blue shadow fill, turquoise mist with a golden sun glow, a warm/cool grade and more saturation.
+- **Start menu** (`GRMenuGameMode`, C++/Slate): the EXIT SUIT portfolio cover is the title card. PLAY leads to 1v1 / 2v2 / 3v3 / 5v5 / PvE, then a loading screen. Multiplayer isn't built, so every mode plays solo for now. The packaged game starts at `L_MainMenu`.

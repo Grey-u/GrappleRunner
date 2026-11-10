@@ -217,10 +217,21 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FVector ThighHarnessOffset = FVector::ZeroVector; // nudge both thigh pieces (X is mirrored per leg)
 	// Size of the harness. 1 = made for a normal adult waist; raise it if it sinks into the body.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float HarnessScale = 1.f;
-	// Where the rope comes out of each launcher's muzzle, in the belt's own directions (cm).
-	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherSpacing = 21.f;  // sideways from the middle
-	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherForward = 14.f;  // forward
-	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherHeight = 5.f;    // up
+	// The ODM gear itself (harness v3): the sculpted, textured model Naomi downloaded
+	// (Art/ThirdParty/make_odm_gear.py). Reel unit at the small of the back, blade boxes and
+	// gas tanks along the hips. Held on by the straps above. Empty = no gear.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UStaticMesh> GearAsset =
+		TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Harness/SM_ODM_Gear.SM_ODM_Gear")));
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FVector GearOffset = FVector::ZeroVector;   // nudge it (cm): X sideways, Y forward, Z up
+	// Tilt (degrees): positive lowers the back ends of the blade boxes, like real ODM gear.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float GearTilt = 12.f;
+	// Stretch: X widens the gap between the blade boxes so they clear the thighs.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FVector GearScale = FVector(1.2f, 1.f, 1.f);
+	// Where the rope comes out of each launcher nozzle, in the GEAR's own directions (cm).
+	// (With no gear, these are measured from the belt instead.)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherSpacing = 15.f;  // sideways from the middle
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherForward = -7.5f; // forward (minus = behind the hip bone)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherHeight = 2.f;    // up
 
 	// ---- Testing ----
 	// When ticked, every frame of play is written to a spreadsheet file (CSV) in
@@ -263,6 +274,7 @@ private:
 	UPROPERTY() TObjectPtr<class UAudioComponent> WindAudio;      // plays the wind sound (see UpdateWind)
 	UPROPERTY() TObjectPtr<USkeletalMeshComponent> Body;          // your visible body (see UpdateBody)
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Harness;         // the grapple gear on your hips
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> Gear;            // the ODM gear (reels, blade boxes, tanks)
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> ThighHarnessL;   // leg loop + blade box on the left thigh
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> ThighHarnessR;   // ... and on the right thigh
 	UPROPERTY() TObjectPtr<UAnimSequence> BodyAnimPlaying;        // which animation the body is playing now
@@ -340,7 +352,7 @@ private:
 	void UpdateWind(float DeltaSeconds);              // wind sound louder / higher the faster you move
 	void SetUpBody();                                 // create the visible body and harness (once)
 	void UpdateBody();                                // keep the body under your eyes and pick its animation
-	UStaticMeshComponent* StrapToBone(UStaticMesh* Mesh, FName Bone, const FVector& OffsetCm, const FRotator& Turn); // fix one harness piece to a bone
+	UStaticMeshComponent* StrapToBone(UStaticMesh* Mesh, FName Bone, const FVector& OffsetCm, const FQuat& Turn, const FVector& Stretch = FVector::OneVector); // fix one harness piece to a bone
 	FVector RopeStart(int32 Index) const;             // where a rope leaves the body (harness launcher, or hand)
 	void RecordTelemetry(float DeltaSeconds);         // add this frame as one row of the test spreadsheet
 	void SaveTelemetry();                             // write the spreadsheet to Saved/Tests/

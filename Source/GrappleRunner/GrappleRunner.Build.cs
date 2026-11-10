@@ -13,5 +13,7 @@ public class GrappleRunner : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "HeadMountedDisplay" });
+		// Slate + SlateCore: Unreal's UI toolkit, used to draw the start menu (GRMenuGameMode.cpp).
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 	}
 }

@@ -1224,7 +1224,15 @@ void AGrappleRig::SetUpBody()
 
 	// The harness: the belt on the hip bone, and one piece on each thigh so the leg loops and
 	// blade boxes swing with your legs when you run.
-	Harness = StrapToBone(HarnessAsset.LoadSynchronous(), HarnessBone, HarnessOffset, HarnessRotation);
+	Harness = StrapToBone(HarnessAsset.LoadSynchronous(), HarnessBone, HarnessOffset, HarnessRotation.Quaternion());
+
+	// The ODM gear goes on the same hip bone, tilted so the blade boxes' back ends hang lower.
+	// The tilt turns round the body's sideways (X) axis.
+	if (UStaticMesh* GearMesh = GearAsset.LoadSynchronous())
+	{
+		const FQuat Tilt(FVector::XAxisVector, FMath::DegreesToRadians(GearTilt));
+		Gear = StrapToBone(GearMesh, HarnessBone, GearOffset, Tilt, GearScale);
+	}
 
 	// Which thigh piece goes on which leg? Piece A's outer side is +X, so it goes on whichever
 	// thigh bone sits on the +X side of the hips. (Checked rather than assumed, so a different
@@ -1241,7 +1249,7 @@ void AGrappleRig::SetUpBody()
 		const bool bPlusX = ThighAt.X > HipsAt.X;
 		const FVector Offset(bPlusX ? ThighHarnessOffset.X : -ThighHarnessOffset.X, ThighHarnessOffset.Y, ThighHarnessOffset.Z);
 		UStaticMeshComponent* Piece = StrapToBone((bPlusX ? ThighHarnessA : ThighHarnessB).LoadSynchronous(),
-			Thighs[i], Offset, FRotator::ZeroRotator);
+			Thighs[i], Offset, FQuat::Identity);
 		if (i == 0)
 		{
 			ThighHarnessL = Piece;
@@ -1258,7 +1266,7 @@ void AGrappleRig::SetUpBody()
 // Why: every bone has its own private directions (a thigh bone's "forward" points down the
 // leg), so a piece attached "straight" to a bone would end up sideways. Placing it first in
 // the body's directions, then attaching with "keep where it is", avoids guessing those.
-UStaticMeshComponent* AGrappleRig::StrapToBone(UStaticMesh* Mesh, FName Bone, const FVector& OffsetCm, const FRotator& Turn)
+UStaticMeshComponent* AGrappleRig::StrapToBone(UStaticMesh* Mesh, FName Bone, const FVector& OffsetCm, const FQuat& Turn, const FVector& Stretch)
 {
 	if (!Mesh || !Body || Body->GetBoneIndex(Bone) == INDEX_NONE)
 	{
@@ -1274,8 +1282,8 @@ UStaticMeshComponent* AGrappleRig::StrapToBone(UStaticMesh* Mesh, FName Bone, co
 	Part->RegisterComponent();
 	const FQuat BodyTurn = Body->GetComponentQuat();
 	Part->SetWorldLocationAndRotation(Body->GetBoneLocation(Bone) + BodyTurn.RotateVector(OffsetCm),
-		BodyTurn * Turn.Quaternion());
-	Part->SetWorldScale3D(FVector(HarnessScale));                 // real size, whatever the body's scale
+		BodyTurn * Turn);
+	Part->SetWorldScale3D(Stretch * HarnessScale);                // real size, whatever the body's scale
 	Part->AttachToComponent(Body, FAttachmentTransformRules::KeepWorldTransform, Bone);
 	AddInstanceComponent(Part);
 	return Part;
@@ -1321,14 +1329,16 @@ void AGrappleRig::UpdateBody()
 // with no harness they come from your hands.
 FVector AGrappleRig::RopeStart(int32 Index) const
 {
-	if (Harness && Body)
+	if ((Gear || Harness) && Body)
 	{
 		// The muzzle position in the belt's own directions (X = sideways, Y = forward, Z = up),
 		// turned into a world position. The body faces +Y, so its LEFT side is +X: rope 0 (left)
 		// leaves from the +X launcher. TransformPosition also applies HarnessScale, so a bigger
 		// harness moves the launchers out with it.
+		// The gear's nozzles if it's there, otherwise measured from the belt.
 		const FVector Muzzle(Index == 0 ? LauncherSpacing : -LauncherSpacing, LauncherForward, LauncherHeight);
-		return Harness->GetComponentTransform().TransformPosition(Muzzle);
+		const UStaticMeshComponent* From = Gear ? Gear.Get() : Harness.Get();
+		return From->GetComponentTransform().TransformPosition(Muzzle);
 	}
 	return HandPosition(Index);
 }

@@ -1,4 +1,4 @@
-# NOW (updated 9 Nov 2026, night)
+# NOW (updated 10 Nov 2026)
 
 ## Works
 - UE 5.8.4 project (VR / OpenXR template) with Brushify Floating Islands.
@@ -23,7 +23,11 @@
 - Packs in the project: Paragon Kwang, Infinity Blade Grass Lands, Infinity Blade Adversaries, Realistic Starter VFX Pack Vol 2, Paragon Grux.
 
 ## Half done
-- Visible body and hip harness (Kwang, idle/run/air animations, harness on `pelvis`): written and reviewed, **not yet compiled or played**. On branch `body-and-harness`. Next: rebuild in Unreal, check from the first-person view, tune `HarnessOffset`/`HarnessRotation`/`BodyScale`, then merge to `main`.
+- Visible body works (legs seen in game). Harness v3 (Sketchfab ODM gear + our straps) written, needs: rebuild, run `import_harness.py`, Play, tune `GearTilt` / `GearScale` / `GearOffset`. Branch `body-and-harness`.
+- Start menu (`GRMenuGameMode`) written, not yet compiled: rebuild, run `make_main_menu.py`, open `L_MainMenu`, Play.
+- Colour pass script ready (`color_grade.py`), not yet run.
+- ODM model licence: get the Sketchfab link from Naomi and record the licence + credit.
+- Beech trees use 8K textures: cap them (Max Texture Size 2048) for VR.
 - Downloading: European Beech, Paragon Agora & Monolith (queued in the launcher; check they finished).
 - New packs aren't placed in the level yet. Older UE4 packs may need a fix-up pass on first open.
 
@@ -37,7 +41,7 @@
 ## Next
 1. Wind: listen in game and tune volume / pitch.
 2. First-person body: compile and check it (see Half done). Hands still need IK later. Redesign the harness from real ODM-gear cosplay and climbing-harness references.
-3. Level: place Grass Lands ruins and Agora/Monolith structures on the islands for cover and retreats; trees; water.
+3. Level density (Naomi, 10 Nov): many more islands, some very large islands with structures, floating structures, vines between trees. Ruins/trees/ponds first pass done.
 4. PvE: one Adversaries monster that chases you and can be killed, then blood (VFX pack), then slicing.
 5. F8: cheaper plants (instancing, LODs).
 - Modes (design): 1v1, 2v2, 3v3, PvE. Realistic gore means an 18+ age rating.

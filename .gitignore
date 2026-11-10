@@ -29,3 +29,8 @@ Content/Collections/
 Content/Developers/
 *.blend1
 __pycache__/
+
+# Third-party models: not ours to publish (licence to confirm), kept local only
+Art/ThirdParty/ODM/
+# Raw exports of Paragon characters
+Art/Characters/

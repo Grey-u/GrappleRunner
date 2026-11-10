@@ -50,6 +50,12 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 FWD = -1.0   # multiply a Y value by this to mean "forward" (see note above)
 
+# STRAPS ONLY (harness v3, 10 Nov 2026): the gas unit, blade boxes, tanks and launchers now
+# come from a properly sculpted and textured ODM-gear model (Art/ThirdParty/make_odm_gear.py),
+# so this script only makes the climbing-harness STRAPS that hold that gear on the body.
+# Set to False to get the all-in-one v2 harness back (it's kept for the portfolio's process story).
+STRAPS_ONLY = "--full" not in argv
+
 
 # ------------------------------------------------------------------ materials
 # Same names as the weapon kit, so Unreal re-uses the materials it already has.
@@ -316,6 +322,9 @@ def make_waist():
                                              tilt=Matrix.Rotation(math.radians(90), 3, "Y")),
                    rounded_rect(0.006, 0.016, 0.002), M_WEB, axis=Vector((1, 0, 0))))
 
+    if STRAPS_ONLY:
+        return join("SM_Harness_Waist", P)
+
     # ---- gas engine box at the lower back (ODM "central unit")
     back = -FWD * (RY + 0.06)
     P.append(box("engine", (0.2, 0.075, 0.13), (0, back, BELT_Z - 0.01), M_DARK, bev=0.014))
@@ -424,6 +433,9 @@ def make_thigh(side, name):
                                                    tilt=Matrix.Rotation(math.radians(-10) * side, 3, "Y")),
                        rounded_rect(0.005, w, 0.002), M_LEATHER, axis=Vector((0, 0, 1))))
         P += buckle("thigh_buckle", Vector((side * 0.02, FWD * (r + 0.004), z)), (0, 0, 0), w=0.024, h=w + 0.006)
+
+    if STRAPS_ONLY:
+        return join(name, P)
 
     # blade box on the outside of the thigh: long, angled back and down, open at the back
     # Everything on the box is placed in the BOX'S OWN directions (bx + R @ offset), so the
