@@ -197,14 +197,30 @@ public:
 	// Size of the body (1 = as made). Kwang is very tall, so he's scaled down to match a
 	// 165 cm eye height; adjust if your shoulders show in front of the camera.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float BodyScale = 0.85f;
-	// The grapple harness (ODM-style gear) worn at the hips. The ropes leave from its launchers.
+	// The grapple harness v2 (Art/Harness/make_harness.py): a real climbing harness with
+	// ODM gear on it, in three pieces so each follows the bone it's strapped to.
+	//   Waist piece -> hip bone: belt, buckle, belay loop, gas engine box, two cable launchers.
+	//   Thigh pieces -> each thigh bone: leg loop, straps, blade box and gas tank.
+	// Offsets are in the BODY's directions (cm): X = sideways, Y = forward, Z = up.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UStaticMesh> HarnessAsset =
-		TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Weapons/SM_GrappleGear.SM_GrappleGear")));
-	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FName HarnessBone = TEXT("pelvis");   // the hip bone it's strapped to
-	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FVector HarnessOffset = FVector::ZeroVector;     // nudge it (cm, in the bone's own directions)
-	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FRotator HarnessRotation = FRotator::ZeroRotator; // turn it to sit right
+		TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Harness/SM_Harness_Waist.SM_Harness_Waist")));
+	// Thigh piece whose outer side is +X, and its mirror image (outer side -X).
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UStaticMesh> ThighHarnessA =
+		TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Harness/SM_Harness_ThighA.SM_Harness_ThighA")));
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UStaticMesh> ThighHarnessB =
+		TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Harness/SM_Harness_ThighB.SM_Harness_ThighB")));
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FName HarnessBone = TEXT("pelvis");   // the hip bone the belt is strapped to
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FName ThighBoneLeft = TEXT("thigh_l");
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FName ThighBoneRight = TEXT("thigh_r");
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FVector HarnessOffset = FVector::ZeroVector;     // nudge the belt (cm)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FRotator HarnessRotation = FRotator::ZeroRotator; // turn it (Yaw 180 if it faces backwards)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") FVector ThighHarnessOffset = FVector::ZeroVector; // nudge both thigh pieces (X is mirrored per leg)
+	// Size of the harness. 1 = made for a normal adult waist; raise it if it sinks into the body.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float HarnessScale = 1.f;
-	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherSpacing = 22.f;  // cm from the middle to each rope launcher (left / right hip)
+	// Where the rope comes out of each launcher's muzzle, in the belt's own directions (cm).
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherSpacing = 21.f;  // sideways from the middle
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherForward = 14.f;  // forward
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float LauncherHeight = 5.f;    // up
 
 	// ---- Testing ----
 	// When ticked, every frame of play is written to a spreadsheet file (CSV) in
@@ -247,6 +263,8 @@ private:
 	UPROPERTY() TObjectPtr<class UAudioComponent> WindAudio;      // plays the wind sound (see UpdateWind)
 	UPROPERTY() TObjectPtr<USkeletalMeshComponent> Body;          // your visible body (see UpdateBody)
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Harness;         // the grapple gear on your hips
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> ThighHarnessL;   // leg loop + blade box on the left thigh
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> ThighHarnessR;   // ... and on the right thigh
 	UPROPERTY() TObjectPtr<UAnimSequence> BodyAnimPlaying;        // which animation the body is playing now
 	float WindLevel = 0.f;                                          // 0..1, smoothed, how windy it is right now              // the cylinder shape each rope link is drawn with
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> RopeLinkMeshes; // left rope's links, then right rope's links
@@ -322,6 +340,7 @@ private:
 	void UpdateWind(float DeltaSeconds);              // wind sound louder / higher the faster you move
 	void SetUpBody();                                 // create the visible body and harness (once)
 	void UpdateBody();                                // keep the body under your eyes and pick its animation
+	UStaticMeshComponent* StrapToBone(UStaticMesh* Mesh, FName Bone, const FVector& OffsetCm, const FRotator& Turn); // fix one harness piece to a bone
 	FVector RopeStart(int32 Index) const;             // where a rope leaves the body (harness launcher, or hand)
 	void RecordTelemetry(float DeltaSeconds);         // add this frame as one row of the test spreadsheet
 	void SaveTelemetry();                             // write the spreadsheet to Saved/Tests/
