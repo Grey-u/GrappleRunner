@@ -1,0 +1,83 @@
+// =====================================================================================
+//  AeloriaHarness.h  -  the grapple harness ("Aeloria rig") worn by the player's body
+// =====================================================================================
+//
+//  WHAT THIS IS
+//  The gear the player wears: a leather waist belt with a brass buckle and a climbing
+//  "belay" ring, two leg loops on each thigh, straps over the shoulders that cross on the
+//  back, two gas canisters on the lower back, rubber hoses, and a steel rope launcher on
+//  each hip. The ropes leave from the launchers' muzzles, at the hips, close to the
+//  body's centre of mass, which is where a real swing would pull you from.
+//
+//  The design mixes three real things (see Docs/TESTS.md and the portfolio doc):
+//  - Attack on Titan ODM-gear cosplay builds: belt + thigh straps + gas tanks + hip units.
+//  - Rock-climbing harnesses: waist belt, leg loops, a belay loop at the front.
+//  - Parachute harnesses: shoulder straps that carry load down to the hips.
+//
+//  HOW IT IS MADE (no 3D modelling program needed)
+//  The shapes are built from code when the game starts, as a "procedural mesh":
+//  we list points in 3D and join them into triangles. Every piece is sized from the
+//  character's own skeleton (where the hips, thighs and shoulders are) and from its
+//  physics capsules (how thick each body part is), so the straps sit ON the body.
+//  Each piece is then pinned to a bone: the belt to the hips, each leg loop to its
+//  thigh, the shoulder straps to the upper back, so they move as the body moves.
+//
+//  HOW TO READ THIS FILE
+//  - "struct" = a bundle of settings. "UPROPERTY(EditAnywhere)" = shows in the Details
+//    panel so it can be changed without code.
+//  - Distances are centimetres (Unreal units). Colours are Red, Green, Blue from 0 to 1.
+// =====================================================================================
+#pragma once
+
+#include "CoreMinimal.h"
+#include "AeloriaHarness.generated.h"
+
+class AActor;
+class USkeletalMeshComponent;
+class UProceduralMeshComponent;
+
+// The harness's tuning values (shown under Grapple > Harness on the GrappleRig).
+USTRUCT(BlueprintType)
+struct FHarnessSettings
+{
+	GENERATED_BODY()
+
+	// Gap between the body and the straps. Raise it if straps disappear into the
+	// armour; lower it if they look like they're floating.
+	UPROPERTY(EditAnywhere, Category = "Fit") float BeltPadding = 2.5f;
+	UPROPERTY(EditAnywhere, Category = "Fit") float LegPadding = 1.5f;
+	UPROPERTY(EditAnywhere, Category = "Fit") float ChestPadding = 2.5f;
+	// How far above the hip bone the belt sits (cm).
+	UPROPERTY(EditAnywhere, Category = "Fit") float BeltHeight = 6.f;
+	// Stretch the belt wider (X) or deeper front-to-back (Y) by hand if the automatic fit is off.
+	UPROPERTY(EditAnywhere, Category = "Fit") FVector2D BeltScale = FVector2D(1.f, 1.f);
+
+	UPROPERTY(EditAnywhere, Category = "Shape") float BeltWidth = 7.f;          // belt height (cm)
+	UPROPERTY(EditAnywhere, Category = "Shape") float StrapWidth = 4.f;         // leg and shoulder straps
+	UPROPERTY(EditAnywhere, Category = "Shape") float StrapThickness = 0.7f;    // leather thickness
+	UPROPERTY(EditAnywhere, Category = "Shape") float CanisterLength = 34.f;    // each gas canister
+	UPROPERTY(EditAnywhere, Category = "Shape") float CanisterRadius = 4.2f;
+	UPROPERTY(EditAnywhere, Category = "Shape") float LauncherAngle = 25.f;     // degrees the launchers point outward from straight ahead
+	UPROPERTY(EditAnywhere, Category = "Shape") bool bShoulderStraps = true;
+
+	UPROPERTY(EditAnywhere, Category = "Colour") FLinearColor Leather = FLinearColor(0.16f, 0.075f, 0.035f);
+	UPROPERTY(EditAnywhere, Category = "Colour") FLinearColor Steel = FLinearColor(0.56f, 0.58f, 0.62f);
+	UPROPERTY(EditAnywhere, Category = "Colour") FLinearColor Brass = FLinearColor(0.72f, 0.5f, 0.2f);
+	UPROPERTY(EditAnywhere, Category = "Colour") FLinearColor Rubber = FLinearColor(0.03f, 0.03f, 0.035f);
+};
+
+// What the builder hands back: the pieces it made, and where the ropes come out.
+struct FHarnessResult
+{
+	TArray<UProceduralMeshComponent*> Pieces;     // every piece, so they can be removed later
+	UProceduralMeshComponent* Hips = nullptr;     // the belt piece (launchers are part of it)
+	FVector MuzzleLocal[2];                        // rope exit points, in the Hips piece's own space (0 = left, 1 = right)
+	bool bOk = false;
+};
+
+namespace AeloriaHarness
+{
+	// Build the harness on Body and pin each piece to its bone.
+	// Returns bOk = false (and builds nothing) if the skeleton lacks a "pelvis" bone.
+	FHarnessResult Build(AActor* Owner, USkeletalMeshComponent* Body, const FHarnessSettings& Settings);
+}
