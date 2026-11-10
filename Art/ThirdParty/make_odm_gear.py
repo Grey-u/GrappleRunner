@@ -78,6 +78,27 @@ for o in cables:
     bpy.data.objects.remove(o)
 
 
+def clean(ob):
+    """Unreal refused the raw download ("Bad MeshDescription"): it has duplicate points, faces
+    with no area and broken stored normals. Fix all three, then let Unreal work out normals."""
+    import bmesh as bm_mod
+    bm = bm_mod.new()
+    bm.from_mesh(ob.data)
+    bm_mod.ops.remove_doubles(bm, verts=bm.verts, dist=0.00002)           # merge points 0.02 mm apart
+    bm_mod.ops.dissolve_degenerate(bm, edges=bm.edges, dist=0.000001)     # remove zero-size faces and edges
+    loose = [v for v in bm.verts if not v.link_faces]
+    bm_mod.ops.delete(bm, geom=loose, context="VERTS")                    # points not part of any face
+    bm_mod.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(ob.data)
+    bm.free()
+    bpy.context.view_layer.objects.active = ob
+    try:
+        bpy.ops.mesh.customdata_custom_splitnormals_clear()               # drop the broken stored normals
+    except Exception:
+        pass
+    ob.data.validate(clean_customdata=True)
+
+
 def merge(name, objs, origin):
     bpy.ops.object.select_all(action="DESELECT")
     for o in objs:
@@ -86,6 +107,7 @@ def merge(name, objs, origin):
     bpy.ops.object.join()
     ob = bpy.context.active_object
     ob.name = ob.data.name = name
+    clean(ob)
     bpy.context.scene.cursor.location = origin
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
     ob.location = (0, 0, 0)                              # origin is now the attach point
@@ -107,6 +129,9 @@ if sword_r:
     assets.append(merge("SM_ODM_Sword_R", sword_r, grip_centre(sword_r)))
 
 for ob in assets:
+    # Export WITHOUT a material: Unreal's importer made a broken temporary one from it. The import
+    # script (Scripts/import_harness.py) gives the mesh our own material with the 4K textures.
+    ob.data.materials.clear()
     bpy.ops.object.select_all(action="DESELECT")
     ob.select_set(True)
     bpy.context.view_layer.objects.active = ob
@@ -117,6 +142,8 @@ for ob in assets:
     print("exported", ob.name, len(ob.data.polygons), "faces")
 
 # ------------------------------------------------------------------ preview: gear + our straps
+for ob in assets:
+    ob.data.materials.append(mat)
 mat.use_nodes = True
 nt = mat.node_tree
 bsdf = nt.nodes["Principled BSDF"]

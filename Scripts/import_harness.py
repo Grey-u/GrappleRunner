@@ -65,6 +65,9 @@ for n in NAMES:
     unreal.log("Harness: ready " + path + " ({} colour slots)".format(len(slots)))
 
 # ---- 3. the ODM gear and swords (harness v3), from the downloaded Sketchfab model.
+# (First remove the broken material the importer made on the first attempt, 10 Nov.)
+if unreal.EditorAssetLibrary.does_asset_exist(DEST + "/M_ODMGear"):
+    unreal.EditorAssetLibrary.delete_asset(DEST + "/M_ODMGear")
 # Its files live in Art/ThirdParty/ODM (kept out of the public repo, see .gitignore):
 #   SM_ODM_Gear.fbx, SM_ODM_Sword_L.fbx, SM_ODM_Sword_R.fbx  (made by Art/ThirdParty/make_odm_gear.py)
 #   snk_texture_BaseColor / Normal / Metallic / Roughness / AO .jpg  (4K textures from the download)
@@ -108,12 +111,16 @@ if os.path.isdir(ODM):
 
     # A material that plugs each texture into its slot (built in code, so it's reproducible).
     mel = unreal.MaterialEditingLibrary
-    mat_path = DEST + "/M_ODMGear"
+    mat_path = DEST + "/M_ODMGear_PBR"      # (not "M_ODMGear": the importer once made a broken asset by that name)
     if unreal.EditorAssetLibrary.does_asset_exist(mat_path):
         material = unreal.load_asset(mat_path)
-        mel.delete_all_material_expressions(material)
+        if isinstance(material, unreal.Material):
+            mel.delete_all_material_expressions(material)
+        else:
+            unreal.EditorAssetLibrary.delete_asset(mat_path)
+            material = tools.create_asset("M_ODMGear_PBR", DEST, unreal.Material, unreal.MaterialFactoryNew())
     else:
-        material = tools.create_asset("M_ODMGear", DEST, unreal.Material, unreal.MaterialFactoryNew())
+        material = tools.create_asset("M_ODMGear_PBR", DEST, unreal.Material, unreal.MaterialFactoryNew())
     S = unreal.MaterialSamplerType
     P = unreal.MaterialProperty
     for i, (tex, sampler, out, prop) in enumerate([
@@ -125,6 +132,9 @@ if os.path.isdir(ODM):
         if not tex:
             continue
         node = mel.create_material_expression(material, unreal.MaterialExpressionTextureSample, -400, i * 260)
+        if node is None:
+            unreal.log_warning("Harness: could not add a texture node to the ODM material")
+            continue
         node.set_editor_property("texture", tex)
         node.set_editor_property("sampler_type", sampler)
         mel.connect_material_property(node, out, prop)
