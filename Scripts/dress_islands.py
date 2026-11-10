@@ -36,9 +36,9 @@ import unreal
 SEED = 7
 CLEAR_START = 600          # cm kept empty round the PlayerStart
 CLEAR_ANCHOR = 700         # cm kept empty round each grapple rock (clear hook lines)
-TREES_PER_ISLAND = 3       # tall beech trees
-SAPLINGS_PER_ISLAND = 4
-POND_ISLANDS = 4           # how many islands get a pond
+TREES_PER_ISLAND = 5       # tall beech trees (more on bigger islands)
+SAPLINGS_PER_ISLAND = 7
+POND_ISLANDS = 8           # how many islands get a pond
 EXTRA_WATERFALLS = 4
 TREE_DRAW_DISTANCE = 30000  # cm: trees further than 300 m aren't drawn (saves frame time)
 
@@ -239,7 +239,8 @@ def find_spot(island, radius, tries=60):
 clusters = 0
 for i, island in enumerate(islands):
     origin, ext = island.get_actor_bounds(False)
-    count = 2 if min(ext.x, ext.y) > 2800 else 1
+    # bigger islands get more clusters: about one per 30 x 30 m of top area, up to 8
+    count = int(max(1, min(8, (ext.x * ext.y * 4) / (3000.0 * 3000.0))))
     for k in range(count):
         recipe, radius = RECIPES[(i + k) % len(RECIPES)] if random.random() < 0.7 else random.choice(RECIPES)
         p = find_spot(island, radius)
@@ -253,8 +254,11 @@ log("{} ruin clusters".format(clusters))
 # ---- 2. trees (around the ruins, not on them)
 trees = 0
 for island in islands:
+    origin, ext = island.get_actor_bounds(False)
+    size = max(1.0, (ext.x * ext.y * 4) / (2500.0 * 2500.0))     # 1 for a normal landing island
     for n, (fam, names, solid) in enumerate([("tree", TREES, True), ("sapling", SAPLINGS, False)]):
-        want = TREES_PER_ISLAND if fam == "tree" else SAPLINGS_PER_ISLAND
+        # grows with the square root of the area, capped: dense, but not thousands of trees (VR frame rate)
+        want = int(min(20, (TREES_PER_ISLAND if fam == "tree" else SAPLINGS_PER_ISLAND) * size ** 0.5))
         for _ in range(want):
             p = find_spot(island, 350 if fam == "tree" else 120, tries=25)
             if not p:
@@ -273,7 +277,7 @@ if plane:
     b = plane.get_bounds()
     pond_scale = min(4.0, max(0.05, 500.0 / max(1.0, 2 * max(b.box_extent.x, b.box_extent.y))))  # ~5 m across
     for island in random.sample(islands, min(POND_ISLANDS, len(islands))):
-        p = find_spot(island, 450)
+        p = find_spot(island, 320, tries=120)     # (450 cm found no room on 10 Nov: 0 ponds)
         if not p:
             continue
         a = actors.spawn_actor_from_object(plane, unreal.Vector(p.x, p.y, p.z + 4.0), unreal.Rotator(yaw=random.uniform(0, 360)))
