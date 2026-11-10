@@ -38,16 +38,18 @@ public:
 	AGRVine();
 
 	// Where the vine ends, measured from this actor (drag the diamond in the level to move it).
-	UPROPERTY(EditAnywhere, Category = "Vine", Meta = (MakeEditWidget = true)) FVector EndPoint = FVector(1000.f, 0.f, 0.f);
+	UPROPERTY(EditAnywhere, Category = "Vine", Meta = (MakeEditWidget = true)) FVector EndPoint = FVector::ZeroVector;
+	// (Starts at zero = draws nothing, so a vine placed by a script is built ONCE, when its end is set.)
 	// How far the middle hangs below the straight line between the ends (cm).
 	UPROPERTY(EditAnywhere, Category = "Vine") float Sag = 200.f;
 	// How many bent pieces the vine is made of: more = smoother curve, a little more cost.
-	UPROPERTY(EditAnywhere, Category = "Vine", Meta = (ClampMin = 2, ClampMax = 32)) int32 Segments = 8;
+	UPROPERTY(EditAnywhere, Category = "Vine", Meta = (ClampMin = 2, ClampMax = 32)) int32 Segments = 5;
 	// Thickness multiplier (1 = the mesh's own thickness).
 	UPROPERTY(EditAnywhere, Category = "Vine") float Thickness = 1.f;
 	// The mesh bent along the curve, and which of its axes runs along its length.
 	UPROPERTY(EditAnywhere, Category = "Vine") TSoftObjectPtr<UStaticMesh> VineMesh =
-		TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/Brushify/Meshes/FloatingIslands/Dressing/Vines/S_Vines.S_Vines")));
+		TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Vines/SM_VineStem.SM_VineStem")));
+	// (Our own light stem with leaves, Art/Vines/make_vine.py. The pack's vine mesh used far too much memory.)
 	UPROPERTY(EditAnywhere, Category = "Vine") TEnumAsByte<ESplineMeshAxis::Type> LengthAxis = ESplineMeshAxis::X;
 	// Vines further away than this aren't drawn (cm), to keep the frame rate up in VR.
 	UPROPERTY(EditAnywhere, Category = "Vine") float DrawDistance = 20000.f;
