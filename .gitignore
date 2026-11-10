@@ -34,3 +34,6 @@ __pycache__/
 Art/ThirdParty/ODM/
 # Raw exports of Paragon characters
 Art/Characters/
+
+# Portfolio build output (embeds the third-party gear render)
+Docs/Portfolio/Out/
