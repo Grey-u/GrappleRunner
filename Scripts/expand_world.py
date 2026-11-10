@@ -47,7 +47,7 @@ FLOAT_HEIGHT = (500, 3000)       # cm above the route
 ANCHOR_HEIGHT = (1100, 2100)     # same as the route: 11-21 m above the island top
 CHAIN_STEP = (1200, 1600)        # cm between rocks on a chain out to an island
 ROUTE_CLEAR = 1500               # cm kept clear either side of the route line
-VINES_PER_TREE = 2
+VINES_PER_TREE = 3            # 10 Nov: more connecting vines
 VINE_LENGTH = (700, 2500)        # cm: tree pairs this far apart get a vine
 FOLDERS = ["GrappleRunner/Expansion/Islands", "GrappleRunner/Expansion/Anchors",
            "GrappleRunner/Expansion/FloatingRuins", "GrappleRunner/Vines"]
@@ -243,8 +243,9 @@ for i in range(FLOATING_RUINS if pieces else 0):
     floats += 1
 log("{} floating ruins".format(floats))
 
-# ---- 5. dress every island (old and new) with ruins, trees and ponds
-log("dressing all islands: this is the slow part")
+# ---- 5. ground plants (70% more), then dress every island with overgrown ruins, trees, water
+log("planting and dressing all islands: this is the slow part")
+exec(open(os.path.join(PROJECT, "Scripts", "scatter_foliage.py")).read(), {"__name__": "scatter_foliage"})
 # (run in its own space, so its settings don't overwrite this script's)
 exec(open(os.path.join(PROJECT, "Scripts", "dress_islands.py")).read(), {"__name__": "dress_islands"})
 
@@ -287,6 +288,21 @@ else:
             vine(a, b, random.uniform(0.12, 0.25))
             links[t.get_name()] += 1
             links[u.get_name()] += 1
+    # vines from the tops of tall ruins to the nearest tree: nature tying the buildings down
+    tall = [a for a in actors.get_all_level_actors() if str(a.get_folder_path()) == "GrappleRunner/Ruins"
+            and any(k in a.get_actor_label() for k in ("_column_", "_arch_", "_tower_", "_wall_"))]
+    for ruin in tall:
+        if random.random() > 0.55:
+            continue
+        o, e = ruin.get_actor_bounds(False)
+        top = unreal.Vector(o.x, o.y, o.z + e.z * 0.85)
+        near = [t for t in trees if 600 < (t.get_actor_location() - top).length() < 2500]
+        if not near:
+            continue
+        t = min(near, key=lambda u: (u.get_actor_location() - top).length())
+        _, te = t.get_actor_bounds(False)
+        vine(top, t.get_actor_location() + unreal.Vector(0, 0, 2 * te.z * random.uniform(0.4, 0.65)),
+             random.uniform(0.12, 0.22))
     # some floating ruins hang a vine down to the nearest island
     islands_now = [a for a in actors.get_all_level_actors() if a.get_actor_label().startswith("Landing_")]
     for r in [a for a in actors.get_all_level_actors() if a.actor_has_tag("FloatingRuin")]:

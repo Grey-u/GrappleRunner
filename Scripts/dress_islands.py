@@ -36,8 +36,10 @@ import unreal
 SEED = 7
 CLEAR_START = 600          # cm kept empty round the PlayerStart
 CLEAR_ANCHOR = 700         # cm kept empty round each grapple rock (clear hook lines)
-TREES_PER_ISLAND = 5       # tall beech trees (more on bigger islands)
-SAPLINGS_PER_ISLAND = 7
+TREES_PER_ISLAND = 8       # tall beech trees (more on bigger islands); 70% up on 10 Nov
+SAPLINGS_PER_ISLAND = 12
+UNDERGROWTH_PER_ISLAND = 14  # ferns and bushes, not solid
+FLOOD_CHANCE = 0.6         # share of temples whose courtyard is flooded (still water between the columns)
 POND_ISLANDS = 8           # how many islands get a pond
 EXTRA_WATERFALLS = 4
 TREE_DRAW_DISTANCE = 30000  # cm: trees further than 300 m aren't drawn (saves frame time)
@@ -46,6 +48,17 @@ R = "/Game/InfinityBladeGrassLands/Environments/Plains/Env_Plains_Ruins/StaticMe
 S = "/Game/InfinityBladeGrassLands/Environments/Plains/Env_Plains_Statues/StaticMesh/"
 O = "/Game/InfinityBladeGrassLands/Environments/Plains/Env_Plains_Organic/StaticMesh/"
 T = "/Game/EuropeanBeech/Geometry/SimpleWind/"
+B = "/Game/Brushify/Meshes/FloatingIslands/Dressing/"
+K = "/Game/KiteDemo/Environments/Foliage/"
+F = "/Game/InfinityBladeGrassLands/Environments/Plains/Env_Plains_Flora/StaticMesh/"
+# Nature taking over the ruins: roots draped over the tops, vines hanging down the sides,
+# ferns and bushes at the feet. (mesh paths; the ones a pack doesn't have are skipped)
+ROOTS = [B + "Roots_01/S_Roots_01", B + "Roots_02/S_Roots_02", B + "Roots_03/S_Roots_03"]
+HANGING = [F + "SM_Plains_Vine01", F + "SM_Plains_Vine02"]
+FERNS = [K + "Ferns/SM_Fern_01", K + "Ferns/SM_Fern_02", K + "Ferns/SM_Fern_03",
+         F + "SM_Plains_Fern01", F + "SM_Plains_Fern02", F + "SM_Plains_Fern03", F + "SM_Plains_Fern04"]
+BUSHES = [K + "BogMyrtleBush_01/BogMyrtleBush_01", K + "BogMyrtleBush_02/BogMyrtleBush_02"]
+OVERGROWN = ("column", "wall", "arch", "tower", "statue", "fountain")
 WF = "/Game/Brushify/Maps/FloatingIslands/PFX/"
 
 # Families: every piece in a family gets the SAME scale, worked out from one reference piece,
@@ -61,6 +74,8 @@ FAMILIES = {
     "fountain": (R + "SM_Plains_Castle_Fountain_01", 150),
     "tree": (T + "SM_EuropeanBeech_Forest_01", 1500),
     "sapling": (T + "SM_EuropeanBeech_Sapling_01", 450),
+    "fern": (K + "Ferns/SM_Fern_01", 110),
+    "bush": (K + "BogMyrtleBush_01/BogMyrtleBush_01", 150),
 }
 COLUMNS = ["SM_Plains_Column_Large_01", "SM_Plains_Column_Large_Broken_01",
            "SM_Plains_Column_Large_Broken_02", "SM_Plains_Column_Large_Broken_03"]
@@ -158,7 +173,79 @@ def place(island, kind, fam, path, x, y, yaw, solid=True, shadow=True, draw=0, j
     a.set_folder_path(FOLDERS[kind])
     a.set_actor_label("{}_{}_{:03d}".format(kind.capitalize(), fam, len(layout)))
     layout.append((kind, path.split("/")[-1], round(p.x), round(p.y), round(p.z), island.get_actor_label()))
+    if kind == "ruin" and fam in OVERGROWN:
+        overgrow(island, a)
     return a
+
+
+def decor(path, loc, yaw, scale, folder):
+    """A non-solid, shadowless piece of plant life (roots, a hanging vine)."""
+    m = mesh(path)
+    if not m:
+        return None
+    d = actors.spawn_actor_from_object(m, loc, unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw))
+    if not d:
+        return None
+    d.set_actor_scale3d(unreal.Vector(scale, scale, scale))
+    c = d.get_component_by_class(unreal.StaticMeshComponent)
+    c.set_collision_profile_name("NoCollision")
+    c.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    c.set_editor_property("cast_shadow", False)
+    d.set_folder_path(folder)
+    return d
+
+
+def overgrow(island, ruin):
+    """Make one ruin piece look reclaimed by the forest."""
+    o, e = ruin.get_actor_bounds(False)
+    top = o.z + e.z
+    width = 2 * max(e.x, e.y)
+    # roots draped over the top, a bit wider than the piece so they spill over the edges
+    rm = mesh(random.choice(ROOTS))
+    if rm:
+        b = rm.get_bounds()
+        sc = max(0.2, min(4.0, width * 1.15 / max(1.0, 2 * max(b.box_extent.x, b.box_extent.y))))
+        decor(rm.get_path_name().split(".")[0], unreal.Vector(o.x, o.y, top - b.box_extent.z * sc * 0.6),
+              random.uniform(0, 360), sc, FOLDERS["ruin"])
+    # one or two vines hanging down the sides from the top edge
+    for _ in range(random.choice([1, 1, 2])):
+        hm = mesh(random.choice(HANGING))
+        if not hm:
+            break
+        b = hm.get_bounds()
+        sc = max(0.3, min(4.0, (2 * e.z * random.uniform(0.45, 0.8)) / max(1.0, 2 * b.box_extent.z)))
+        ang = random.uniform(0, 2 * math.pi)
+        edge = unreal.Vector(o.x + math.cos(ang) * max(e.x, e.y) * 0.85, o.y + math.sin(ang) * max(e.x, e.y) * 0.85, top)
+        z = top - (b.origin.z + b.box_extent.z) * sc
+        decor(hm.get_path_name().split(".")[0], unreal.Vector(edge.x, edge.y, z), math.degrees(ang) + 90, sc, FOLDERS["ruin"])
+    # ferns and a bush round its feet
+    for _ in range(random.randint(3, 6)):
+        ang = random.uniform(0, 2 * math.pi)
+        r = max(e.x, e.y) * random.uniform(0.9, 1.4)
+        is_bush = random.random() < 0.25
+        place(island, "tree", "bush" if is_bush else "fern", random.choice(BUSHES if is_bush else FERNS),
+              o.x + math.cos(ang) * r, o.y + math.sin(ang) * r, random.uniform(0, 360),
+              solid=False, shadow=False, draw=TREE_DRAW_DISTANCE, jitter=random.uniform(0.7, 1.3))
+
+
+def flood(island, cx, cy, radius):
+    """Still water over a temple courtyard, like a ruin the rain has taken back."""
+    plane = mesh(O + "SM_WaterPlain")
+    p = ground(island, cx, cy)
+    if not plane or not p:
+        return
+    b = plane.get_bounds()
+    sc = min(6.0, max(0.05, 2 * radius / max(1.0, 2 * max(b.box_extent.x, b.box_extent.y))))
+    w = actors.spawn_actor_from_object(plane, unreal.Vector(p.x, p.y, p.z + 6.0), unreal.Rotator(yaw=random.uniform(0, 360)))
+    if not w:
+        return
+    w.set_actor_scale3d(unreal.Vector(sc, sc, 1.0))
+    c = w.get_component_by_class(unreal.StaticMeshComponent)
+    c.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    c.set_editor_property("cast_shadow", False)
+    w.set_folder_path(FOLDERS["water"])
+    w.set_actor_label("Flood_{:03d}".format(len(layout)))
+    layout.append(("water", "flooded courtyard", round(p.x), round(p.y), round(p.z), island.get_actor_label()))
 
 
 def local(cx, cy, yaw, dx, dy):
@@ -189,6 +276,8 @@ def temple(island, cx, cy, yaw):
     elif centre < 0.8:
         place(island, "ruin", "statue", S + "SM_Plains_Angel_Statue_01", cx, cy, yaw + 180)
     rubble(island, cx, cy, yaw, 4)
+    if random.random() < FLOOD_CHANCE:
+        flood(island, cx, cy, 600)
 
 
 def wall(island, cx, cy, yaw):
@@ -256,19 +345,25 @@ trees = 0
 for island in islands:
     origin, ext = island.get_actor_bounds(False)
     size = max(1.0, (ext.x * ext.y * 4) / (2500.0 * 2500.0))     # 1 for a normal landing island
-    for n, (fam, names, solid) in enumerate([("tree", TREES, True), ("sapling", SAPLINGS, False)]):
+    for n, (fam, names, solid) in enumerate([("tree", TREES, True), ("sapling", SAPLINGS, False),
+                                             ("fern", FERNS + BUSHES, False)]):
         # grows with the square root of the area, capped: dense, but not thousands of trees (VR frame rate)
-        want = int(min(20, (TREES_PER_ISLAND if fam == "tree" else SAPLINGS_PER_ISLAND) * size ** 0.5))
+        base = {"tree": TREES_PER_ISLAND, "sapling": SAPLINGS_PER_ISLAND, "fern": UNDERGROWTH_PER_ISLAND}[fam]
+        want = int(min(34, base * size ** 0.5))
         for _ in range(want):
-            p = find_spot(island, 350 if fam == "tree" else 120, tries=25)
+            p = find_spot(island, {"tree": 350, "sapling": 120, "fern": 50}[fam], tries=25)
             if not p:
                 continue
-            if place(island, "tree", fam, T + random.choice(names), p.x, p.y, random.uniform(0, 360),
+            name = random.choice(names)
+            path = name if name.startswith("/Game") else T + name      # ferns and bushes carry their full path
+            kind_fam = "bush" if "Bush" in path else fam
+            if place(island, "tree", kind_fam, path, p.x, p.y, random.uniform(0, 360),
                      solid=solid, shadow=(fam == "tree"), draw=TREE_DRAW_DISTANCE,
                      jitter=random.uniform(0.8, 1.2)):
-                used.append((p, 250 if fam == "tree" else 80))
+                if fam != "fern":
+                    used.append((p, 250 if fam == "tree" else 80))
                 trees += 1
-log("{} trees and saplings".format(trees))
+log("{} trees, saplings, ferns and bushes".format(trees))
 
 # ---- 3. water: ponds ringed with stones, and more waterfalls
 plane = mesh(O + "SM_WaterPlain")

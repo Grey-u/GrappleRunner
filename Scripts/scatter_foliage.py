@@ -25,7 +25,7 @@ import unreal
 
 # ---------------------------------------------------------------- SETTINGS
 SEED = 21                    # change for a different arrangement
-TRIES_PER_ISLAND = 90        # random spots tried per island (some miss the top and are skipped)
+TRIES_PER_ISLAND = 153       # random spots tried per island (70% more than the first pass); bigger islands get more
 CLEAR_RADIUS = 400           # cm kept empty around the PlayerStart
 FOLDER = "GrappleRunner/Foliage"
 F = "/Game/Brushify/Materials/Landscape/ProceduralMeshes/Foliage/"
@@ -45,6 +45,9 @@ PLANTS = [
     (B + "MoorlandHeather/S_MoorlandHeather_Ferns_01", 2, 0.7, 1.1),
     (B + "GenericBush/S_GenericBush_Small", 2, 0.7, 1.0),
     (B + "GenericBush/S_GenericBush_Medium", 1, 0.6, 0.9),
+    ("/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_01", 4, 0.7, 1.2),
+    ("/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_02", 4, 0.7, 1.2),
+    ("/Game/InfinityBladeGrassLands/Environments/Plains/Env_Plains_Flora/StaticMesh/SM_Plains_Fern01", 3, 0.7, 1.2),
 ]
 # -------------------------------------------------------------------------
 
@@ -75,7 +78,8 @@ islands = [a for a in actors.get_all_level_actors() if a.get_actor_label().start
 placed = 0
 for island in islands:
     origin, ext = island.get_actor_bounds(False)
-    for _ in range(TRIES_PER_ISLAND):
+    area_factor = max(1.0, (ext.x * ext.y * 4) / (2500.0 * 2500.0))      # 1 = a normal landing island
+    for _ in range(int(min(900, TRIES_PER_ISLAND * area_factor ** 0.5))):
         # a random spot within the middle 80% of the island, seen from above
         x = origin.x + random.uniform(-0.8, 0.8) * ext.x
         y = origin.y + random.uniform(-0.8, 0.8) * ext.y

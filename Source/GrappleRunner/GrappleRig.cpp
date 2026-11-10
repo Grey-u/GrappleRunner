@@ -34,6 +34,7 @@
 // =====================================================================================
 
 #include "GrappleRig.h"
+#include "GRVine.h"                               // hanging vines that snap
 
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
@@ -151,6 +152,11 @@ void AGrappleRig::BeginPlay()
 	for (AActor* A : Found)
 	{
 		Anchors.Add(A);
+	}
+	// Every vine, so we can snap the ones the player flies through.
+	for (TActorIterator<AGRVine> It(GetWorld()); It; ++It)
+	{
+		Vines.Add(*It);
 	}
 
 	// ---- 3. Death height ----
@@ -548,6 +554,33 @@ void AGrappleRig::ReleaseHook(int32 Index)
 // =====================================================================================
 //  Pulse: vibrate a VR controller for 0.08 seconds. Amplitude: 0 = nothing, 1 = full.
 // =====================================================================================
+// Vines: for each one, a quick "is it anywhere near the path?" test against a sphere round
+// the whole vine, then the exact test (AGRVine::TrySnap) only for the few that are close.
+// A snap gives both hands a light buzz, so you feel it tear.
+void AGrappleRig::SnapVines(const FVector& From, const FVector& To)
+{
+	const float Reach = BodyRadius * 1.2f;   // the body plus a little: vines are thin
+	for (const TWeakObjectPtr<AGRVine>& Weak : Vines)
+	{
+		AGRVine* Vine = Weak.Get();
+		if (!Vine || Vine->IsSnapped())
+		{
+			continue;
+		}
+		const FVector C = Vine->BoundsCentre();
+		const float R = Vine->BoundsRadius() + Reach;
+		if (FMath::PointDistToSegmentSquared(C, From, To) > R * R)
+		{
+			continue;   // nowhere near
+		}
+		if (Vine->TrySnap(From, To, Reach, Velocity))
+		{
+			Pulse(0, 0.35f);
+			Pulse(1, 0.35f);
+		}
+	}
+}
+
 void AGrappleRig::Pulse(int32 Index, float Amplitude)
 {
 	APlayerController* P = PC.Get();
@@ -622,6 +655,7 @@ void AGrappleRig::Tick(float DeltaSeconds)
 	// run as many 1/120 s steps as fit. Leftover time waits for next frame.
 	// The bucket is capped at 0.1 s, so a big hitch can't launch the player across the map.
 	const float Step = 1.f / 120.f;   // same fixed step as the physics bench
+	const FVector CentreBefore = BodyCenter();   // remembered so we know the path the body took (vines)
 	Accumulator = FMath::Min(Accumulator + DeltaSeconds, 0.1f);
 	while (Accumulator >= Step)
 	{
@@ -665,6 +699,7 @@ void AGrappleRig::Tick(float DeltaSeconds)
 	// Actually move the player's body to the new position.
 	Pawn->SetActorLocation(BodyPos, false, nullptr, ETeleportType::TeleportPhysics);
 	LastSetLocation = Pawn->GetActorLocation();
+	SnapVines(CentreBefore, BodyCenter());   // flew through a vine? it breaks
 
 	UpdateBody();                        // body follows your eyes, plays idle / run / air
 	UpdateVisuals();

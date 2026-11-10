@@ -10,6 +10,10 @@
 //  Scripts/expand_world.py places these between trees automatically.
 //
 //  VINES ARE NOT SOLID: no collision, so they never snag the player or a rope.
+//  But they SNAP: fly through one faster than MinSnapSpeed and it breaks where your body hit
+//  it. The two halves drop and swing from their anchors, the swing dying away over a few
+//  seconds, then they hang still. (The GrappleRig checks your path through the vines every
+//  frame and calls TrySnap; see AGrappleRig::SnapVines.)
 //
 //  HOW TO READ THIS FILE
 //  - "UPROPERTY(EditAnywhere)" = shows in the Details panel; change it and the vine redraws.
@@ -48,10 +52,32 @@ public:
 	// Vines further away than this aren't drawn (cm), to keep the frame rate up in VR.
 	UPROPERTY(EditAnywhere, Category = "Vine") float DrawDistance = 20000.f;
 
+	// Snapping: the slowest speed (cm/s) that breaks the vine, and how fast the halves settle.
+	UPROPERTY(EditAnywhere, Category = "Vine") bool bCanSnap = true;
+	UPROPERTY(EditAnywhere, Category = "Vine") float MinSnapSpeed = 400.f;
+	UPROPERTY(EditAnywhere, Category = "Vine") float SwingSettleSeconds = 1.6f;
+
 	// Runs whenever the vine is placed or a setting changes: rebuilds the pieces.
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void Tick(float DeltaSeconds) override;   // only runs while snapped halves are swinging
+
+	// Called by the GrappleRig each frame with the path the player's body took (From -> To),
+	// the body's radius and its velocity. Snaps the vine if that path crossed it. True = snapped.
+	bool TrySnap(const FVector& From, const FVector& To, float Radius, const FVector& Velocity);
+	bool IsSnapped() const { return bSnapped; }
+	// A sphere that holds the whole vine (world space), for a quick "is it anywhere near?" test.
+	FVector BoundsCentre() const { return GetActorLocation() + EndPoint * 0.5f - FVector(0.f, 0.f, Sag * 0.5f); }
+	float BoundsRadius() const { return EndPoint.Size() * 0.5f + Sag; }
 
 private:
 	UPROPERTY() TArray<TObjectPtr<USplineMeshComponent>> Pieces;
 	FVector PointAt(float T) const;   // a point along the sagging curve, T from 0 (start) to 1 (end)
+
+	// After a snap: pieces [0, CutPiece) hang from the start, [CutPiece, N) from the end.
+	bool bSnapped = false;
+	int32 CutPiece = 0;
+	float SnapAge = 0.f;
+	FVector RestEnd[2];        // where each half's loose end comes to rest (relative to the actor)
+	FVector SwingKick[2];      // how far each loose end is thrown at first (the player's push)
+	void PoseHalves();         // bend the pieces of both halves into their hanging curves
 };

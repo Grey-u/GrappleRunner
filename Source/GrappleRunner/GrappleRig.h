@@ -294,6 +294,7 @@ private:
 	TWeakObjectPtr<UCameraComponent> Camera;    // the player's eyes / headset
 	TWeakObjectPtr<USceneComponent> Hands[2];   // left and right VR controllers
 	TArray<TWeakObjectPtr<AActor>> Anchors;     // every rock tagged "GrappleAnchor" (for aim assist)
+	TArray<TWeakObjectPtr<class AGRVine>> Vines; // every vine in the level (they snap when you fly through)
 
 	// Lists of controller button names. Different headsets name their buttons differently
 	// (Vive, Quest, Index...), so we keep a list per action and accept any of them.
@@ -347,6 +348,7 @@ private:
 	void ReleaseHook(int32 Index);                    // let go of a hook
 	void Respawn();                                   // put the player back on the first island
 	void Pulse(int32 Index, float Amplitude);         // vibrate a VR controller
+	void SnapVines(const FVector& From, const FVector& To);   // break any vine the body flew through this frame
 	void SimulateRopeShape(int32 Index, float DeltaSeconds); // move the rope's links (sag, swing, whip)
 	void FeelRopeTension();                           // vibrate each controller by how hard its rope pulls
 	void UpdateWind(float DeltaSeconds);              // wind sound louder / higher the faster you move

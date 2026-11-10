@@ -108,3 +108,16 @@ One entry per work session: what was built, what broke, and what was learned. Ne
   - Problem found: the beech trees ship with 8K textures, and Unreal froze for minutes building them on first use. They need smaller texture sizes for VR.
 - **Colour** (`Scripts/color_grade.py`): Naomi said the game looked colourless and dull. Golden-hour sun, cool blue shadow fill, turquoise mist with a golden sun glow, a warm/cool grade and more saturation.
 - **Start menu** (`GRMenuGameMode`, C++/Slate): the EXIT SUIT portfolio cover is the title card. PLAY leads to 1v1 / 2v2 / 3v3 / 5v5 / PvE, then a loading screen. Multiplayer isn't built, so every mode plays solo for now. The packaged game starts at `L_MainMenu`.
+
+## 10 Nov 2026 (evening): Ethereal fantasy pass and snapping vines
+- **Brief from Naomi:** nature taking over architecture, an ethereal fantasy feel with atmosphere, no "white-washed" look, 70% more greenery, and vines that snap when you fly through them. The old harness on the weapon stand is to go.
+- **Snapping vines (C++).** Each frame, `AGrappleRig::SnapVines` checks the path your body took. It first checks a sphere round each vine, then the exact distance from the body's path to each short piece of the vine. If you hit a vine faster than 4 m/s, it breaks there. The two halves drop for 0.35 s, then swing like pendulums whose swing dies away over about 1.6 s (period = 2π√(length / g)), and the controllers give a light buzz. The vines are still not solid, so they never stop the player.
+- **Overgrown ruins** (`dress_islands.py`): every column, wall, arch, tower and statue gets roots draped over its top, one or two hanging vines and ferns or bushes at its base. 60% of temple courtyards are flooded with still water. Trees, saplings and undergrowth are up 70%. Ground plants go from 90 to 153 tries per island, scaled up for big islands, with ferns added.
+- **More vines** (`expand_world.py`): up to 3 per tree, plus vines from the tops of tall ruins to the nearest tree.
+- **Atmosphere** (`color_grade.py`, now three moods: rose, amber and teal):
+  - a low coloured sun with light shafts;
+  - thick coloured volumetric fog that glows toward the sun;
+  - a tinted, dimmer sky light, so shadows are coloured rather than grey;
+  - a stronger grade (cool shadows, warm highlights);
+  - about 90 glowing orbs hanging from the tree canopies, plus soft coloured lights by the ruins, with no shadows to keep them cheap.
+- **Performance risk:** all of this adds draw calls and overdraw. Measure with `gr.Test perf` (T-15) before VR testing.
