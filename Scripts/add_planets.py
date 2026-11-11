@@ -14,6 +14,7 @@ WHAT IT DOES
      Shade    1 = shade it like a ball (planets), 0 = flat (the ring)
      Glow     how bright (dim by day, bright at night)
      Opacity  how solid (planets fade a little into a bright day sky)
+     HazeColour / HazeAmount  blend toward the fog's colour, so they sit far off behind the mist
    It's "unlit" (it makes its own light, like a TV screen), "translucent" (can be see-through,
    for the ring) and ignores the fog, so the mist doesn't swallow it.
 
@@ -104,7 +105,14 @@ mel.connect_material_expressions(pick, "", lit, "B")
 bright = mel.create_material_expression(m, unreal.MaterialExpressionMultiply, 0, 0)
 mel.connect_material_expressions(lit, "", bright, "A")
 mel.connect_material_expressions(glow, "", bright, "B")
-mel.connect_material_property(bright, "", P.MP_EMISSIVE_COLOR)
+# Haze: blend the colour toward the fog's colour, so planets look far away behind the mist
+haze_col = param(unreal.MaterialExpressionVectorParameter, "HazeColour", unreal.LinearColor(0.7, 0.55, 0.44, 1), -150, -200)
+haze_amt = param(unreal.MaterialExpressionScalarParameter, "HazeAmount", 0.5, -150, -80)
+hazed = mel.create_material_expression(m, unreal.MaterialExpressionLinearInterpolate, 150, 0)
+mel.connect_material_expressions(bright, "", hazed, "A")
+mel.connect_material_expressions(haze_col, "RGB", hazed, "B")
+mel.connect_material_expressions(haze_amt, "", hazed, "Alpha")
+mel.connect_material_property(hazed, "", P.MP_EMISSIVE_COLOR)
 
 op = mel.create_material_expression(m, unreal.MaterialExpressionMultiply, -150, 460)
 mel.connect_material_expressions(tex, "A", op, "A")

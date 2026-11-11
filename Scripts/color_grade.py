@@ -4,7 +4,10 @@ Grapple Runner: atmosphere and colour. Makes Aeloria an ethereal fantasy place, 
 Run with the Floating Islands level open (not while playing), AFTER expand_world.py:
     py "C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/color_grade.py"
 
-THREE MOODS. Change MOOD below and re-run to switch (it updates the same lights every time):
+FOUR MOODS. Change MOOD below and re-run to switch (it updates the same lights every time):
+  "haze"   - (CURRENT ART DIRECTION, 11 Nov) sepia haze: one warm family of peach, amber and
+             umber; low sun disc in thick dusty mist; ruins as dark silhouettes; colour drained
+             so the light does the work. Calm, ancient, a little melancholy.
   "rose"   - rose and violet light through mist, cool teal shadows: flooded temple ruins
   "amber"  - low amber sun burning through dusty haze, long light shafts
   "teal"   - deep teal forest gloom, crimson light shafts, glowing orbs: a bioluminescent jungle
@@ -30,9 +33,13 @@ import math
 import random
 import unreal
 
-MOOD = "rose"
+MOOD = "haze"
 
 MOODS = {
+    "haze":  dict(sun=(255, 226, 196), lux=7.0, pitch=-12, sky=(220, 170, 140), skyi=0.7, fog=(0.70, 0.55, 0.44), glow=(1.0, 0.82, 0.62), dens=0.065,
+                  shadows=(1.04, 0.92, 0.82), highs=(1.06, 0.96, 0.86), orbs=[(1.0, 0.62, 0.30), (1.0, 0.50, 0.24)],
+                  saturation=0.5, contrast=1.06, bloom=1.4, midsat=1.0, falloff=0.0015, start=0.0, extinction=2.2,
+                  grain=0.22, gamma=(1.0, 0.98, 0.95), orb_light=450.0, ruin_light=700.0),
     #            sun colour       sun lux pitch  sky light colour  sky   fog colour          fog glow (toward the sun)  fog density  shadows tint        highlights tint      glow colours (orbs and lights)
     "rose":  dict(sun=(255, 176, 190), lux=9.0, pitch=-14, sky=(150, 170, 255), skyi=0.9, fog=(0.42, 0.30, 0.52), glow=(1.0, 0.55, 0.62), dens=0.045,
                   shadows=(0.86, 0.98, 1.12), highs=(1.10, 0.98, 1.02), orbs=[(1.0, 0.35, 0.55), (0.35, 0.9, 1.0), (0.75, 0.45, 1.0)]),
@@ -52,6 +59,9 @@ SEED = 3
 # -------------------------------------------------------------------------
 
 M = MOODS[MOOD]
+SATURATION = M.get("saturation", SATURATION)
+CONTRAST = M.get("contrast", CONTRAST)
+BLOOM = M.get("bloom", BLOOM)
 random.seed(SEED)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -124,16 +134,16 @@ if sky:
 for fog in [a for a in actors.get_all_level_actors() if isinstance(a, unreal.ExponentialHeightFog)]:
     c = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
     try_set(c, ["fog_density"], M["dens"])
-    try_set(c, ["fog_height_falloff"], 0.0022)
+    try_set(c, ["fog_height_falloff"], M.get("falloff", 0.0022))     # lower = the fog reaches higher up
     try_set(c, ["fog_inscattering_luminance", "fog_inscattering_color"], unreal.LinearColor(*M["fog"], 1.0))
     try_set(c, ["directional_inscattering_luminance", "directional_inscattering_color"], unreal.LinearColor(*M["glow"], 1.0))
     try_set(c, ["directional_inscattering_exponent"], 5.0)
-    try_set(c, ["start_distance"], 400.0)
+    try_set(c, ["start_distance"], M.get("start", 400.0))
     try_set(c, ["fog_max_opacity"], 0.97)
     try_set(c, ["volumetric_fog", "enable_volumetric_fog"], True)
     try_set(c, ["volumetric_fog_scattering_distribution"], 0.75)   # light scatters forward: bright beams toward the sun
     try_set(c, ["volumetric_fog_albedo"], col((int(255 * M["fog"][0] + 120), int(255 * M["fog"][1] + 120), int(255 * M["fog"][2] + 120))))
-    try_set(c, ["volumetric_fog_extinction_scale"], 1.6)
+    try_set(c, ["volumetric_fog_extinction_scale"], M.get("extinction", 1.6))   # higher = thicker: things far away turn to silhouettes
     try_set(c, ["volumetric_fog_distance"], 9000.0)
     log("fog: coloured and volumetric")
 
@@ -151,7 +161,9 @@ for flag, prop, val in [
         ("override_color_contrast", "color_contrast", V(1.0, 1.0, 1.0, CONTRAST)),
         ("override_color_gain_shadows", "color_gain_shadows", V(*M["shadows"], 1.0)),
         ("override_color_gain_highlights", "color_gain_highlights", V(*M["highs"], 1.0)),
-        ("override_color_saturation_midtones", "color_saturation_midtones", V(1.0, 1.12, 1.0, 1.0)),
+        ("override_color_saturation_midtones", "color_saturation_midtones", V(1.0, 1.0, 1.0, M.get("midsat", 1.12))),
+        ("override_color_gamma", "color_gamma", V(*M.get("gamma", (1.0, 1.0, 1.0)), 1.0)),
+        ("override_film_grain_intensity", "film_grain_intensity", M.get("grain", 0.0)),   # a fine grain, like film
         ("override_white_temp", "white_temp", 6500.0),
         ("override_bloom_intensity", "bloom_intensity", BLOOM),
         ("override_vignette_intensity", "vignette_intensity", 0.0)]:     # no vignette: wrong in VR
@@ -230,7 +242,7 @@ for t in trees[:ORB_COUNT]:
         light = actors.spawn_actor_from_class(unreal.PointLight, orb_at)
         lc = light.get_component_by_class(unreal.PointLightComponent)
         try_set(lc, ["light_color"], col((int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))))
-        try_set(lc, ["intensity"], 800.0)
+        try_set(lc, ["intensity"], M.get("orb_light", 800.0))
         try_set(lc, ["attenuation_radius"], 900.0)
         try_set(lc, ["cast_shadows"], False)
         try_set(lc, ["volumetric_scattering_intensity"], 3.0)   # a soft halo in the fog
@@ -247,7 +259,7 @@ for r in ruins[:RUIN_LIGHTS]:
     light = actors.spawn_actor_from_class(unreal.PointLight, unreal.Vector(o.x, o.y, o.z - e.z + 80))
     lc = light.get_component_by_class(unreal.PointLightComponent)
     try_set(lc, ["light_color"], col((int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))))
-    try_set(lc, ["intensity"], 1500.0)
+    try_set(lc, ["intensity"], M.get("ruin_light", 1500.0))
     try_set(lc, ["attenuation_radius"], 1200.0)
     try_set(lc, ["cast_shadows"], False)
     try_set(lc, ["volumetric_scattering_intensity"], 2.0)

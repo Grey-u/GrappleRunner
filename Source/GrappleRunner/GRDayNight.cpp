@@ -20,17 +20,19 @@ AGRDayNight::AGRDayNight()
 	PrimaryActorTick.bCanEverTick = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
-	// The four looks of the day, in the rose / violet "Aeloria" palette.
+	// The four looks of the day: the "sepia haze" art direction (11 Nov). Everything stays in
+	// one warm family - peach, amber, umber - like dusk light through dust and mist. Ruins read
+	// as dark silhouettes against bright haze; colour comes from the light, not from the objects.
 	auto Key = [](FLinearColor Sun, float Lux, FLinearColor Fog, FLinearColor Glow, float SkyI)
 	{
 		FGRSkyKey K;
 		K.SunColor = Sun; K.SunLux = Lux; K.FogColor = Fog; K.FogGlow = Glow; K.SkyLight = SkyI;
 		return K;
 	};
-	Dawn = Key(FLinearColor(1.00f, 0.62f, 0.58f), 6.f, FLinearColor(0.45f, 0.30f, 0.50f), FLinearColor(1.0f, 0.55f, 0.60f), 0.7f);
-	Noon = Key(FLinearColor(1.00f, 0.92f, 0.82f), 10.f, FLinearColor(0.36f, 0.44f, 0.60f), FLinearColor(1.0f, 0.85f, 0.70f), 1.0f);
-	Dusk = Key(FLinearColor(1.00f, 0.45f, 0.30f), 6.f, FLinearColor(0.55f, 0.27f, 0.36f), FLinearColor(1.0f, 0.42f, 0.28f), 0.6f);
-	Night = Key(FLinearColor(0.55f, 0.63f, 1.00f), 1.2f, FLinearColor(0.05f, 0.07f, 0.20f), FLinearColor(0.35f, 0.45f, 1.0f), 0.25f);
+	Dawn = Key(FLinearColor(1.00f, 0.78f, 0.62f), 5.f, FLinearColor(0.62f, 0.44f, 0.36f), FLinearColor(1.0f, 0.75f, 0.55f), 0.6f);
+	Noon = Key(FLinearColor(1.00f, 0.90f, 0.78f), 8.f, FLinearColor(0.70f, 0.55f, 0.44f), FLinearColor(1.0f, 0.86f, 0.70f), 0.8f);
+	Dusk = Key(FLinearColor(1.00f, 0.62f, 0.42f), 5.f, FLinearColor(0.55f, 0.34f, 0.26f), FLinearColor(1.0f, 0.60f, 0.38f), 0.5f);
+	Night = Key(FLinearColor(0.78f, 0.74f, 0.70f), 0.8f, FLinearColor(0.12f, 0.09f, 0.08f), FLinearColor(0.55f, 0.50f, 0.46f), 0.2f);   // dark umber, never blue
 }
 
 void AGRDayNight::BeginPlay()
@@ -129,6 +131,7 @@ void AGRDayNight::Tick(float DeltaSeconds)
 			RecaptureTimer = 2.f;
 		}
 	}
+	CurrentFog = K.FogColor;   // the planets read this, so they fade into the same haze
 	if (Fog.IsValid())
 	{
 		Fog->SetFogInscatteringColor(K.FogColor);

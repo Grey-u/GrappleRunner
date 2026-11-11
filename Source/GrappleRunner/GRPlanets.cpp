@@ -8,6 +8,7 @@
 //    2. turn each planet a little (spin) and tilt its ring
 //    3. which way is the sun? tell every planet, so its lit side faces the sun
 //    4. how far through the day are we? fade the planets in for the night
+//    5. blend them toward the fog colour (haze), and put the sun's disc where the light comes from
 // =====================================================================================
 #include "GRPlanets.h"
 #include "GRDayNight.h"
@@ -40,13 +41,13 @@ AGRPlanets::AGRPlanets()
 	{
 		return TSoftObjectPtr<UTexture2D>(FSoftObjectPath(FString::Printf(TEXT("/Game/GrappleRunner/Sky/Planets/%s.%s"), Name, Name)));
 	};
-	FGRPlanet Vael;   // the big ringed gas giant, low over the route ahead
+	FGRPlanet Vael;   // the ringed gas giant, far off and low over the route ahead
 	Vael.Name = TEXT("Vael");
 	Vael.Surface = Tex(TEXT("T_Planet_Vael"));
 	Vael.Ring = Tex(TEXT("T_Planet_Vael_Ring"));
 	Vael.Yaw = 20.f;
-	Vael.Pitch = 16.f;
-	Vael.Size = 22.f;
+	Vael.Pitch = 11.f;
+	Vael.Size = 9.f;
 	Vael.Tilt = FRotator(14.f, 0.f, -18.f);
 	Vael.SpinDegreesPerMinute = 3.f;
 	Planets.Add(Vael);
@@ -55,8 +56,8 @@ AGRPlanets::AGRPlanets()
 	Lun.Name = TEXT("Lun");
 	Lun.Surface = Tex(TEXT("T_Planet_Lun"));
 	Lun.Yaw = -55.f;
-	Lun.Pitch = 38.f;
-	Lun.Size = 5.f;
+	Lun.Pitch = 24.f;
+	Lun.Size = 2.5f;
 	Lun.SpinDegreesPerMinute = 0.5f;
 	Planets.Add(Lun);
 
@@ -64,16 +65,16 @@ AGRPlanets::AGRPlanets()
 	Iskra.Name = TEXT("Iskra");
 	Iskra.Surface = Tex(TEXT("T_Planet_Iskra"));
 	Iskra.Yaw = 140.f;
-	Iskra.Pitch = 24.f;
-	Iskra.Size = 3.5f;
+	Iskra.Pitch = 14.f;
+	Iskra.Size = 1.6f;
 	Planets.Add(Iskra);
 
 	FGRPlanet Merrow; // far ocean world, low on the left horizon
 	Merrow.Name = TEXT("Merrow");
 	Merrow.Surface = Tex(TEXT("T_Planet_Merrow"));
 	Merrow.Yaw = -120.f;
-	Merrow.Pitch = 9.f;
-	Merrow.Size = 8.f;
+	Merrow.Pitch = 6.f;
+	Merrow.Size = 3.5f;
 	Merrow.Tilt = FRotator(0.f, 0.f, 10.f);
 	Planets.Add(Merrow);
 }
@@ -145,6 +146,15 @@ void AGRPlanets::BeginPlay()
 		Rings.Add(MakePart(PlaneMesh, M));
 		Materials.Add(M);
 	}
+	// The sun disc: plain white, unshaded, very bright (the bloom turns it into a glow).
+	SunMaterial = UMaterialInstanceDynamic::Create(Base, this);
+	if (UTexture2D* White = LoadObject<UTexture2D>(nullptr, TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture")))
+	{
+		SunMaterial->SetTextureParameterValue(TEXT("Surface"), White);
+	}
+	SunMaterial->SetScalarParameterValue(TEXT("Shade"), 0.f);
+	SunMaterial->SetScalarParameterValue(TEXT("Opacity"), 1.f);
+	SunDisc = MakePart(SphereMesh, SunMaterial);
 }
 
 void AGRPlanets::Tick(float DeltaSeconds)
@@ -167,8 +177,10 @@ void AGRPlanets::Tick(float DeltaSeconds)
 	}
 	// ---- Night factor: 0 by day, 1 at night (the clock's night starts about two thirds through) ----
 	float Night = 0.f;
+	FLinearColor FogColour(0.7f, 0.55f, 0.44f);
 	for (TActorIterator<AGRDayNight> It(GetWorld()); It; ++It)
 	{
+		FogColour = It->GetFogColor();
 		const float T = It->GetDayProgress();
 		Night = FMath::Clamp((T - 0.6f) / 0.12f, 0.f, 1.f) + FMath::Clamp((0.08f - T) / 0.08f, 0.f, 1.f);   // dusk -> night, and the dark before dawn
 		Night = FMath::Clamp(Night, 0.f, 1.f);
@@ -176,11 +188,26 @@ void AGRPlanets::Tick(float DeltaSeconds)
 	}
 	const float Glow = FMath::Lerp(DayGlow, NightGlow, Night);
 	const float Opacity = FMath::Lerp(DayOpacity, 1.f, Night);
+	const float Haze = FMath::Lerp(DayHaze, NightHaze, Night);
 	for (UMaterialInstanceDynamic* M : Materials)
 	{
 		M->SetVectorParameterValue(TEXT("SunDir"), FLinearColor(ToSun.X, ToSun.Y, ToSun.Z, 0.f));
 		M->SetScalarParameterValue(TEXT("Glow"), Glow);
 		M->SetScalarParameterValue(TEXT("Opacity"), Opacity);
+		M->SetVectorParameterValue(TEXT("HazeColour"), FogColour);
+		M->SetScalarParameterValue(TEXT("HazeAmount"), Haze);
+	}
+
+	// ---- The sun's disc: a small bright circle where the light comes from (a pale moon at night) ----
+	if (SunDisc && SunMaterial)
+	{
+		const float Width = 2.f * Distance * FMath::Tan(FMath::DegreesToRadians(SunSize * 0.5f));
+		SunDisc->SetWorldLocation(Eye + ToSun * Distance * 0.98f);   // just in front of the planets
+		SunDisc->SetWorldScale3D(FVector(Width / 100.f));
+		SunDisc->SetHiddenInGame(ToSun.Z < -0.03f);                  // below the horizon: no disc
+		SunMaterial->SetScalarParameterValue(TEXT("Glow"), FMath::Lerp(SunGlow, 1.5f, Night));
+		SunMaterial->SetScalarParameterValue(TEXT("HazeAmount"), FMath::Lerp(0.15f, 0.35f, Night));
+		SunMaterial->SetVectorParameterValue(TEXT("HazeColour"), FogColour);
 	}
 
 	for (int32 i = 0; i < Planets.Num(); ++i)

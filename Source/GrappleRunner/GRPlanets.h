@@ -11,9 +11,11 @@
 //  sky. So every frame each planet is put at the same distance in the same DIRECTION from
 //  the camera: you can swing 10 km and the gas giant still sits over the same horizon.
 //
-//  DAY AND NIGHT
+//  DAY AND NIGHT, AND HAZE
 //  The planets read the day/night clock (GRDayNight): faint by day, bright at night. Their
-//  lit side faces the sun, so you see crescents at dawn and dusk.
+//  lit side faces the sun, so you see crescents at dawn and dusk. They are also blended toward
+//  the fog's colour, so they sit far off behind the mist (the "sepia haze" look). This actor
+//  also draws the sun's disc: a small bright circle where the sunlight comes from.
 //
 //  PICTURES AND MATERIAL
 //  Painted by Art/Planets/make_planets.py, imported by Scripts/add_planets.py (M_Planet).
@@ -61,9 +63,13 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Planets") TArray<FGRPlanet> Planets;
 	UPROPERTY(EditAnywhere, Category = "Planets") float Distance = 600000.f;   // 6 km: past the islands, inside the sky
-	UPROPERTY(EditAnywhere, Category = "Planets") float DayGlow = 0.6f;        // brightness by day...
+	UPROPERTY(EditAnywhere, Category = "Planets") float DayGlow = 0.5f;        // brightness by day...
 	UPROPERTY(EditAnywhere, Category = "Planets") float NightGlow = 1.6f;      // ...and at night
-	UPROPERTY(EditAnywhere, Category = "Planets") float DayOpacity = 0.55f;    // a bright sky washes them out a little
+	UPROPERTY(EditAnywhere, Category = "Planets") float DayOpacity = 0.45f;    // a bright sky washes them out a little
+	UPROPERTY(EditAnywhere, Category = "Planets") float DayHaze = 0.6f;        // how much they fade into the fog colour by day...
+	UPROPERTY(EditAnywhere, Category = "Planets") float NightHaze = 0.3f;      // ...and at night (clearer)
+	UPROPERTY(EditAnywhere, Category = "Planets") float SunSize = 1.8f;        // the sun's disc, degrees wide
+	UPROPERTY(EditAnywhere, Category = "Planets") float SunGlow = 14.f;        // how bright the disc is (bloom makes the halo)
 	UPROPERTY(EditAnywhere, Category = "Planets") TSoftObjectPtr<UMaterialInterface> PlanetMaterial =
 		TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Sky/Planets/M_Planet.M_Planet")));
 
@@ -76,5 +82,7 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Balls;   // one per planet
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Rings;   // one per planet (empty if no ring)
 	UPROPERTY() TArray<TObjectPtr<UMaterialInstanceDynamic>> Materials;   // balls first, then rings
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> SunDisc;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> SunMaterial;
 	float Spin = 0.f;   // minutes of spin so far
 };
