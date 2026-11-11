@@ -669,7 +669,9 @@ void AGRArsenal::UpdateEffects(float Dt)
 			Effects[i]->SetHiddenInGame(true);
 			continue;
 		}
-		const float Left = EffectLife[i] / EffectLifeStart[i];   // 1 -> 0: thins out as it fades
+		// 1 -> 0.2: thins out as it fades (never all the way to 0: a zero-width shape breaks the
+		// engine's maths for that frame, which floods the log with "non-invertible matrix")
+		const float Left = FMath::Max(0.2f, EffectLife[i] / EffectLifeStart[i]);
 		Effects[i]->SetWorldScale3D(FVector(EffectScale[i].X * Left, EffectScale[i].Y * Left, EffectScale[i].Z));
 	}
 	if (MuzzleFlash > 0.f)
