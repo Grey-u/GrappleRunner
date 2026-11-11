@@ -6,7 +6,7 @@
 //  The "rules" for the main-menu level (L_MainMenu). When that level starts, this game
 //  mode puts the menu on screen:
 //    1. TITLE:   the EXIT SUIT portfolio cover as the title card, with PLAY and QUIT.
-//    2. MODES:   1v1, 2v2, 3v3, 5v5 squads (the planned five-person teams) and PvE.
+//    2. MODES:   Endless Runner (solo), 1v1, 2v2, 3v3, 5v5 squads and PvE.
 //    3. LOADING: the cover again with "Loading..." while the game level opens.
 //  The chosen mode is passed to the game level as an option ("?mode=2v2"), so the game
 //  can read it later. Multiplayer isn't built yet, so every mode currently plays solo.

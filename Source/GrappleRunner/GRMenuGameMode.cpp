@@ -112,7 +112,7 @@ private:
 	TSharedRef<SWidget> Panel(TSharedRef<SWidget> Content)
 	{
 		return SNew(SCanvas)
-			+ SCanvas::Slot().Position(FVector2D(640.f, 175.f)).Size(FVector2D(470.f, 470.f))
+			+ SCanvas::Slot().Position(FVector2D(640.f, 150.f)).Size(FVector2D(470.f, 520.f))
 			[
 				Content
 			];
@@ -158,6 +158,7 @@ private:
 		auto Start = [this](const TCHAR* Mode) { return [this, Mode]() { if (Owner.IsValid()) { Owner->StartMode(Mode); } }; };
 		return SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 14.f)[ Label(TEXT("CHOOSE A MODE"), 24, Ink) ]
+			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("ENDLESS RUNNER"), TEXT("solo, swing forever"), Start(TEXT("endless"))) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("1 v 1"), TEXT("duel"), Start(TEXT("1v1"))) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("2 v 2"), TEXT("pairs"), Start(TEXT("2v2"))) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("3 v 3"), TEXT("trios"), Start(TEXT("3v3"))) ]

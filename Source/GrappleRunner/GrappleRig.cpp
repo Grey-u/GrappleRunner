@@ -35,6 +35,10 @@
 
 #include "GrappleRig.h"
 #include "GRVine.h"                               // hanging vines that snap
+#include "GRDayNight.h"                           // the match clock: dawn to night
+#include "GREndlessSpawner.h"                     // Endless Runner: islands keep coming
+#include "GRArsenal.h"                             // the weapons: switch, aim, fire, slash
+#include "GRPlanets.h"                             // planets in the sky
 
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
@@ -104,6 +108,7 @@ AGrappleRig::AGrappleRig()
 	RopeR = MakeMesh(TEXT("RopeRight"), CylinderMesh.Object);
 	HeadL = MakeMesh(TEXT("HookLeft"), SphereMesh.Object);
 	HeadR = MakeMesh(TEXT("HookRight"), SphereMesh.Object);
+	// (The weapons used to be set up here; they now live in GRArsenal.)
 }
 
 // =====================================================================================
@@ -157,6 +162,27 @@ void AGrappleRig::BeginPlay()
 	for (TActorIterator<AGRVine> It(GetWorld()); It; ++It)
 	{
 		Vines.Add(*It);
+	}
+
+	// The day/night clock and the endless spawner. If the level doesn't have them, make them
+	// now (each decides for itself what to do from the mode the menu picked).
+	if (!TActorIterator<AGRDayNight>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRDayNight>();
+	}
+	if (!TActorIterator<AGREndlessSpawner>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGREndlessSpawner>();
+	}
+	// The weapons (switching, aiming, firing, knives): they live in their own class, GRArsenal.
+	if (!TActorIterator<AGRArsenal>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRArsenal>();
+	}
+	// Planets in the sky (they follow the day/night clock).
+	if (!TActorIterator<AGRPlanets>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRPlanets>();
 	}
 
 	// ---- 3. Death height ----
@@ -362,8 +388,10 @@ void AGrappleRig::ReadInput(float DeltaSeconds)
 	else
 	{
 		// ---- Mouse and keyboard (testing without a headset) ----
-		bHookDown[0] = P->IsInputKeyDown(EKeys::LeftMouseButton);
-		bHookDown[1] = P->IsInputKeyDown(EKeys::RightMouseButton);
+		// Q / E always fire the hooks. The mouse buttons do too, but only with empty hands:
+		// with a weapon out they fire and aim it instead (see GRArsenal.cpp).
+		bHookDown[0] = P->IsInputKeyDown(EKeys::Q) || (bMouseHooks && P->IsInputKeyDown(EKeys::LeftMouseButton));
+		bHookDown[1] = P->IsInputKeyDown(EKeys::E) || (bMouseHooks && P->IsInputKeyDown(EKeys::RightMouseButton));
 		const bool bShift = P->IsInputKeyDown(EKeys::LeftShift);
 		// Auto-pull on: hooks reel you in by themselves, Shift = stop pulling and swing.
 		// Auto-pull off: Shift = reel in.
@@ -580,6 +608,17 @@ void AGrappleRig::SnapVines(const FVector& From, const FVector& To)
 		}
 	}
 }
+
+void AGrappleRig::AddVine(AGRVine* Vine)
+{
+	Vines.Add(Vine);
+}
+
+// Small "getters" the weapons use (see GrappleRig.h). They live here, not in the .h,
+// because only this file knows the full camera and player-controller types.
+UCameraComponent* AGrappleRig::GetEyes() const { return Camera.Get(); }
+USceneComponent* AGrappleRig::GetHand(int32 Index) const { return (Index == 0 || Index == 1) ? Hands[Index].Get() : nullptr; }
+APlayerController* AGrappleRig::GetPlayerController() const { return PC.Get(); }
 
 void AGrappleRig::Pulse(int32 Index, float Amplitude)
 {
@@ -1016,7 +1055,7 @@ void AGrappleRig::UpdateVisuals()
 		DrawDebugPoint(World, Camera.IsValid() ? Camera->GetComponentLocation() + Camera->GetForwardVector() * 200.f : BodyCenter(), 4.f, FColor::White, false, -1.f, SDPG_Foreground);
 		// Speed in cm/s x 0.036 = km/h.
 		GEngine->AddOnScreenDebugMessage(9001, 0.f, FColor::White,
-			FString::Printf(TEXT("Speed %.0f km/h   Gas %.0f%%   %s   Rope pull %.0f N (%.1fx body weight)   |  LMB/RMB hooks  Shift %s  Space jump/boost  R respawn"),
+			FString::Printf(TEXT("Speed %.0f km/h   Gas %.0f%%   %s   Rope pull %.0f N (%.1fx body weight)   |  Q/E hooks (LMB/RMB when holstered)  Shift %s  Space jump/boost  R respawn"),
 				Velocity.Size() * 0.036f, 100.f * Gas / FMath::Max(1.f, GasMax), bGrounded ? TEXT("ground") : TEXT("air"),
 				RopeTension[0] + RopeTension[1], (RopeTension[0] + RopeTension[1]) / FMath::Max(1.f, PlayerMass * 9.8f),
 				bAutoPull ? TEXT("stop pulling") : TEXT("reel in")));

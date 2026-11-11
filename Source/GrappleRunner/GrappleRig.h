@@ -251,6 +251,34 @@ public:
 	//   SoftRope: 0 = stiff rope, 1 = soft rope, -1 = keep the current setting.
 	void StartTest(const FString& Name, int32 SoftRope);
 
+	// For other parts of the game (the endless spawner): add a new grapple rock to aim assist,
+	// a new vine to the snap check, and read where the player is.
+	void AddAnchor(AActor* Anchor) { Anchors.Add(Anchor); }
+	void AddVine(class AGRVine* Vine);
+	FVector GetBodyPosition() const { return BodyPos; }
+
+	// For the weapons (GRArsenal): where your eyes and hands are, and how you're moving.
+	UCameraComponent* GetEyes() const;                 // (written out in the .cpp)
+	USceneComponent* GetHand(int32 Index) const;
+	APlayerController* GetPlayerController() const;
+	bool IsUsingVR() const { return bVR; }
+	bool IsGrounded() const { return bGrounded; }
+	FVector GetBodyVelocity() const { return Velocity; }
+	const TArray<TWeakObjectPtr<class AGRVine>>& GetVines() const { return Vines; }
+	// Desktop: with a weapon out, the mouse buttons fire and aim, so the hooks move to Q and E.
+	// With empty hands (weapon put away), the mouse buttons fire the hooks again.
+	void SetMouseFiresHooks(bool bHooks) { bMouseHooks = bHooks; }
+	// Recoil: nudge where you're looking (degrees up, degrees right). Desktop only; in VR your
+	// head is never moved for you (that causes motion sickness).
+	void AddLookKick(float UpDegrees, float RightDegrees)
+	{
+		if (!bVR)
+		{
+			DesktopPitch = FMath::Clamp(DesktopPitch + UpDegrees, -85.f, 85.f);
+			DesktopYaw += RightDegrees;
+		}
+	}
+
 protected:
 	// BeginPlay runs ONCE when you press Play. We use it to find grapple rocks and controller buttons.
 	virtual void BeginPlay() override;
@@ -317,6 +345,7 @@ private:
 	bool bJumpWasDown = false;                     // was Space held last frame? (press detection)
 	bool bRespawnWasDown = false;                  // was R held last frame?
 	bool bDesktopSetupDone = false;                // have we set up the mouse-and-keyboard camera yet?
+	bool bMouseHooks = true;                       // desktop: do the mouse buttons fire the hooks? (no when a weapon is out)
 
 	// Test recording (see bRecordTelemetry above)
 	FString Telemetry;                             // the spreadsheet rows collected so far, as text

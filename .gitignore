@@ -32,6 +32,9 @@ __pycache__/
 
 # Third-party models: not ours to publish (licence to confirm), kept local only
 Art/ThirdParty/ODM/
+Art/ThirdParty/Weapons/
+# Fan-made weapon skins (Riot Games designs): imported for private testing only, never published
+Content/ThirdParty/
 # Raw exports of Paragon characters
 Art/Characters/
 
