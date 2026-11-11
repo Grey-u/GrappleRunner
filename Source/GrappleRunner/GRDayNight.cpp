@@ -14,25 +14,28 @@
 #include "EngineUtils.h"
 #include "GameFramework/GameModeBase.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMaterialLibrary.h"
+#include "Materials/MaterialParameterCollection.h"
 
 AGRDayNight::AGRDayNight()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
-	// The four looks of the day: the "sepia haze" art direction (11 Nov). Everything stays in
-	// one warm family - peach, amber, umber - like dusk light through dust and mist. Ruins read
-	// as dark silhouettes against bright haze; colour comes from the light, not from the objects.
+	// The four looks of the day: the "living Pandora" art direction (11 Nov, Naomi: "plants
+	// should feel green, alive and real but fantastical - think Avatar"). Clean, true daylight
+	// so greens stay green; humid blue-green air in the distance; golden dawn and dusk; and a
+	// deep blue-teal night when the bioluminescent glow takes over.
 	auto Key = [](FLinearColor Sun, float Lux, FLinearColor Fog, FLinearColor Glow, float SkyI)
 	{
 		FGRSkyKey K;
 		K.SunColor = Sun; K.SunLux = Lux; K.FogColor = Fog; K.FogGlow = Glow; K.SkyLight = SkyI;
 		return K;
 	};
-	Dawn = Key(FLinearColor(1.00f, 0.78f, 0.62f), 5.f, FLinearColor(0.62f, 0.44f, 0.36f), FLinearColor(1.0f, 0.75f, 0.55f), 0.6f);
-	Noon = Key(FLinearColor(1.00f, 0.90f, 0.78f), 8.f, FLinearColor(0.70f, 0.55f, 0.44f), FLinearColor(1.0f, 0.86f, 0.70f), 0.8f);
-	Dusk = Key(FLinearColor(1.00f, 0.62f, 0.42f), 5.f, FLinearColor(0.55f, 0.34f, 0.26f), FLinearColor(1.0f, 0.60f, 0.38f), 0.5f);
-	Night = Key(FLinearColor(0.78f, 0.74f, 0.70f), 0.8f, FLinearColor(0.12f, 0.09f, 0.08f), FLinearColor(0.55f, 0.50f, 0.46f), 0.2f);   // dark umber, never blue
+	Dawn = Key(FLinearColor(1.00f, 0.80f, 0.60f), 6.f, FLinearColor(0.50f, 0.52f, 0.58f), FLinearColor(1.0f, 0.78f, 0.55f), 0.8f);
+	Noon = Key(FLinearColor(1.00f, 0.97f, 0.92f), 10.f, FLinearColor(0.42f, 0.58f, 0.68f), FLinearColor(1.0f, 0.95f, 0.85f), 1.1f);
+	Dusk = Key(FLinearColor(1.00f, 0.60f, 0.40f), 6.f, FLinearColor(0.48f, 0.40f, 0.52f), FLinearColor(1.0f, 0.58f, 0.40f), 0.7f);
+	Night = Key(FLinearColor(0.55f, 0.72f, 1.00f), 1.0f, FLinearColor(0.02f, 0.06f, 0.10f), FLinearColor(0.30f, 0.55f, 0.85f), 0.25f);   // deep blue-teal: the glow takes over
 }
 
 void AGRDayNight::BeginPlay()
@@ -132,6 +135,12 @@ void AGRDayNight::Tick(float DeltaSeconds)
 		}
 	}
 	CurrentFog = K.FogColor;   // the planets read this, so they fade into the same haze
+	// Bioluminescence: 0 by day, rising through dusk to 1 at night, falling again before dawn.
+	if (UMaterialParameterCollection* Params = WorldParams.LoadSynchronous())
+	{
+		const float Night = FMath::Clamp(FMath::Clamp((Progress - 0.6f) / 0.12f, 0.f, 1.f) + FMath::Clamp((0.08f - Progress) / 0.08f, 0.f, 1.f), 0.f, 1.f);
+		UKismetMaterialLibrary::SetScalarParameterValue(this, Params, TEXT("Night"), Night);
+	}
 	if (Fog.IsValid())
 	{
 		Fog->SetFogInscatteringColor(K.FogColor);

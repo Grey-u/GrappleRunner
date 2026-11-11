@@ -39,6 +39,7 @@
 #include "GREndlessSpawner.h"                     // Endless Runner: islands keep coming
 #include "GRArsenal.h"                             // the weapons: switch, aim, fire, slash
 #include "GRPlanets.h"                             // planets in the sky
+#include "GRHandFeel.h"                            // haptic gloves: feel what your fingers touch
 
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
@@ -183,6 +184,11 @@ void AGrappleRig::BeginPlay()
 	if (!TActorIterator<AGRPlanets>(GetWorld()))
 	{
 		GetWorld()->SpawnActor<AGRPlanets>();
+	}
+	// Haptic gloves (LucidGloves / OpenGloves): fingers feel what they touch. Sleeps on desktop.
+	if (!TActorIterator<AGRHandFeel>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRHandFeel>();
 	}
 
 	// ---- 3. Death height ----

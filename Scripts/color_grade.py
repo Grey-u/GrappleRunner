@@ -4,8 +4,11 @@ Grapple Runner: atmosphere and colour. Makes Aeloria an ethereal fantasy place, 
 Run with the Floating Islands level open (not while playing), AFTER expand_world.py:
     py "C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/color_grade.py"
 
-FOUR MOODS. Change MOOD below and re-run to switch (it updates the same lights every time):
-  "haze"   - (CURRENT ART DIRECTION, 11 Nov) sepia haze: one warm family of peach, amber and
+FIVE MOODS. Change MOOD below and re-run to switch (it updates the same lights every time):
+  "pandora" - (CURRENT ART DIRECTION, 11 Nov, Naomi: "alive and real but fantastical - think
+             Avatar"): true daylight so plants are properly GREEN, humid blue-green air in the
+             distance, natural contrast, and bioluminescent orbs that glow brighter at night.
+  "haze"   - sepia haze: one warm family of peach, amber and
              umber; low sun disc in thick dusty mist; ruins as dark silhouettes; colour drained
              so the light does the work. Calm, ancient, a little melancholy.
   "rose"   - rose and violet light through mist, cool teal shadows: flooded temple ruins
@@ -33,9 +36,13 @@ import math
 import random
 import unreal
 
-MOOD = "haze"
+MOOD = "pandora"
 
 MOODS = {
+    "pandora": dict(sun=(255, 247, 235), lux=10.0, pitch=-38, sky=(190, 215, 255), skyi=1.1, fog=(0.42, 0.58, 0.68), glow=(1.0, 0.95, 0.85), dens=0.03,
+                  shadows=(0.96, 1.0, 1.06), highs=(1.03, 1.02, 0.97), orbs=[(0.15, 0.85, 1.0), (0.3, 1.0, 0.7), (0.55, 0.35, 1.0)],
+                  saturation=1.12, sat_rgb=(0.96, 1.14, 1.02), contrast=1.08, bloom=0.8, midsat=1.05, falloff=0.002, start=800.0, extinction=1.2,
+                  grain=0.0, gamma=(1.0, 1.0, 1.0), gain=(1.0, 1.0, 1.0), orb_light=600.0, ruin_light=900.0, retint_lights=True, biolum=True),
     "haze":  dict(sun=(255, 226, 196), lux=7.0, pitch=-12, sky=(220, 170, 140), skyi=0.7, fog=(0.70, 0.55, 0.44), glow=(1.0, 0.82, 0.62), dens=0.085,
                   shadows=(1.04, 0.92, 0.82), highs=(1.06, 0.96, 0.86), orbs=[(1.0, 0.62, 0.30), (1.0, 0.50, 0.24)],
                   saturation=0.4, gain=(1.16, 0.94, 0.74), contrast=1.08, bloom=1.4, midsat=1.0, falloff=0.0015, start=0.0, extinction=2.2,
@@ -157,7 +164,7 @@ try_set(pp, ["unbound", "infinite_extent"], True)
 s = pp.get_editor_property("settings")
 V = unreal.Vector4
 for flag, prop, val in [
-        ("override_color_saturation", "color_saturation", V(1.0, 1.0, 1.0, SATURATION)),
+        ("override_color_saturation", "color_saturation", V(*M.get("sat_rgb", (1.0, 1.0, 1.0)), SATURATION)),   # (r, g, b, all): pandora lifts green
         ("override_color_contrast", "color_contrast", V(1.0, 1.0, 1.0, CONTRAST)),
         ("override_color_gain_shadows", "color_gain_shadows", V(*M["shadows"], 1.0)),
         ("override_color_gain_highlights", "color_gain_highlights", V(*M["highs"], 1.0)),
@@ -178,8 +185,24 @@ log("colour grade: mood '{}'".format(MOOD))
 
 
 # ---- 5. glow: a glowing material, then orbs hanging from the canopies and lights by the ruins
+def world_params():
+    """MPC_World: shared values every material can read. "Night" (0 day .. 1 night) is set by GRDayNight."""
+    path = "/Game/GrappleRunner/Materials/MPC_World"
+    if unreal.EditorAssetLibrary.does_asset_exist(path):
+        return unreal.load_asset(path)
+    mpc = tools.create_asset("MPC_World", "/Game/GrappleRunner/Materials", unreal.MaterialParameterCollection,
+                             unreal.MaterialParameterCollectionFactoryNew())
+    p = unreal.CollectionScalarParameter()
+    p.set_editor_property("parameter_name", "Night")
+    p.set_editor_property("default_value", 0.0)
+    mpc.set_editor_property("scalar_parameters", [p])
+    unreal.EditorAssetLibrary.save_asset(path)
+    return mpc
+
+
 def glow_material(name, rgb):
-    """A material that gives off its own light (emissive), in one colour. Made once, re-coloured on re-runs."""
+    """A material that gives off its own light (emissive), in one colour. Made once, re-coloured on re-runs.
+    Bioluminescent moods: faint by day, bright at night (reads "Night" from MPC_World)."""
     path = "/Game/GrappleRunner/Materials/" + name
     if unreal.EditorAssetLibrary.does_asset_exist(path):
         m = unreal.load_asset(path)
@@ -188,8 +211,17 @@ def glow_material(name, rgb):
         m = tools.create_asset(name, "/Game/GrappleRunner/Materials", unreal.Material, unreal.MaterialFactoryNew())
     colour = mel.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -400, 0)
     colour.set_editor_property("constant", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
-    strength = mel.create_material_expression(m, unreal.MaterialExpressionConstant, -400, 160)
-    strength.set_editor_property("r", 40.0)                      # bright enough to bloom
+    if M.get("biolum"):
+        night = mel.create_material_expression(m, unreal.MaterialExpressionCollectionParameter, -700, 160)
+        night.set_editor_property("collection", world_params())
+        night.set_editor_property("parameter_name", "Night")
+        strength = mel.create_material_expression(m, unreal.MaterialExpressionLinearInterpolate, -400, 160)
+        strength.set_editor_property("const_a", 4.0)            # by day: a soft glow
+        strength.set_editor_property("const_b", 60.0)           # at night: bright enough to bloom
+        mel.connect_material_expressions(night, "", strength, "Alpha")
+    else:
+        strength = mel.create_material_expression(m, unreal.MaterialExpressionConstant, -400, 160)
+        strength.set_editor_property("r", 40.0)                  # bright enough to bloom
     times = mel.create_material_expression(m, unreal.MaterialExpressionMultiply, -200, 60)
     mel.connect_material_expressions(colour, "", times, "A")
     mel.connect_material_expressions(strength, "", times, "B")

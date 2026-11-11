@@ -55,13 +55,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Day and Night") float StartAt = 0.02f;
 	// The direction the sun rises from (degrees round the sky; it sets on the opposite side).
 	UPROPERTY(EditAnywhere, Category = "Day and Night") float SunriseYaw = -60.f;
-	UPROPERTY(EditAnywhere, Category = "Day and Night") float HighestSun = 32.f;   // degrees above the horizon at noon (kept low: long hazy light all day)
+	UPROPERTY(EditAnywhere, Category = "Day and Night") float HighestSun = 50.f;   // degrees above the horizon at noon
 	UPROPERTY(EditAnywhere, Category = "Day and Night") float MoonHeight = 40.f;
 
 	UPROPERTY(EditAnywhere, Category = "Day and Night|Looks") FGRSkyKey Dawn;
 	UPROPERTY(EditAnywhere, Category = "Day and Night|Looks") FGRSkyKey Noon;
 	UPROPERTY(EditAnywhere, Category = "Day and Night|Looks") FGRSkyKey Dusk;
 	UPROPERTY(EditAnywhere, Category = "Day and Night|Looks") FGRSkyKey Night;
+	// Bioluminescence: a shared material value "Night" (0 by day, 1 at night) that glowing
+	// plants and orbs read, so they brighten as the light goes (made by Scripts/color_grade.py).
+	UPROPERTY(EditAnywhere, Category = "Day and Night|Looks") TSoftObjectPtr<class UMaterialParameterCollection> WorldParams =
+		TSoftObjectPtr<class UMaterialParameterCollection>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Materials/MPC_World.MPC_World")));
 
 	float GetDayProgress() const { return Progress; }   // 0..1 through the match
 	FLinearColor GetFogColor() const { return CurrentFog; } // the haze colour right now
