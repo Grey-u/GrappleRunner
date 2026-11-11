@@ -41,8 +41,8 @@ MOOD = "pandora"
 MOODS = {
     "pandora": dict(sun=(255, 247, 235), lux=10.0, pitch=-38, sky=(190, 215, 255), skyi=1.1, fog=(0.42, 0.58, 0.68), glow=(1.0, 0.95, 0.85), dens=0.03,
                   shadows=(0.96, 1.0, 1.06), highs=(1.03, 1.02, 0.97), orbs=[(0.15, 0.85, 1.0), (0.3, 1.0, 0.7), (0.55, 0.35, 1.0)],
-                  saturation=1.0, sat_rgb=(0.5, 1.2, 1.05), contrast=1.06, bloom=0.8, midsat=1.05, falloff=0.002, start=800.0, extinction=1.2,
-                  grain=0.0, gamma=(1.0, 1.0, 1.0), gain=(0.95, 1.03, 1.0), orb_light=600.0, ruin_light=900.0, retint_lights=True, biolum=True),
+                  saturation=1.08, sat_rgb=(0.85, 1.12, 1.02), contrast=1.06, bloom=0.8, midsat=1.05, falloff=0.002, start=800.0, extinction=1.2,
+                  grain=0.0, gamma=(1.0, 1.0, 1.0), gain=(0.98, 1.01, 1.0), orb_light=600.0, ruin_light=900.0, retint_lights=True, biolum=True),
     "haze":  dict(sun=(255, 226, 196), lux=7.0, pitch=-12, sky=(220, 170, 140), skyi=0.7, fog=(0.70, 0.55, 0.44), glow=(1.0, 0.82, 0.62), dens=0.085,
                   shadows=(1.04, 0.92, 0.82), highs=(1.06, 0.96, 0.86), orbs=[(1.0, 0.62, 0.30), (1.0, 0.50, 0.24)],
                   saturation=0.4, gain=(1.16, 0.94, 0.74), contrast=1.08, bloom=1.4, midsat=1.0, falloff=0.0015, start=0.0, extinction=2.2,
