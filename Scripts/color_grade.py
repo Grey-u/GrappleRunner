@@ -36,10 +36,10 @@ import unreal
 MOOD = "haze"
 
 MOODS = {
-    "haze":  dict(sun=(255, 226, 196), lux=7.0, pitch=-12, sky=(220, 170, 140), skyi=0.7, fog=(0.70, 0.55, 0.44), glow=(1.0, 0.82, 0.62), dens=0.065,
+    "haze":  dict(sun=(255, 226, 196), lux=7.0, pitch=-12, sky=(220, 170, 140), skyi=0.7, fog=(0.70, 0.55, 0.44), glow=(1.0, 0.82, 0.62), dens=0.085,
                   shadows=(1.04, 0.92, 0.82), highs=(1.06, 0.96, 0.86), orbs=[(1.0, 0.62, 0.30), (1.0, 0.50, 0.24)],
                   saturation=0.4, gain=(1.16, 0.94, 0.74), contrast=1.08, bloom=1.4, midsat=1.0, falloff=0.0015, start=0.0, extinction=2.2,
-                  grain=0.22, gamma=(1.0, 0.98, 0.95), orb_light=450.0, ruin_light=700.0),
+                  grain=0.22, gamma=(1.0, 0.98, 0.95), orb_light=450.0, ruin_light=700.0, retint_lights=True),
     #            sun colour       sun lux pitch  sky light colour  sky   fog colour          fog glow (toward the sun)  fog density  shadows tint        highlights tint      glow colours (orbs and lights)
     "rose":  dict(sun=(255, 176, 190), lux=9.0, pitch=-14, sky=(150, 170, 255), skyi=0.9, fog=(0.42, 0.30, 0.52), glow=(1.0, 0.55, 0.62), dens=0.045,
                   shadows=(0.86, 0.98, 1.12), highs=(1.10, 0.98, 1.02), orbs=[(1.0, 0.35, 0.55), (0.35, 0.9, 1.0), (0.75, 0.45, 1.0)]),
@@ -266,6 +266,19 @@ for r in ruins[:RUIN_LIGHTS]:
     try_set(lc, ["volumetric_scattering_intensity"], 2.0)
     light.set_folder_path(GLOW_FOLDER)
 log("{} ruin lights".format(min(RUIN_LIGHTS, len(ruins))))
+
+# ---- 6. (moods that ask for it) recolour every other light our scripts placed, so no stray
+# pink or blue from an older mood leaks into the picture
+if M.get("retint_lights"):
+    n = 0
+    for a in actors.get_all_level_actors():
+        if not str(a.get_folder_path()).startswith("GrappleRunner/") or str(a.get_folder_path()) == GLOW_FOLDER:
+            continue
+        for lc in a.get_components_by_class(unreal.PointLightComponent) + a.get_components_by_class(unreal.SpotLightComponent):
+            rgb = random.choice(M["orbs"])
+            try_set(lc, ["light_color"], col((int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))))
+            n += 1
+    log("{} other lights recoloured to the mood".format(n))
 
 unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
 try:
