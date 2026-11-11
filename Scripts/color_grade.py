@@ -38,7 +38,7 @@ MOOD = "haze"
 MOODS = {
     "haze":  dict(sun=(255, 226, 196), lux=7.0, pitch=-12, sky=(220, 170, 140), skyi=0.7, fog=(0.70, 0.55, 0.44), glow=(1.0, 0.82, 0.62), dens=0.065,
                   shadows=(1.04, 0.92, 0.82), highs=(1.06, 0.96, 0.86), orbs=[(1.0, 0.62, 0.30), (1.0, 0.50, 0.24)],
-                  saturation=0.5, contrast=1.06, bloom=1.4, midsat=1.0, falloff=0.0015, start=0.0, extinction=2.2,
+                  saturation=0.4, gain=(1.16, 0.94, 0.74), contrast=1.08, bloom=1.4, midsat=1.0, falloff=0.0015, start=0.0, extinction=2.2,
                   grain=0.22, gamma=(1.0, 0.98, 0.95), orb_light=450.0, ruin_light=700.0),
     #            sun colour       sun lux pitch  sky light colour  sky   fog colour          fog glow (toward the sun)  fog density  shadows tint        highlights tint      glow colours (orbs and lights)
     "rose":  dict(sun=(255, 176, 190), lux=9.0, pitch=-14, sky=(150, 170, 255), skyi=0.9, fog=(0.42, 0.30, 0.52), glow=(1.0, 0.55, 0.62), dens=0.045,
@@ -163,6 +163,7 @@ for flag, prop, val in [
         ("override_color_gain_highlights", "color_gain_highlights", V(*M["highs"], 1.0)),
         ("override_color_saturation_midtones", "color_saturation_midtones", V(1.0, 1.0, 1.0, M.get("midsat", 1.12))),
         ("override_color_gamma", "color_gamma", V(*M.get("gamma", (1.0, 1.0, 1.0)), 1.0)),
+        ("override_color_gain", "color_gain", V(*M.get("gain", (1.0, 1.0, 1.0)), 1.0)),   # tints the whole picture (sepia = more red, less blue)
         ("override_film_grain_intensity", "film_grain_intensity", M.get("grain", 0.0)),   # a fine grain, like film
         ("override_white_temp", "white_temp", 6500.0),
         ("override_bloom_intensity", "bloom_intensity", BLOOM),
