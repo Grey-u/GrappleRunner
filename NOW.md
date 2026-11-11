@@ -1,52 +1,42 @@
-# NOW (updated 10 Nov 2026)
+# NOW (updated 11 Nov 2026)
 
 ## Works
-- UE 5.8.4 project (VR / OpenXR template) with Brushify Floating Islands.
-- Level `L_FloatingIslands_2`:
-  - 14 landing islands and 53 `GrappleAnchor` rocks
-  - backdrop, sky dome, mist and waterfalls
-  - **805 plants** on the islands' tops
-  - **Aeloria music** on a loop.
-- `GrappleRig` (C++), on desktop:
-  - twin hooks with **auto-pull** (hold Shift / grip to stop pulling and swing)
-  - **soft rope** (`bSoftRope`)
-  - **flexible orange rope**
-  - rope pull in newtons, which drives the VR vibration
-  - gas boost, walking, respawn.
-- Testing:
-  - telemetry CSV every session
-  - `gr.Test snap|reel [stiff|soft]` and `gr.Test perf`
-  - `Tools/analyse_telemetry.py` and `Tools/rope_model.py`
-  - T-01 to T-12 written up in `Docs/TESTS.md`.
-
-- Swing exaggeration (x1.35, +17% speed) and a speed-driven wind sound. The progressive soft rope fixed F6.
-- Packs in the project: Paragon Kwang, Infinity Blade Grass Lands, Infinity Blade Adversaries, Realistic Starter VFX Pack Vol 2, Paragon Grux.
+- UE 5.8.4 project (VR / OpenXR template), level `L_FloatingIslands_2`: 47 islands, 70 overgrown ruin clusters, about 1,550 plants, 250 snappable vines, rose atmosphere, Aeloria music.
+- Start menu (`L_MainMenu`): EXIT SUIT cover title card, then Endless Runner / 1v1 / 2v2 / 3v3 / 5v5 / PvE, then a loading screen. Every mode plays solo for now.
+- `GrappleRig`: twin hooks (auto-pull, Shift = swing), soft flexible rope, swing exaggeration, wind, Kwang body with ODM gear on the hips, vines snap when you fly through.
+- **New 11 Nov (compiled and tested in Play):**
+  - `GREndlessSpawner` (endless island chunks, distance score)
+  - `GRDayNight` (each match runs dawn to night)
+  - `GRPlanets` (4 planets, glow at night)
+  - `GRArsenal`: 11 weapons. ODM swords, then Kuronami Rifle, SMG, Marksman, Revolver and Blade, then Araxys Rifle, Burst, Sniper, Sidearm and Knife. Each has switching, aim, scope, fire, tracers, recoil, reload, slash and stab.
+- Desktop controls: Q/E hooks, LMB fire or slash, RMB aim or stab, 1-0 or the wheel to switch, X holster, T reload, Shift swing, Space jump/boost, R respawn.
+- Testing: telemetry CSV, `gr.Test snap|reel|catch|swing|perf`, T-01 to T-14 in `Docs/TESTS.md`.
 
 ## Half done
-- Visible body works (legs seen in game). Harness v3 (Sketchfab ODM gear + our straps) written, needs: rebuild, run `import_harness.py`, Play, tune `GearTilt` / `GearScale` / `GearOffset`. Branch `body-and-harness`.
-- Start menu (`GRMenuGameMode`) written, not yet compiled: rebuild, run `make_main_menu.py`, open `L_MainMenu`, Play.
-- Colour pass script ready (`color_grade.py`), not yet run.
-- ODM model licence: get the Sketchfab link from Naomi and record the licence + credit.
-- Beech trees use 8K textures: cap them (Max Texture Size 2048) for VR.
-- Downloading: European Beech, Paragon Agora & Monolith (queued in the launcher; check they finished).
-- New packs aren't placed in the level yet. Older UE4 packs may need a fix-up pass on first open.
+- Aim down sights and the scope are written but not yet checked by hand. Hold RMB with the rifle, then with the Araxys Sniper (key 9). Tune `HipOffset` / `AimDistance` per weapon in the Details of the spawned `GRArsenal` (or in `SetDefaultWeapons`).
+- Endless Runner: start it from the menu (or press Play) and swing past the last island to check that chunks appear. Not yet played end to end.
+- Day/night: watch a full 12 min match once and check that night isn't too dark.
+- **Bug:** "InverseFast non-invertible matrix" logged every frame during Play, since the 10 Nov vines work. Find the zero-size piece (vines or rope links).
+- Weapons in VR: they are held by the controllers, but trigger-to-fire waits for the headset step.
+- ODM model licence: get the Sketchfab link from Naomi. The Kuronami and Araxys models are fan models of Riot designs: private prototype only.
+- Beech trees use 8K textures: cap them at 2048 for VR (needs Naomi's OK, it changes pack assets).
+- Restore Packages prompt on start: M_VineLeaf / M_VineStem autosaves from the crash. Skipped; the saved versions are fine.
 
 ## Decided
-- First person is the main view. Optional third person comes later with no advantage: see "Camera rule" in CLAUDE.md.
-- Comfort: reduce motion sickness and help players know their limits. This will be measured with the Simulator Sickness Questionnaire once the headset is back.
-- Auto-pull is the default. Pull-on-demand stays available as a setting.
-- Base avatar: start from Unreal's Manny, or Naomi's own Paragon character if that's the one she owns.
-- The harness (grapple gear) goes on the avatar's hips, not floating on the display rack.
+- First person is the main view. Optional third person later with no advantage (CLAUDE.md camera rule). Shots trace from the eyes.
+- A match runs from day to night instead of a countdown timer.
+- Third-party models stay out of the public repo.
+- Auto-pull is the default.
 
 ## Next
-1. Wind: listen in game and tune volume / pitch.
-2. First-person body: compile and check it (see Half done). Hands still need IK later. Redesign the harness from real ODM-gear cosplay and climbing-harness references.
-3. Level density (Naomi, 10 Nov): many more islands, some very large islands with structures, floating structures, vines between trees. Ruins/trees/ponds first pass done.
-4. PvE: one Adversaries monster that chases you and can be killed, then blood (VFX pack), then slicing.
-5. F8: cheaper plants (instancing, LODs).
-- Modes (design): 1v1, 2v2, 3v3, PvE. Realistic gore means an 18+ age rating.
+1. Hand-check aim and scope, and tune hip/aim offsets (one weapon at a time).
+2. Fix the per-frame InverseFast error.
+3. PvE: one Adversaries monster that chases you and takes damage from `GRArsenal` (ApplyPointDamage is already sent), then blood VFX, then slicing.
+4. In-world ammo counter on the weapon, gas gauge on the hip (VR comfort rule: no screen HUD).
+5. Performance: `gr.Test perf` (T-15), cap beech textures.
 
 ## Tried and dropped
-- Physical Sky Atmosphere: it renders black below the horizon in this forward-shaded VR setup, so we use Brushify's sky dome instead.
-- First guess for the fall-through bug ("islands have no collision") was wrong: disproved by `diagnose_collision.py`. The cause was the solid sky dome.
-- Typing editor commands with select-all and backspace: unsafe when another window can take focus. Paste from the clipboard instead.
+- Physical Sky Atmosphere: it renders black below the horizon in this setup, so we use Brushify's sky dome.
+- "Islands have no collision" was the wrong guess for the fall-through bug; the cause was the solid sky dome.
+- Typing editor commands with select-all and backspace is unsafe. Paste from the clipboard instead. The Output Log box is in Python mode, so use `exec(open("...py").read())`, not `py "..."`.
+- Weapon orientation by "the thin end is the barrel" alone: it got the revolver and the burst rifle backwards. It's now decided by the grip and magazine.

@@ -121,3 +121,39 @@ One entry per work session: what was built, what broke, and what was learned. Ne
   - a stronger grade (cool shadows, warm highlights);
   - about 90 glowing orbs hanging from the tree canopies, plus soft coloured lights by the ruins, with no shadows to keep them cheap.
 - **Performance risk:** all of this adds draw calls and overdraw. Measure with `gr.Test perf` (T-15) before VR testing.
+
+## 11 Nov 2026: Endless Runner, day-to-night matches, planets, and the weapon system
+- **Brief from Naomi:**
+  - every mode is its own menu choice, with Endless Runner among them;
+  - build the endless runner;
+  - planets in the sky;
+  - each match runs from day to night instead of using a Valorant-style timer;
+  - use the downloaded Kuronami and Araxys weapons, switched with the mouse wheel or number keys;
+  - every weapon (knives included) can be used, with aim and scope animation.
+- **Endless Runner** (`GREndlessSpawner`). It builds island "chunks" 300 m ahead of you and removes them 150 m behind you, so memory stays flat however far you swing. Each chunk has a Brushify island 18–40 m wide, 45–70 m after the last one, with grapple rocks 11–21 m up and 7–16 m apart (the spacing the 2D bench and tests T-01 to T-14 proved swingable). Trees, ferns, an overgrown ruin and a snappable vine are added on top. It keeps a distance score and your best run.
+- **Day-to-night match clock** (`GRDayNight`). The sun rises, crosses the sky and sets over one match (12 min by default), then the moon light takes over. Sun colour, sky light and fog are blended between dawn, noon, dusk and night looks. In Endless mode the day loops.
+- **Planets** (`GRPlanets`, `Art/Planets/make_planets.py`). Four worlds are painted in code from layered noise: Vael, a ringed gas giant in Arcadium orange; Lun, a cratered moon; Iskra, an ice world; Merrow, an ocean world. Every frame each one is placed 6 km from the camera in a fixed direction, so it behaves like it's infinitely far away (it never gets closer, however far you swing). Their lit side faces the real sun, so dawn and dusk give crescents. They are faint by day and bright at night.
+- **Weapons** (`GRArsenal`, a new class; the weapon code moved out of the rig):
+  - **Preparing the models** (`Art/ThirdParty/make_skin_weapons.py`, Blender scripted). Each pack was one FBX with every weapon facing a different way, plus separate magazines and scopes.
+    - The script joins each weapon's parts, cleans the mesh and points the barrel along +X.
+    - Which way the barrel points: for a gun with a magazine, the pistol grip hangs right behind the magazine. For pistols, the barrel tip is the end furthest from the grip. Knives are laid out by PCA (their main length direction).
+    - The pivot goes on the grip, and the script saves two sockets: `Muzzle` and `Sight`.
+    - First attempts got the revolver and the burst rifle backwards and saw the Araxys knife side-on. A side-view contact sheet showed this, and each rule was fixed.
+  - **Import** (`Scripts/import_skin_weapons.py`): one material per texture set (colour, normal, and metal/roughness from the MRS mask), glowing materials for the Kuronami water and the Araxys light strips, and a display rack by the spawn.
+  - **Animation is "procedural".** The models have no animations of their own, so the code works out the weapon's place each frame:
+    - a blend from hip to aim (the gun moves so its `Sight` socket sits on the eye line);
+    - recoil kick;
+    - sway that lags behind the mouse, and a walk bob;
+    - switching (lower, swap, raise) and a reload tilt;
+    - knife slash and heavy-stab curves.
+  - **Snipers.** Aiming zooms in and hides the gun behind a reticle and a dark vignette. Mouse sensitivity scales with the zoom.
+  - **Shooting.**
+    - Shots are line traces from the eyes, following the CLAUDE.md camera rule.
+    - Spread is smaller when aiming and bigger in the air.
+    - A hit deals Unreal point damage (ready for enemies) and shoves loose physics objects.
+    - Shots and blades snap vines.
+    - Each shot draws a glowing tracer and a muzzle flash light.
+  - **Desktop controls:** 1–0 or the mouse wheel switch weapon, X holsters, left mouse fires or slashes, right mouse aims or heavy-stabs, T reloads, and Q/E fire the hooks. With the weapon holstered, the mouse buttons fire the hooks again.
+- **Verified on the PC.** It compiled first time, the planets and weapons imported, and in Play the Kuronami rifle, marksman and blade showed in hand and the rifle fired. Vael and its ring hang over the route.
+- **Found while testing.** Every frame of Play logs "InverseFast: non-invertible matrix". The 10 Nov evening log has it too, so it predates this work. The likely cause is a vine or rope piece of zero size; to investigate.
+- **Licensing.** The weapons are fan models of Riot Games designs. They stay on Naomi's PC (`Art/ThirdParty/Weapons`, `Content/ThirdParty` are gitignored) and are fine for a private prototype, but can't ship in a release.
