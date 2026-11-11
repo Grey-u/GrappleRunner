@@ -157,3 +157,19 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - **Verified on the PC.** It compiled first time, the planets and weapons imported, and in Play the Kuronami rifle, marksman and blade showed in hand and the rifle fired. Vael and its ring hang over the route.
 - **Found while testing.** Every frame of Play logs "InverseFast: non-invertible matrix". The 10 Nov evening log has it too, so it predates this work. The likely cause is a vine or rope piece of zero size; to investigate.
 - **Licensing.** The weapons are fan models of Riot Games designs. They stay on Naomi's PC (`Art/ThirdParty/Weapons`, `Content/ThirdParty` are gitignored) and are fine for a private prototype, but can't ship in a release.
+
+## 11 Nov 2026 (evening): Art direction changed to "sepia haze"
+- **Brief from Naomi.** A fantasy setting in one warm, hazy, almost colourless palette: peach, amber and umber light through thick dusty mist. Ruins read as dark silhouettes against a bright haze, with a low sun disc. Planets should sit far off in the distance, not loom over you.
+- **What changed:**
+  - **Day/night looks** (`GRDayNight`): all four keys are now in one warm family. Night is a dark umber, not blue. The sun stays lower (32° at noon), so the light is long and hazy all day.
+  - **Grade** (`color_grade.py`, new mood `haze`):
+    - saturation drops to 0.4 and an overall warm gain is added, so pinks and greens turn into dusty beige and brown;
+    - thicker fog that starts at your feet and reaches higher, with more volumetric extinction, so distant islands become silhouettes;
+    - a fine film grain, a softer bloom, and warm, dimmer orb and ruin lights.
+  - **Planets** (`GRPlanets`): about 2–2.5× smaller and lower toward the horizon. They're blended toward the current fog colour (60% by day, 30% at night), so they read as far away behind the mist.
+  - **Sun disc:** the planets actor now draws a small bright disc where the sunlight comes from. The bloom makes its halo, and at night it becomes a pale moon.
+- **First try came out lavender-grey.** Desaturating alone let the pale sky dome dominate. An overall warm colour gain fixed it.
+- **Still to do for this look:**
+  - wet, reflective stone underfoot;
+  - a magenta glow near one floating rock, which isn't from our lights (0 recoloured); probably a light inside a Brushify island, to find;
+  - the fog may need tuning so grapple rocks 20 m away stay readable.
