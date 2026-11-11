@@ -40,6 +40,7 @@
 #include "GRArsenal.h"                             // the weapons: switch, aim, fire, slash
 #include "GRPlanets.h"                             // planets in the sky
 #include "GRHandFeel.h"                            // haptic gloves: feel what your fingers touch
+#include "GRAmbientLife.h"                         // drifting pollen by day, glowing spores at night
 
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
@@ -189,6 +190,11 @@ void AGrappleRig::BeginPlay()
 	if (!TActorIterator<AGRHandFeel>(GetWorld()))
 	{
 		GetWorld()->SpawnActor<AGRHandFeel>();
+	}
+	// The living air: pollen and dust by day, glowing spores at night.
+	if (!TActorIterator<AGRAmbientLife>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRAmbientLife>();
 	}
 
 	// ---- 3. Death height ----
