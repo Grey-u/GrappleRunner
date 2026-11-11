@@ -11,7 +11,7 @@
 #include "GRHandFeel.h"
 #include "GrappleRig.h"
 
-#include "OverlapResult.h"   // FOverlapResult: one thing a fingertip overlaps
+#include "Engine/OverlapResult.h"   // FOverlapResult: one thing a fingertip overlaps
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
