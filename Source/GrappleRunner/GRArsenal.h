@@ -13,8 +13,18 @@
 //    Knife / Swords left click = quick slash, right click = heavy stab
 //    Hands          nothing in your hands: the mouse buttons fire the grapple hooks again
 //
+//  THREE WEAPONS (Naomi, 11 Nov): 1 knife, 2 rifle, 3 sniper.
+//
+//  HANDS DO THE RELOADING
+//  Two hands are drawn (the VR template's hand models): the right one on the grip, the left on
+//  the foregrip. A reload is the left hand doing the work: it grabs the magazine, pulls it out,
+//  drops to the belt for a fresh one and slaps it in. The sniper is bolt action: after each
+//  shot the left hand works the bolt. In VR this becomes MANUAL (see VRReload in the .cpp):
+//    grip near the magazine and pull = eject   |   grip at your left hip = take a fresh one
+//    bring it to the magwell = it clicks in    |   sniper: grab the bolt, pull back = next round
+//
 //  DESKTOP CONTROLS (for testing before the headset arrives)
-//    1-9, 0 / mouse wheel  switch weapon       X  put the weapon away (hands free)
+//    1 / 2 / 3, mouse wheel  switch weapon     X  put the weapon away (hands free)
 //    Left mouse            fire / slash        Right mouse  aim down sights / heavy stab
 //    T                     reload              Q / E  left / right grapple hook
 //
@@ -81,6 +91,7 @@ struct FGRWeapon
 	UPROPERTY(EditAnywhere, Category = "Weapon") EGRWeaponKind Kind = EGRWeaponKind::Rifle;
 	UPROPERTY(EditAnywhere, Category = "Weapon") TSoftObjectPtr<UStaticMesh> Mesh;       // right hand
 	UPROPERTY(EditAnywhere, Category = "Weapon") TSoftObjectPtr<UStaticMesh> LeftMesh;   // left hand (twin blades)
+	UPROPERTY(EditAnywhere, Category = "Weapon") TSoftObjectPtr<UStaticMesh> FallbackMesh; // used until Mesh has been imported
 	UPROPERTY(EditAnywhere, Category = "Weapon") float Scale = 0.75f;                    // the models are a little big for a person
 
 	// ---- Where it's held (desktop, from the eyes: forward, right, up) ----
@@ -103,6 +114,13 @@ struct FGRWeapon
 
 	// ---- Melee ----
 	UPROPERTY(EditAnywhere, Category = "Weapon|Melee") float Reach = 160.f;        // how far a slash reaches from your eyes
+
+	// ---- Hands and reloading (points on the weapon, in the model's own centimetres; X = toward the muzzle) ----
+	UPROPERTY(EditAnywhere, Category = "Weapon|Reload") FVector SupportHand = FVector(28.f, 0.f, -4.f);   // where the left hand holds (foregrip)
+	UPROPERTY(EditAnywhere, Category = "Weapon|Reload") FVector MagazinePoint = FVector(10.f, 0.f, -9.f); // the magazine / magwell
+	UPROPERTY(EditAnywhere, Category = "Weapon|Reload") FVector BoltPoint = FVector(-2.f, 4.f, 5.f);      // the bolt handle (bolt-action rifles)
+	UPROPERTY(EditAnywhere, Category = "Weapon|Reload") bool bBoltAction = false;   // pull the bolt after every shot
+	UPROPERTY(EditAnywhere, Category = "Weapon|Reload") TSoftObjectPtr<UStaticMesh> MagazineMesh;   // optional: the magazine shown in the hand
 };
 
 UCLASS()
@@ -120,12 +138,27 @@ public:
 
 	// ---- Feel ----
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float AimSeconds = 0.18f;    // time to raise the sights
-	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float SwitchSeconds = 0.35f; // time to put one weapon away and draw the next
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float SwitchSeconds = 0.3f; // time to put one weapon away and draw the next
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float SwayAmount = 0.6f;     // how much the weapon lags behind the mouse
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float BobAmount = 1.f;       // walk bob strength
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float RecoilRecovery = 10.f; // how fast the gun settles after a shot
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float SlashSeconds = 0.32f;
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float StabSeconds = 0.55f;
+
+	// ---- Hands (the VR template's hand models) ----
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") TSoftObjectPtr<class USkeletalMesh> RightHandModel =
+		TSoftObjectPtr<class USkeletalMesh>(FSoftObjectPath(TEXT("/Game/XRMannequins/Meshes/SKM_MannyXR_right.SKM_MannyXR_right")));
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") TSoftObjectPtr<class USkeletalMesh> LeftHandModel =
+		TSoftObjectPtr<class USkeletalMesh>(FSoftObjectPath(TEXT("/Game/XRMannequins/Meshes/SKM_MannyXR_left.SKM_MannyXR_left")));
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") TSoftObjectPtr<class UAnimationAsset> GraspPose =
+		TSoftObjectPtr<class UAnimationAsset>(FSoftObjectPath(TEXT("/Game/XRMannequins/Animations/A_MannequinsXR_Grasp_Right.A_MannequinsXR_Grasp_Right")));
+	// How a hand model sits on a grip point (tune these if a hand looks twisted).
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") FVector RightHandOffset = FVector(-3.f, -3.5f, 4.5f);
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") FRotator RightHandTurn = FRotator(-25.f, 0.f, 90.f);
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") FVector LeftHandOffset = FVector(-3.f, 3.5f, 4.5f);
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") FRotator LeftHandTurn = FRotator(-25.f, 0.f, -90.f);
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") FVector BeltPoint = FVector(10.f, -16.f, -60.f);   // left hip pouch, from the eyes (desktop)
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") float BoltSeconds = 0.7f;
 
 	// Glowing material for tracers and sparks (made by Scripts/import_skin_weapons.py).
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Effects") TSoftObjectPtr<UMaterialInterface> GlowMaterial =
@@ -172,6 +205,19 @@ private:
 	float MuzzleFlash = 0.f;      // seconds of muzzle light left
 	bool bWantAim = false;        // right mouse held (guns)
 	bool bSwapped = false;        // during a switch: has the new weapon been swapped in yet?
+	float BoltTime = -1.f;        // sniper: <0 = not working the bolt; otherwise seconds into it
+	// VR manual reload
+	bool bMagIn = true;           // is a magazine in the gun?
+	bool bMagInLeftHand = false;  // is the left hand holding a magazine?
+	bool bChambered = true;       // is a round ready to fire? (bolt action)
+	bool bGripWas[2] = { false, false };
+	FVector BoltGrabStart = FVector::ZeroVector;
+	bool bBoltHeld = false;
+	UPROPERTY() TObjectPtr<class USkeletalMeshComponent> HandR;     // the hands
+	UPROPERTY() TObjectPtr<class USkeletalMeshComponent> HandL;
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> HeldMag;           // magazine in the left hand during a reload
+	void UpdateHands(float Dt);   // place the hands on the weapon (and do the reload / bolt choreography)
+	void VRReload();              // the manual VR reload (headset only)
 
 	// ---- Scope reticle (a flat overlay; desktop only) ----
 	TSharedPtr<SWidget> Reticle;

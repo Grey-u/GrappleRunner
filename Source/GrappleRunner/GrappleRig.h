@@ -268,6 +268,8 @@ public:
 	// Desktop: with a weapon out, the mouse buttons fire and aim, so the hooks move to Q and E.
 	// With empty hands (weapon put away), the mouse buttons fire the hooks again.
 	void SetMouseFiresHooks(bool bHooks) { bMouseHooks = bHooks; }
+	// VR: is this hand's grip squeezed? (0 left, 1 right). The weapons use it to grab magazines and bolts.
+	bool IsGripping(int32 Index) const { return (Index == 0 || Index == 1) && bGripNow[Index]; }
 	// Recoil: nudge where you're looking (degrees up, degrees right). Desktop only; in VR your
 	// head is never moved for you (that causes motion sickness).
 	void AddLookKick(float UpDegrees, float RightDegrees)
@@ -345,6 +347,7 @@ private:
 	bool bJumpWasDown = false;                     // was Space held last frame? (press detection)
 	bool bRespawnWasDown = false;                  // was R held last frame?
 	bool bDesktopSetupDone = false;                // have we set up the mouse-and-keyboard camera yet?
+	bool bGripNow[2] = { false, false };            // VR grip squeezed, per hand (read by the weapons)
 	bool bMouseHooks = true;                       // desktop: do the mouse buttons fire the hooks? (no when a weapon is out)
 
 	// Test recording (see bRecordTelemetry above)

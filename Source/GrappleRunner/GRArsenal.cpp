@@ -26,6 +26,9 @@
 #include "Camera/CameraComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/AnimationAsset.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/StaticMesh.h"
@@ -135,34 +138,32 @@ void AGRArsenal::SetDefaultWeapons()
 		W.HipTurn = FRotator(20.f, -12.f, 0.f);   // blade tipped up and in, ready to slash
 		return W;
 	};
-	const FLinearColor KuronamiBlue(0.25f, 0.6f, 1.f);
-	const FLinearColor AraxysTeal(0.3f, 1.f, 0.75f);
+	// THREE WEAPONS (Naomi, 11 Nov): knife, rifle, sniper. Their new models are imported to
+	// /Game/GrappleRunner/Weapons/Arsenal/ (SM_Knife, SM_Rifle, SM_Sniper). Until then each slot
+	// shows its FallbackMesh, so the game still works.
+	auto Ours = [](const TCHAR* Name)
+	{
+		return TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(TEXT("/Game/GrappleRunner/Weapons/Arsenal/%s.%s"), Name, Name)));
+	};
+	const FLinearColor Tracer(0.55f, 0.85f, 1.f);   // cool white-blue: clean, sci-fi
 
 	Weapons.Reset();
-	// Key 1: the twin ODM swords from the gear (our own import, not a skin).
-	FGRWeapon Swords;
-	Swords.Name = TEXT("ODM swords");
-	Swords.Kind = EGRWeaponKind::Swords;
-	Swords.Mesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Harness/SM_ODM_Sword_R.SM_ODM_Sword_R")));
-	Swords.LeftMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Harness/SM_ODM_Sword_L.SM_ODM_Sword_L")));
-	Swords.Scale = 1.f;
-	Swords.Damage = 60.f;
-	Swords.Reach = 190.f;
-	Swords.HipOffset = FVector(40.f, 24.f, -28.f);
-	Swords.HipTurn = FRotator(-35.f, 0.f, 0.f);
-	Weapons.Add(Swords);
-	// Keys 2-6: Kuronami (blue water)
-	Weapons.Add(Gun(TEXT("Kuronami Rifle"), TEXT("SM_Kuronami_Rifle"), EGRWeaponKind::Rifle, 40.f, 9.75f, 25, 2.5f, 2.f, 0.25f, 0.7f, 70.f, KuronamiBlue));
-	Weapons.Add(Gun(TEXT("Kuronami SMG"), TEXT("SM_Kuronami_SMG"), EGRWeaponKind::SMG, 26.f, 13.33f, 30, 2.25f, 1.6f, 0.4f, 0.45f, 78.f, KuronamiBlue));
-	Weapons.Add(Gun(TEXT("Kuronami Marksman"), TEXT("SM_Kuronami_Marksman"), EGRWeaponKind::Sniper, 101.f, 1.5f, 5, 2.5f, 4.f, 0.f, 2.5f, 35.f, KuronamiBlue));
-	Weapons.Add(Gun(TEXT("Kuronami Revolver"), TEXT("SM_Kuronami_Revolver"), EGRWeaponKind::Pistol, 55.f, 4.f, 6, 2.25f, 1.2f, 0.5f, 1.6f, 80.f, KuronamiBlue));
-	Weapons.Add(Blade(TEXT("Kuronami Blade"), TEXT("SM_Kuronami_Knife"), 50.f));
-	// Keys 7-0, then the wheel: Araxys (alien teal)
-	Weapons.Add(Gun(TEXT("Araxys Rifle"), TEXT("SM_Araxys_Rifle"), EGRWeaponKind::Rifle, 40.f, 9.75f, 25, 2.5f, 2.f, 0.25f, 0.7f, 70.f, AraxysTeal));
-	Weapons.Add(Gun(TEXT("Araxys Burst"), TEXT("SM_Araxys_Burst"), EGRWeaponKind::Burst, 35.f, 15.f, 21, 2.5f, 1.8f, 0.2f, 0.5f, 75.f, AraxysTeal));
-	Weapons.Add(Gun(TEXT("Araxys Sniper"), TEXT("SM_Araxys_Sniper"), EGRWeaponKind::Sniper, 150.f, 0.6f, 5, 3.7f, 5.f, 0.f, 3.5f, 25.f, AraxysTeal));
-	Weapons.Add(Gun(TEXT("Araxys Sidearm"), TEXT("SM_Araxys_Sidearm"), EGRWeaponKind::Pistol, 30.f, 6.75f, 15, 1.5f, 1.f, 0.4f, 0.8f, 80.f, AraxysTeal));
-	Weapons.Add(Blade(TEXT("Araxys Knife"), TEXT("SM_Araxys_Knife"), 50.f));
+	FGRWeapon Knife = Blade(TEXT("Knife"), TEXT("SM_Araxys_Knife"), 55.f);
+	Knife.FallbackMesh = Knife.Mesh;
+	Knife.Mesh = Ours(TEXT("SM_Knife"));
+	Weapons.Add(Knife);                                                                         // key 1
+
+	FGRWeapon Rifle = Gun(TEXT("Rifle"), TEXT("SM_Kuronami_Rifle"), EGRWeaponKind::Rifle, 40.f, 9.75f, 25, 2.4f, 2.f, 0.25f, 0.7f, 70.f, Tracer);
+	Rifle.FallbackMesh = Rifle.Mesh;
+	Rifle.Mesh = Ours(TEXT("SM_Rifle"));
+	Weapons.Add(Rifle);                                                                         // key 2
+
+	FGRWeapon Sniper = Gun(TEXT("Sniper"), TEXT("SM_Araxys_Sniper"), EGRWeaponKind::Sniper, 150.f, 0.6f, 5, 3.2f, 5.f, 0.f, 3.5f, 25.f, Tracer);
+	Sniper.FallbackMesh = Sniper.Mesh;
+	Sniper.Mesh = Ours(TEXT("SM_Sniper"));
+	Sniper.bBoltAction = true;
+	Sniper.SupportHand = FVector(38.f, 0.f, -3.f);
+	Weapons.Add(Sniper);                                                                        // key 3
 }
 
 // =====================================================================================
@@ -272,7 +273,7 @@ void AGRArsenal::StartSwitch(int32 Slot)
 		return;
 	}
 	const FGRWeapon& W = Weapons[Slot];
-	if (W.Kind != EGRWeaponKind::Hands && W.Mesh.IsNull())
+	if (W.Kind != EGRWeaponKind::Hands && W.Mesh.IsNull() && W.FallbackMesh.IsNull())
 	{
 		return;   // empty slot
 	}
@@ -321,6 +322,10 @@ void AGRArsenal::ShowSlot(int32 Slot)
 	auto Show = [&](TObjectPtr<UStaticMeshComponent>& Part, const TSoftObjectPtr<UStaticMesh>& Asset, int32 Side)
 	{
 		UStaticMesh* Mesh = Asset.IsNull() ? nullptr : Asset.LoadSynchronous();
+		if (!Mesh && Side == 1 && !W.FallbackMesh.IsNull())
+		{
+			Mesh = W.FallbackMesh.LoadSynchronous();   // new model not imported yet
+		}
 		if (!Mesh)
 		{
 			if (Part)
@@ -386,7 +391,7 @@ void AGRArsenal::ReadInput(float Dt)
 		for (int32 Tries = 1; Tries <= Weapons.Num(); ++Tries)
 		{
 			const int32 Next = (From + Step * Tries + Weapons.Num() * 2) % Weapons.Num();
-			if (!Weapons[Next].Mesh.IsNull())
+			if (!Weapons[Next].Mesh.IsNull() || !Weapons[Next].FallbackMesh.IsNull())
 			{
 				StartSwitch(Next);
 				break;
@@ -524,6 +529,11 @@ void AGRArsenal::Fire()
 	RecoilBack += FMath::Clamp(W.RecoilKick * 2.5f, 1.f, 8.f);
 	R->AddLookKick(W.RecoilKick * (1.f - 0.4f * AimAlpha), FMath::FRandRange(-0.3f, 0.3f) * W.RecoilKick);
 
+	if (W.bBoltAction)
+	{
+		BoltTime = 0.f;        // desktop: the left hand works the bolt (see UpdateHands)
+		bChambered = false;    // VR: you must pull the bolt yourself
+	}
 	if (Ammo[Current] <= 0)
 	{
 		BurstLeft = 0;
@@ -851,9 +861,12 @@ void AGRArsenal::Animate(float Dt)
 		Turn.Pitch += 10.f * S * FMath::Sin(2.f * PI * Pr);
 	}
 
-	// ---- 6. Switching: lowered out of view ----
-	Loc.Z -= 24.f * Down;
-	Turn.Pitch -= 50.f * Down;
+	// ---- 6. Switching: a quick, eased dip down and to the side (not a big flip) ----
+	const float E = FMath::SmoothStep(0.f, 1.f, Down);
+	Loc.Z -= 16.f * E;
+	Loc.Y += 6.f * E;
+	Turn.Pitch -= 20.f * E;
+	Turn.Roll += 14.f * E;
 
 	// ---- 7. Melee curves ----
 	FVector SwingLoc = FVector::ZeroVector;
@@ -905,6 +918,226 @@ void AGRArsenal::Animate(float Dt)
 }
 
 // =====================================================================================
+//  Hands: the right hand on the grip, the left on the foregrip; the left hand reloads
+// =====================================================================================
+//  Desktop reload choreography (each step is a share of ReloadSeconds):
+//    0.00-0.20  left hand slides from the foregrip to the magazine
+//    0.20-0.45  pulls it out and drops down to the belt pouch (old magazine gone)
+//    0.45-0.70  comes back up with a fresh magazine
+//    0.70-0.85  pushes it into the magwell (the gun bumps)
+//    0.85-1.00  back to the foregrip
+//  Sniper bolt (BoltSeconds after each shot): left hand to the bolt, pull back, push forward, back.
+void AGRArsenal::UpdateHands(float Dt)
+{
+	AGrappleRig* R = Rig.Get();
+	UCameraComponent* Eyes = R ? R->GetEyes() : nullptr;
+	if (!Eyes)
+	{
+		return;
+	}
+	// Make the two hands once (the VR template's hand models, holding a "grasp" pose).
+	auto MakeHand = [this](TObjectPtr<USkeletalMeshComponent>& Hand, const TSoftObjectPtr<USkeletalMesh>& Model)
+	{
+		if (Hand)
+		{
+			return;
+		}
+		USkeletalMesh* Mesh = Model.LoadSynchronous();
+		if (!Mesh)
+		{
+			return;
+		}
+		Hand = NewObject<USkeletalMeshComponent>(this);
+		Hand->SetSkeletalMesh(Mesh);
+		Hand->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Hand->SetCastShadow(false);
+		Hand->RegisterComponent();
+		Hand->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepWorldTransform);
+		Hand->SetUsingAbsoluteLocation(true);
+		Hand->SetUsingAbsoluteRotation(true);
+		if (UAnimationAsset* Pose = GraspPose.LoadSynchronous())
+		{
+			Hand->PlayAnimation(Pose, true);   // fingers curled round the grip (if this hand's skeleton accepts it)
+		}
+	};
+	if (R->IsUsingVR())
+	{
+		return;   // in VR your real hands (the controllers / template hands) are the hands
+	}
+	MakeHand(HandR, RightHandModel);
+	MakeHand(HandL, LeftHandModel);
+	if (!HandR || !HandL)
+	{
+		return;
+	}
+	const FGRWeapon* W = Held();
+	const bool bScopedIn = W && W->bScope && AimAlpha > 0.92f;   // looking through the scope: no gun, no hands
+	const bool bShow = W && RightMesh && RightMesh->IsVisible() && !bHolstered && !bScopedIn;
+	HandR->SetHiddenInGame(!bShow);
+	HandL->SetHiddenInGame(!bShow);
+	if (HeldMag)
+	{
+		HeldMag->SetHiddenInGame(true);
+	}
+	if (!bShow)
+	{
+		return;
+	}
+	const FTransform Gun = RightMesh->GetComponentTransform();          // the weapon in the world
+	const FTransform View = Eyes->GetComponentTransform();              // the eyes in the world
+	const FQuat GunRot = Gun.GetRotation();
+
+	// Right hand: always on the grip (the weapon's pivot).
+	HandR->SetWorldLocationAndRotation(Gun.TransformPosition(RightHandOffset / FMath::Max(0.01f, W->Scale)),
+		GunRot * RightHandTurn.Quaternion());
+
+	// Left hand: where should it be this frame?
+	const FVector Fore = Gun.TransformPosition(W->SupportHand);
+	FVector Left = Fore;
+	bool bMagInHand = false;
+	if (IsBlade(W->Kind))
+	{
+		Left = View.TransformPosition(FVector(26.f, -16.f, -24.f));   // knife: left hand up and ready, off to the side
+	}
+	else if (ReloadLeft > 0.f && W->ReloadSeconds > 0.f)
+	{
+		const float P = 1.f - ReloadLeft / W->ReloadSeconds;
+		const FVector Mag = Gun.TransformPosition(W->MagazinePoint);
+		const FVector Belt = View.TransformPosition(BeltPoint);
+		auto Ease = [](float A, float B, float T) { return FMath::SmoothStep(0.f, 1.f, FMath::Clamp((T - A) / (B - A), 0.f, 1.f)); };
+		if (P < 0.20f)      { Left = FMath::Lerp(Fore, Mag, Ease(0.f, 0.20f, P)); }
+		else if (P < 0.45f) { Left = FMath::Lerp(Mag, Belt, Ease(0.20f, 0.45f, P)); bMagInHand = P < 0.30f; }
+		else if (P < 0.70f) { Left = FMath::Lerp(Belt, Mag - Gun.GetUnitAxis(EAxis::Z) * 12.f, Ease(0.45f, 0.70f, P)); bMagInHand = true; }
+		else if (P < 0.85f) { Left = FMath::Lerp(Mag - Gun.GetUnitAxis(EAxis::Z) * 12.f, Mag, Ease(0.70f, 0.85f, P)); bMagInHand = true; }
+		else                { Left = FMath::Lerp(Mag, Fore, Ease(0.85f, 1.f, P)); }
+	}
+	else if (BoltTime >= 0.f && W->bBoltAction)
+	{
+		BoltTime += Dt;
+		const float P = BoltTime / FMath::Max(0.05f, BoltSeconds);
+		const FVector Bolt = Gun.TransformPosition(W->BoltPoint);
+		const FVector Back = Bolt - Gun.GetUnitAxis(EAxis::X) * 7.f;      // pulled back 7 cm
+		const float A = FMath::SmoothStep(0.f, 1.f, FMath::Clamp(P / 0.3f, 0.f, 1.f));
+		if (P < 0.3f)       { Left = FMath::Lerp(Fore, Bolt, A); }
+		else if (P < 0.55f) { Left = FMath::Lerp(Bolt, Back, FMath::SmoothStep(0.f, 1.f, (P - 0.3f) / 0.25f)); }
+		else if (P < 0.75f) { Left = FMath::Lerp(Back, Bolt, FMath::SmoothStep(0.f, 1.f, (P - 0.55f) / 0.2f)); }
+		else                { Left = FMath::Lerp(Bolt, Fore, FMath::SmoothStep(0.f, 1.f, (P - 0.75f) / 0.25f)); }
+		if (P >= 1.f)
+		{
+			BoltTime = -1.f;
+			bChambered = true;
+		}
+	}
+	HandL->SetWorldLocationAndRotation(Left + GunRot.RotateVector(LeftHandOffset), GunRot * LeftHandTurn.Quaternion());
+
+	// The fresh magazine travelling in the left hand (only if the weapon names a magazine model).
+	if (bMagInHand && !W->MagazineMesh.IsNull())
+	{
+		if (!HeldMag)
+		{
+			HeldMag = NewObject<UStaticMeshComponent>(this);
+			HeldMag->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			HeldMag->SetCastShadow(false);
+			HeldMag->RegisterComponent();
+			HeldMag->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepWorldTransform);
+			HeldMag->SetUsingAbsoluteLocation(true);
+			HeldMag->SetUsingAbsoluteRotation(true);
+			HeldMag->SetUsingAbsoluteScale(true);
+		}
+		HeldMag->SetStaticMesh(W->MagazineMesh.LoadSynchronous());
+		HeldMag->SetWorldLocationAndRotation(Left, GunRot);
+		HeldMag->SetWorldScale3D(FVector(W->Scale));
+		HeldMag->SetHiddenInGame(false);
+	}
+}
+
+// =====================================================================================
+//  VR manual reload (runs only in the headset). Your left hand does it for real:
+//    1. squeeze grip near the magazine and pull away   -> magazine out (gun is empty)
+//    2. let go                                          -> it drops
+//    3. squeeze grip at your left hip                   -> a fresh magazine in your hand
+//    4. bring it to the magwell (within 7 cm)           -> click: loaded
+//    5. sniper: squeeze grip on the bolt, pull back 5 cm -> next round ready
+//  Firing in VR (trigger) arrives with the headset controls; it will check bMagIn and bChambered.
+//  Note: in VR the grip also stops a hook reeling. With a gun out, a grip NEAR the gun or the
+//  hip counts as a grab; elsewhere it still works the hooks.
+// =====================================================================================
+void AGRArsenal::VRReload()
+{
+	AGrappleRig* R = Rig.Get();
+	const FGRWeapon* W = Held();
+	if (!R || !R->IsUsingVR() || !W || !IsGun(W->Kind) || !RightMesh || !R->GetHand(0))
+	{
+		return;
+	}
+	const bool bGrip = R->IsGripping(0);
+	const bool bPressed = bGrip && !bGripWas[0];
+	const bool bReleased = !bGrip && bGripWas[0];
+	bGripWas[0] = bGrip;
+
+	const FTransform Gun = RightMesh->GetComponentTransform();
+	const FVector Hand = R->GetHand(0)->GetComponentLocation();
+	const FVector Mag = Gun.TransformPosition(W->MagazinePoint);
+	const FVector Bolt = Gun.TransformPosition(W->BoltPoint);
+	const FVector Hip = R->GetBodyPosition() + FVector(0.f, 0.f, -10.f) - R->GetEyes()->GetRightVector() * 18.f;
+	auto Click = [R](int32 Side, float Strength)
+	{
+		if (APlayerController* P = R->GetPlayerController())
+		{
+			P->SetHapticsByValue(1.f, Strength, Side == 0 ? EControllerHand::Left : EControllerHand::Right);
+		}
+	};
+
+	// 1. grab the magazine out
+	if (bPressed && bMagIn && FVector::Dist(Hand, Mag) < 10.f)
+	{
+		bMagIn = false;
+		bMagInLeftHand = true;
+		Ammo[Current] = 0;
+		Click(0, 0.5f);
+	}
+	// 2. drop it
+	else if (bReleased && bMagInLeftHand)
+	{
+		bMagInLeftHand = false;
+	}
+	// 3. fresh magazine from the hip
+	else if (bPressed && !bMagInLeftHand && !bMagIn && FVector::Dist(Hand, Hip) < 20.f)
+	{
+		bMagInLeftHand = true;
+		Click(0, 0.3f);
+	}
+	// 4. insert
+	if (bMagInLeftHand && !bMagIn && bGrip && Ammo[Current] == 0 && FVector::Dist(Hand, Mag) < 7.f && !bPressed)
+	{
+		bMagIn = true;
+		bMagInLeftHand = false;
+		Ammo[Current] = W->Magazine;
+		Click(0, 0.8f);
+		Click(1, 0.8f);
+	}
+	// 5. bolt
+	if (W->bBoltAction && !bChambered)
+	{
+		if (bPressed && FVector::Dist(Hand, Bolt) < 8.f)
+		{
+			bBoltHeld = true;
+			BoltGrabStart = Hand;
+		}
+		if (bBoltHeld && FVector::DotProduct(BoltGrabStart - Hand, Gun.GetUnitAxis(EAxis::X)) > 5.f)
+		{
+			bChambered = true;
+			bBoltHeld = false;
+			Click(0, 0.6f);
+		}
+	}
+	if (!bGrip)
+	{
+		bBoltHeld = false;
+	}
+}
+
+// =====================================================================================
 //  Tick: every frame
 // =====================================================================================
 void AGRArsenal::Tick(float DeltaSeconds)
@@ -942,6 +1175,8 @@ void AGRArsenal::Tick(float DeltaSeconds)
 	}
 
 	Animate(DeltaSeconds);
+	UpdateHands(DeltaSeconds);
+	VRReload();
 	UpdateEffects(DeltaSeconds);
 
 	// The mouse buttons fire the hooks only when your hands are empty.

@@ -384,6 +384,7 @@ void AGrappleRig::ReadInput(float DeltaSeconds)
 		{
 			bHookDown[i] = AnyDown(TriggerKeys[i]) || AnyAxis(TriggerAxes[i], 0.6f); // trigger more than 60% squeezed
 			const bool bGrip = AnyDown(GripKeys[i]) || AnyAxis(GripAxes[i], 0.6f);
+			bGripNow[i] = bGrip;
 			// Auto-pull (AoT style): the hook reels you in by itself; squeeze grip to STOP
 			// pulling and swing freely. With auto-pull off, it's the other way round.
 			bReel[i] = bAutoPull ? !bGrip : bGrip;
