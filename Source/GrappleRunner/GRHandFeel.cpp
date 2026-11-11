@@ -14,8 +14,9 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
-#include "HeadMountedDisplayFunctionLibrary.h"
-#include "HeadMountedDisplayTypes.h"
+#include "Engine/Engine.h"
+#include "HeadMountedDisplayTypes.h"   // FXRHandTrackingState, EHandKeypoint
+#include "IXRTrackingSystem.h"         // the headset system (GEngine->XRSystem)
 #include "Kismet/GameplayStatics.h"
 
 #if PLATFORM_WINDOWS
@@ -41,7 +42,7 @@ AGRHandFeel::AGRHandFeel()
 void AGRHandFeel::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (!UHeadMountedDisplayFunctionLibrary::IsHeadMountedDisplayEnabled())
+	if (!GEngine || !GEngine->XRSystem.IsValid() || !GEngine->XRSystem->IsHeadTrackingAllowed())
 	{
 		return;   // desktop: nothing to feel with
 	}
@@ -50,7 +51,7 @@ void AGRHandFeel::Tick(float DeltaSeconds)
 		// ---- 1. where are this hand's joints? ----
 		FXRHandTrackingState State;
 		const EControllerHand Which = Hand == 0 ? EControllerHand::Left : EControllerHand::Right;
-		UHeadMountedDisplayFunctionLibrary::GetHandTrackingState(this, EXRSpaceType::UnrealWorldSpace, Which, State);
+		GEngine->XRSystem->GetHandTrackingState(this, EXRSpaceType::UnrealWorldSpace, Which, State);
 		if (!State.bValid || State.HandKeyLocations.Num() < EHandKeypointCount)
 		{
 			continue;   // this hand isn't tracked right now

@@ -138,8 +138,8 @@ void AGRDayNight::Tick(float DeltaSeconds)
 	// Bioluminescence: 0 by day, rising through dusk to 1 at night, falling again before dawn.
 	if (UMaterialParameterCollection* Params = WorldParams.LoadSynchronous())
 	{
-		const float Night = FMath::Clamp(FMath::Clamp((Progress - 0.6f) / 0.12f, 0.f, 1.f) + FMath::Clamp((0.08f - Progress) / 0.08f, 0.f, 1.f), 0.f, 1.f);
-		UKismetMaterialLibrary::SetScalarParameterValue(this, Params, TEXT("Night"), Night);
+		const float Darkness = FMath::Clamp(FMath::Clamp((Progress - 0.6f) / 0.12f, 0.f, 1.f) + FMath::Clamp((0.08f - Progress) / 0.08f, 0.f, 1.f), 0.f, 1.f);
+		UKismetMaterialLibrary::SetScalarParameterValue(this, Params, TEXT("Night"), Darkness);
 	}
 	if (Fog.IsValid())
 	{
