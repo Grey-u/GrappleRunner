@@ -23,14 +23,14 @@
 - Restore Packages prompt on start: M_VineLeaf / M_VineStem autosaves from the crash. Skipped; the saved versions are fine.
 
 ## Decided
-- Art direction (11 Nov): **sepia haze**. One warm family (peach, amber, umber) through thick dusty mist, ruins as silhouettes, a low sun disc, planets small and far off behind the haze. `color_grade.py` MOOD = "haze".
+- Art direction (11 Nov, replaces "sepia haze"): **living Pandora**. Realistic rendering with a semi-realistic, cinematic style, lush GREEN, alive but fantastical (Avatar films and the animated series); clean daylight, humid blue-green distance, bioluminescence at night. `color_grade.py` MOOD = "pandora".
 - First person is the main view. Optional third person later with no advantage (CLAUDE.md camera rule). Shots trace from the eyes.
 - A match runs from day to night instead of a countdown timer.
 - Third-party models stay out of the public repo.
 - Auto-pull is the default.
 
 ## Next
-0. Sepia haze polish: wet reflective stone underfoot; find the magenta light near a floating rock (not one of ours); check grapple rocks stay readable in the thicker fog.
+0. Pandora look: Brushify island rocks and hanging moss are red-tinted by their own materials; the grade now mutes red (re-run color_grade.py to apply), but the real fix is our own green material instances for the islands (ask Naomi first: touches pack content) and replacing the plants with photoreal ones from Fab (Quixel Megaplants, free, UE 5.7+). Haptic gloves: GRHandFeel built (LucidGloves via OpenGloves pipe); needs gloves plus SteamVR to test.
 1. Hand-check aim and scope, and tune hip/aim offsets (one weapon at a time).
 2. Fix the per-frame InverseFast error.
 3. PvE: one Adversaries monster that chases you and takes damage from `GRArsenal` (ApplyPointDamage is already sent), then blood VFX, then slicing.

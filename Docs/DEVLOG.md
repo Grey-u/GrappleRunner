@@ -173,3 +173,21 @@ One entry per work session: what was built, what broke, and what was learned. Ne
   - wet, reflective stone underfoot;
   - a magenta glow near one floating rock, which isn't from our lights (0 recoloured); probably a light inside a Brushify island, to find;
   - the fog may need tuning so grapple rocks 20 m away stay readable.
+
+## 11 Nov 2026 (night): Art direction changed again to "living Pandora", and haptic glove bridge
+- **Naomi's correction.** Sepia wasn't what she meant. What she wants is realism or hyper-realism graphics with a semi-realistic style, plants that feel green, and a world that feels alive and real but fantastical, like Avatar (both the films and the animated series).
+- **What changed:**
+  - **Day/night keys** (`GRDayNight`): clean daylight, humid blue-green distance, golden dawn and dusk, and a deep teal night.
+  - **Bioluminescence:** a new `MPC_World.Night` value (driven by `GRDayNight`) makes the glowing orbs faint by day and bright at night.
+  - **Grade:** a new `color_grade.py` mood, "pandora".
+- **Problem found.** The Brushify floating islands' rock and hanging-moss materials are red. Raising saturation made the whole scene read red ("wayyy too much red"). The grade now mutes the red channel and lifts green.
+  - Proper fix: our own material instances for the islands, plus photoreal plants from Fab (Quixel Megaplants, free).
+- **Haptic gloves** (`GRHandFeel`):
+  - Fingertip positions come from OpenXR hand tracking (`GEngine->XRSystem->GetHandTrackingState`).
+  - A 0.9 cm touch sphere sits on each tip.
+  - When a tip touches something, the code sends force feedback to LucidGloves through the OpenGloves pipe `\\.\pipe\vrapplication\ffb\curl\left|right`: five int16 values, 0–1000, thumb to pinky.
+  - Plants, vines and water are soft (25%); rock and ruins are firm (100%).
+  - A small controller tick plays on first contact, and there is a hook for the EXIT SUIT.
+  - **Build fixes in 5.8:**
+    - `HeadMountedDisplayFunctionLibrary.h` isn't available, so the code uses `IXRTrackingSystem`.
+    - `FOverlapResult` needs `Engine/OverlapResult.h`.
