@@ -585,9 +585,12 @@ void AGRArsenal::ReadInput(float Dt)
 
 	if (IsBlade(W->Kind))
 	{
-		if (MeleeTime < 0.f && (bFirePressed || bAltPressed))
+		// Mouse, or V = slash and C = cross-cut (keyboard alternatives).
+		const bool bSlashKey = P->WasInputKeyJustPressed(EKeys::V);
+		const bool bCrossKey = P->WasInputKeyJustPressed(EKeys::C);
+		if (MeleeTime < 0.f && (bFirePressed || bAltPressed || bSlashKey || bCrossKey))
 		{
-			StartMelee(bAltPressed);
+			StartMelee(bAltPressed || bCrossKey);
 		}
 		return;
 	}
@@ -1873,7 +1876,7 @@ void AGRArsenal::Tick(float DeltaSeconds)
 		}
 		else
 		{
-			Status = FString::Printf(TEXT("%s   |  LMB slash  RMB cross-cut  X holster  Q/E hooks  F9 slow-mo   (swing %.2f, cuts %d)"),
+			Status = FString::Printf(TEXT("%s   |  LMB/V slash  RMB/C cross-cut  X holster  Q/E hooks  F9 slow-mo   (swing %.2f, cuts %d)"),
 				*W->Name, MeleeTime, GCutCount);
 		}
 		GEngine->AddOnScreenDebugMessage(4202, 0.f, FColor(255, 200, 120), Status);
