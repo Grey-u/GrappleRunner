@@ -224,3 +224,13 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - **One pair of hands:** Kwang's arms, sword and head are hidden in first person (`HiddenBodyBones`). In VR the template's hand models step aside while the blades are out.
 - **Game objective** (Claude Doc "Grapple Runner: game objective"): keep the run alive as long as you can; score = metres × flow multiplier; gas is the pressure and slicing pods refills it; no kill quotas. Based on six case studies (Attack on Titan VR: Unbreakable, Swarm, Windlands 2, Sprint Vector, Subway Surfers, Gorilla Tag) and research on motivation, session length, comfort and haptics.
 - **Not built or tested yet:** computer control was stopped, so the code is on the PC but not compiled. The build steps are in NOW.md.
+
+## 12 Nov 2026 (afternoon): built, tested, deferred + Lumen on, islands dressed with Megascans
+- **Built:** one compile error (a local variable named `Owner` hid `AActor::Owner`, warning C4458 treated as an error); renamed to `Holder`. Everything else compiled first time.
+- **Blades tested in Play:** draw, ready stance, alternating slashes and cut plants all work ("cuts 1" in the status line; the Message Log shows the copy-to-procedural-mesh step for banana and tropical plants). The ready stance was too low (hands off screen), so it's raised to (40, 21, -17). The hands sat low on the grips: `GripSlide` default is now 4 cm.
+- **Testing aids:** F9 toggles 10% slow motion; the status line shows swing time and number of cuts; V = slash and C = cross-cut on the keyboard. (Automated clicks from the agent's computer control are often too short for Unreal to see; a real mouse is fine.)
+- **Rendering switched** (Naomi's go-ahead): `r.ForwardShading=False` (deferred, so Lumen GI and reflections work), `vr.InstancedStereo=False` (5.8 bug with deferred), anti-aliasing TSR. About 2,200 shaders recompiled on first open.
+- **Lumen made the island undersides pitch black**, because no sky light reaches under them. `Scripts/tools/lighting_fix.py` sets Lumen skylight leaking to 0.12 on the post-process volume.
+- **Free Megascans via the Fab panel in the editor** (Naomi OK'd accepting the Fab licence for free assets): Huge Nordic Coastal Cliff, Granite Cliff, Mossy Rock Formation (high quality), Mossy Forest Roots.
+- **`Scripts/dress_megascans.py`** on all 47 landing islands: 221 scanned cliffs hung upside down under the islands, 271 rocks round the rims, 1,474 more plants in clumps (Project Nature photoscans), 102 root sprawls.
+- **Disk:** Unreal warned that the C: drive has under 5 GB free. Stopped downloading; high-quality Megascans use 4K textures.
