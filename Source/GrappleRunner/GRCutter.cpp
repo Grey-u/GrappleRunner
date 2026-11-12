@@ -292,11 +292,11 @@ void AGRCutter::Cut(FEntry& E, const FVector& PlanePoint, FVector PlaneNormal, c
 	{
 		return;
 	}
-	AActor* Owner = S->GetOwner();
+	AActor* Holder = S->GetOwner();
 
 	// 1. A procedural copy, in the same place. It belongs to the same actor, so if an island
 	//    chunk is removed later, its cut pieces go with it.
-	UProceduralMeshComponent* Piece = NewObject<UProceduralMeshComponent>(Owner ? static_cast<UObject*>(Owner) : this);
+	UProceduralMeshComponent* Piece = NewObject<UProceduralMeshComponent>(Holder ? static_cast<UObject*>(Holder) : this);
 	Piece->SetUsingAbsoluteLocation(true);
 	Piece->SetUsingAbsoluteRotation(true);
 	Piece->SetUsingAbsoluteScale(true);
