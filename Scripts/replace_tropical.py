@@ -36,7 +36,7 @@ def meshes_under(folder):
     return out
 
 
-ferns = [m for m in meshes_under("/Game/PN_Fern") if m]
+ferns = [m for m in meshes_under("/Game/PN_Fern/Meshes") if m]
 ferns.sort(key=lambda m: m.get_bounds().box_extent.z)
 if not ferns:
     raise RuntimeError("No fern meshes found under /Game/PN_Fern")
