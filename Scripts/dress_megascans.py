@@ -45,7 +45,8 @@ GROUPS = [
     ("roots", ["root"]),
     ("cliff", ["cliff", "formation", "coastal", "ledge"]),
     ("rock", ["rock", "boulder", "stone"]),
-    ("plant", ["fern", "palm", "elephant", "knotweed", "ginkgo", "cherry", "plant", "bush", "leaf", "megaplant"]),
+    ("plant", ["fern", "palm", "elephant", "knotweed", "ginkgo", "cherry", "plant", "bush", "leaf", "megaplant",
+               "banana", "pandanus", "pn_"]),
 ]
 
 random.seed(SEED)
@@ -60,7 +61,10 @@ def log(text):
 # ---------------------------------------------------------------- 1. find the models
 registry = unreal.AssetRegistryHelpers.get_asset_registry()
 found = {g: [] for g, _ in GROUPS}
-for root in ("/Game/Fab", "/Game/Megascans"):
+# Our photoscanned Project Nature plants (banana, pandanus, fern, tropical ground plants) are
+# used for the plant clumps too, so every island top gets dense, real-looking jungle.
+for root in ("/Game/Fab", "/Game/Megascans", "/Game/PN_Banana", "/Game/PN_Pandanus", "/Game/PN_Fern",
+             "/Game/PN_tropicalGroundPlants"):
     if not unreal.EditorAssetLibrary.does_directory_exist(root):
         continue
     for data in registry.get_assets_by_path(root, recursive=True):
