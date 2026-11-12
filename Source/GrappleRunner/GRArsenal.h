@@ -13,7 +13,16 @@
 //    Knife / Swords left click = quick slash, right click = heavy stab
 //    Hands          nothing in your hands: the mouse buttons fire the grapple hooks again
 //
-//  THREE WEAPONS (Naomi, 11 Nov): 1 knife, 2 rifle, 3 sniper.
+//  THREE WEAPONS (Naomi, 11 Nov; blades 12 Nov): 1 twin ODM blades, 2 rifle, 3 sniper.
+//
+//  THE TWIN BLADES (12 Nov)
+//  One sword in each hand, Attack on Titan style. Left click = a quick slash (the blades take
+//  turns), right click = a heavy X-shaped cross-cut with both. The blades really cut: every
+//  frame of a swing, each blade's path is handed to GRCutter, which slices plants and props in
+//  one hit and takes several hacks to fell a tree (see GRCutter.h).
+//  The hands are fitted to the grip automatically: from the curled finger joints of the
+//  "grasp" pose we work out where the hollow of the fist is and which way it points, then
+//  move the hand so that hollow sits exactly round the sword's grip (FitHandToBlade).
 //
 //  HANDS DO THE RELOADING
 //  Two hands are drawn (the VR template's hand models): the right one on the grip, the left on
@@ -58,6 +67,7 @@
 #include "GRArsenal.generated.h"
 
 class AGrappleRig;
+class AGRCutter;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UPointLightComponent;
@@ -139,7 +149,7 @@ public:
 
 	// The slots. Keys 1-9 and 0 pick the first ten; the mouse wheel steps through all of them.
 	UPROPERTY(EditAnywhere, Category = "Arsenal") TArray<FGRWeapon> Weapons;
-	UPROPERTY(EditAnywhere, Category = "Arsenal") int32 StartWeapon = 1;   // 0 = the first slot
+	UPROPERTY(EditAnywhere, Category = "Arsenal") int32 StartWeapon = 0;   // 0 = the first slot (the blades)
 
 	// ---- Feel ----
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Feel") float AimSeconds = 0.18f;    // time to raise the sights
@@ -183,6 +193,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimMontage>> GunMontages;    // Fire, Reload, ReloadEmpty
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> ArmsAnims;    // fallback clips if the blueprint is missing
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> GunAnims;     // Idle, Fire, Reload, ReloadEmpty
+
+	// ---- Twin blades: how the hands hold them, and how fast a VR swing must be to cut ----
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float GripSlide = 0.f;      // move both hands along the grip (cm, + = toward the blade)
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float GripTwist = 0.f;      // turn the hands round the grip (degrees)
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float MinCutSpeed = 250.f;  // VR: the blade tip must move this fast (cm/s) to cut
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") FVector VRGripOffset = FVector(2.f, 0.f, -3.f);   // VR: where the grip sits in the controller
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") FRotator VRGripTurn = FRotator(-55.f, 0.f, 0.f);  // VR: blade tilted forward out of the fist
 
 	// Glowing material for tracers and sparks (made by Scripts/import_skin_weapons.py).
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Effects") TSoftObjectPtr<UMaterialInterface> GlowMaterial =
@@ -250,6 +267,21 @@ private:
 	void UpdateArms(float Dt, const FVector& LocDelta, const FRotator& TurnDelta);
 	void UpdateHands(float Dt);   // place the hands on the weapon (and do the reload / bolt choreography)
 	void VRReload();              // the manual VR reload (headset only)
+
+	// ---- Twin blades ----
+	UPROPERTY() TObjectPtr<class USkeletalMeshComponent> HandLM;   // left hand on the blades: the right hand mirrored (so it gets the same grasp pose)
+	TWeakObjectPtr<AGRCutter> Cutter;                              // does the actual cutting
+	FVector BladePrev[2][2];                                       // [left/right][handle end, tip] last frame
+	bool bBladePrevValid[2] = { false, false };
+	int32 SwingIds[2] = { 0, 0 };                                  // each swing gets a number so a thing is hit once per swing
+	int32 NextSwingId = 1;
+	bool bVRSwinging[2] = { false, false };
+	float HapticLeft[2] = { 0.f, 0.f };
+	FQuat SwordFrame(const UStaticMeshComponent* Part) const;      // which way the blade points and the edge faces, in the model's own space
+	bool BladeEnds(const UStaticMeshComponent* Part, FVector& Base, FVector& Tip) const;
+	void AnimateSwords(float Dt, const FVector& ExtraLoc, const FRotator& ExtraTurn);
+	void FitHandToBlade(class USkeletalMeshComponent* Hand, const UStaticMeshComponent* Blade);
+	void CutWithBlades(float Dt);
 
 	// ---- Scope reticle (a flat overlay; desktop only) ----
 	TSharedPtr<SWidget> Reticle;

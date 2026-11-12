@@ -192,6 +192,12 @@ public:
 		TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jog_Fwd.Jog_Fwd")));
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UAnimSequence> AirAnim =
 		TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jump_Apex.Jump_Apex")));
+	// Body parts NOT drawn in first person (12 Nov): the head (you'd see inside it), Kwang's
+	// arms (YOUR hands are the game's hands; his arms clipped through them and made two pairs)
+	// and his sword (on his back and in his hands in the idle animation). Hiding a bone hides
+	// everything below it too: hiding "upperarm_r" hides the whole right arm and hand.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TArray<FName> HiddenBodyBones = {
+		TEXT("head"), TEXT("upperarm_l"), TEXT("upperarm_r"), TEXT("weapon_l"), TEXT("weapon_r"), TEXT("weapon_backMount_r") };
 	// How far the body sits BEHIND your eyes (cm), so the camera never ends up inside the head.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float BodyBehindEyes = 18.f;
 	// Size of the body (1 = as made). Kwang is very tall, so he's scaled down to match a

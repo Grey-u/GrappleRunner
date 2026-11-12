@@ -40,7 +40,8 @@
 #include "GRArsenal.h"                             // the weapons: switch, aim, fire, slash
 #include "GRPlanets.h"                             // planets in the sky
 #include "GRHandFeel.h"                            // haptic gloves: feel what your fingers touch
-#include "GRAmbientLife.h"                         // drifting pollen by day, glowing spores at night
+#include "GRAmbientLife.h"
+#include "GRCutter.h"                         // drifting pollen by day, glowing spores at night
 
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
@@ -190,6 +191,11 @@ void AGrappleRig::BeginPlay()
 	if (!TActorIterator<AGRHandFeel>(GetWorld()))
 	{
 		GetWorld()->SpawnActor<AGRHandFeel>();
+	}
+	// The cutter: lets the blades slice plants, props and (with several hacks) trees.
+	if (!TActorIterator<AGRCutter>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRCutter>();
 	}
 	// The living air: pollen and dust by day, glowing spores at night.
 	if (!TActorIterator<AGRAmbientLife>(GetWorld()))
@@ -1306,7 +1312,13 @@ void AGrappleRig::SetUpBody()
 	// AttachToComponent (not SetupAttachment) is the call that works for parts made while the game runs.
 	Body->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepWorldTransform);
 	AddInstanceComponent(Body);                                   // lists the body under this actor, so it shows in the Outliner
-	Body->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);  // no head in your own view
+	for (const FName& Bone : HiddenBodyBones)                    // no head, no second pair of arms, no sword
+	{
+		if (Body->GetBoneIndex(Bone) != INDEX_NONE)
+		{
+			Body->HideBoneByName(Bone, EPhysBodyOp::PBO_None);
+		}
+	}
 	Body->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 
 	// The harness: the belt on the hip bone, and one piece on each thigh so the leg loops and

@@ -22,6 +22,7 @@
 #include "GRArsenal.h"
 #include "GrappleRig.h"
 #include "GRVine.h"
+#include "GRCutter.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/PointLightComponent.h"
@@ -222,10 +223,18 @@ void AGRArsenal::SetDefaultWeapons()
 	const FLinearColor Tracer(0.55f, 0.85f, 1.f);   // cool white-blue: clean, sci-fi
 
 	Weapons.Reset();
-	FGRWeapon Knife = Blade(TEXT("Knife"), TEXT("SM_Araxys_Knife"), 55.f);
-	Knife.FallbackMesh = Knife.Mesh;
-	Knife.Mesh = Ours(TEXT("SM_Knife"));
-	Weapons.Add(Knife);                                                                         // key 1
+	// Key 1: the twin ODM blades (our own model, Art/Weapons/make_odm_swords.py). One in each hand.
+	FGRWeapon Blades = Blade(TEXT("Blades"), TEXT("SM_Araxys_Knife"), 55.f);
+	Blades.Kind = EGRWeaponKind::Swords;
+	const TSoftObjectPtr<UStaticMesh> Sword(FSoftObjectPath(TEXT("/Game/GrappleRunner/Weapons/SM_ODMSword.SM_ODMSword")));
+	Blades.FallbackMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Weapons/SM_Blade.SM_Blade")));
+	Blades.Mesh = Sword;
+	Blades.LeftMesh = Sword;
+	Blades.Scale = 1.f;                                   // modelled at real size: 95 cm of blade
+	Blades.HipOffset = FVector(34.f, 24.f, -26.f);         // ready stance: fists low and wide...
+	Blades.HipTurn = FRotator(30.f, -12.f, 0.f);           // ...blades angled up and slightly in, edge forward
+	Blades.Reach = 190.f;
+	Weapons.Add(Blades);                                                                        // key 1
 
 	FGRWeapon Rifle = Gun(TEXT("Rifle"), TEXT("SM_Kuronami_Rifle"), EGRWeaponKind::Rifle, 40.f, 9.75f, 25, 2.4f, 2.f, 0.25f, 0.7f, 70.f, Tracer);
 	Rifle.FallbackMesh = Rifle.Mesh;
@@ -398,7 +407,7 @@ void AGRArsenal::ShowSlot(int32 Slot)
 	auto Show = [&](TObjectPtr<UStaticMeshComponent>& Part, const TSoftObjectPtr<UStaticMesh>& Asset, int32 Side)
 	{
 		UStaticMesh* Mesh = Asset.IsNull() ? nullptr : Asset.LoadSynchronous();
-		if (!Mesh && Side == 1 && !W.FallbackMesh.IsNull())
+		if (!Mesh && (Side == 1 || W.Kind == EGRWeaponKind::Swords) && !W.FallbackMesh.IsNull())
 		{
 			Mesh = W.FallbackMesh.LoadSynchronous();   // new model not imported yet
 		}
@@ -705,6 +714,7 @@ void AGRArsenal::StartMelee(bool bHeavyStab)
 	bHeavy = bHeavyStab;
 	bMeleeHit = false;
 	bLeftBlade = !bLeftBlade && LeftMesh && LeftMesh->IsVisible();   // twin swords take turns
+	SwingIds[0] = SwingIds[1] = NextSwingId++;                        // a new swing: everything can be hit once again
 }
 
 void AGRArsenal::MeleeHit()
@@ -957,7 +967,19 @@ void AGRArsenal::Animate(float Dt)
 
 	if (bVR)
 	{
-		return;   // in VR the controller IS the animation: the weapon simply sits in your hand
+		// In VR the controller IS the animation: the weapon simply sits in your hand. The blades
+		// are turned so the grip lies in your fist and the blade comes out above your thumb.
+		if (W.Kind == EGRWeaponKind::Swords)
+		{
+			for (UStaticMeshComponent* Part : { RightMesh.Get(), LeftMesh.Get() })
+			{
+				if (Part && Part->IsVisible())
+				{
+					Part->SetRelativeLocationAndRotation(VRGripOffset, VRGripTurn.Quaternion() * SwordFrame(Part).Inverse());
+				}
+			}
+		}
+		return;
 	}
 
 	// ---- 1. Hip and aim poses, blended ----
@@ -1026,6 +1048,13 @@ void AGRArsenal::Animate(float Dt)
 	Loc.Y += 6.f * E;
 	Turn.Pitch -= 20.f * E;
 	Turn.Roll += 14.f * E;
+
+	// ---- The twin blades have their own two-handed moves (AnimateSwords, below) ----
+	if (W.Kind == EGRWeaponKind::Swords)
+	{
+		AnimateSwords(Dt, Loc - W.HipOffset, Turn - W.HipTurn);   // pass on only the extras: sway, bob, switch dip
+		return;
+	}
 
 	// ---- 7. Melee curves ----
 	FVector SwingLoc = FVector::ZeroVector;
@@ -1124,8 +1153,60 @@ void AGRArsenal::UpdateHands(float Dt)
 			Hand->PlayAnimation(Pose, true);   // fingers curled round the grip (if this hand's skeleton accepts it)
 		}
 	};
+	// ---- Twin blades: a hand closed round each grip (desktop AND headset) ----
+	const FGRWeapon* Wb = Held();
+	const bool bBlades = Wb && Wb->Kind == EGRWeaponKind::Swords && RightMesh && RightMesh->IsVisible();
 	if (R->IsUsingVR())
 	{
+		// The VR template draws its own hand models on the controllers. While the blades are out
+		// they step aside for ours (which hold the grips properly), so there is only ever ONE pair.
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			if (USceneComponent* Ctrl = R->GetHand(Side))
+			{
+				TArray<USceneComponent*> Kids;
+				Ctrl->GetChildrenComponents(true, Kids);
+				for (USceneComponent* K : Kids)
+				{
+					USkeletalMeshComponent* Sk = Cast<USkeletalMeshComponent>(K);
+					if (Sk && Sk != HandR && Sk != HandLM)
+					{
+						Sk->SetHiddenInGame(bBlades);
+					}
+				}
+			}
+		}
+	}
+	if (bBlades)
+	{
+		MakeHand(HandR, RightHandModel);
+		// The left hand is the RIGHT hand model mirrored (scale -1 sideways). The template's
+		// grasp animation only curls right-hand fingers, so a mirrored right hand is the only
+		// way to get a properly closed left fist.
+		if (!HandLM)
+		{
+			MakeHand(HandLM, RightHandModel);
+			if (HandLM)
+			{
+				HandLM->SetUsingAbsoluteScale(true);
+				HandLM->SetWorldScale3D(FVector(1.f, -1.f, 1.f));
+			}
+		}
+		if (HandL) { HandL->SetHiddenInGame(true); }
+		if (HeldMag) { HeldMag->SetHiddenInGame(true); }
+		const bool bRight = !RightMesh->bHiddenInGame;
+		const bool bLeft = LeftMesh && LeftMesh->IsVisible() && !LeftMesh->bHiddenInGame;
+		if (HandR) { HandR->SetHiddenInGame(!bRight); if (bRight) { FitHandToBlade(HandR, RightMesh); } }
+		if (HandLM) { HandLM->SetHiddenInGame(!bLeft); if (bLeft) { FitHandToBlade(HandLM, LeftMesh); } }
+		return;
+	}
+	if (HandLM)
+	{
+		HandLM->SetHiddenInGame(true);
+	}
+	if (R->IsUsingVR())
+	{
+		if (HandR) { HandR->SetHiddenInGame(true); }
 		return;   // in VR your real hands (the controllers / template hands) are the hands
 	}
 	MakeHand(HandR, RightHandModel);
@@ -1414,6 +1495,311 @@ void AGRArsenal::UpdateArms(float Dt, const FVector& LocDelta, const FRotator& T
 }
 
 // =====================================================================================
+//  TWIN BLADES
+// =====================================================================================
+//  The "sword frame": inside the model, which way does the blade point (X) and which way
+//  is the back of the blade (Z, so the sharp edge is -Z)? Read from the three marker points
+//  saved in the model (Tip, Base, Edge). If they're missing, guess from the model's box.
+FQuat AGRArsenal::SwordFrame(const UStaticMeshComponent* Part) const
+{
+	const UStaticMesh* M = Part ? Part->GetStaticMesh() : nullptr;
+	if (!M)
+	{
+		return FQuat::Identity;
+	}
+	const UStaticMeshSocket* TipS = M->FindSocket(TEXT("Tip"));
+	const UStaticMeshSocket* EdgeS = M->FindSocket(TEXT("Edge"));
+	FVector Tip, Edge;
+	if (TipS && EdgeS)
+	{
+		Tip = TipS->RelativeLocation;
+		Edge = EdgeS->RelativeLocation;
+	}
+	else
+	{
+		// No markers: the blade runs along the box's longest side, toward its far end.
+		const FBox B = M->GetBoundingBox();
+		const FVector Ext = B.GetExtent();
+		const int32 Long = Ext.X >= Ext.Y && Ext.X >= Ext.Z ? 0 : (Ext.Y >= Ext.Z ? 1 : 2);
+		const int32 Wide = Long == 0 ? (Ext.Y >= Ext.Z ? 1 : 2) : (Long == 1 ? (Ext.X >= Ext.Z ? 0 : 2) : (Ext.X >= Ext.Y ? 0 : 1));
+		Tip = FVector::ZeroVector;
+		Tip[Long] = FMath::Abs(B.Max[Long]) >= FMath::Abs(B.Min[Long]) ? B.Max[Long] : B.Min[Long];
+		Edge = FVector::ZeroVector;
+		Edge[Wide] = B.Max[Wide];
+	}
+	const FVector X = Tip.GetSafeNormal();
+	const FVector EdgeDir = (Edge - X * FVector::DotProduct(Edge, X)).GetSafeNormal();
+	return FRotationMatrix::MakeFromXZ(X, -EdgeDir).ToQuat();
+}
+
+//  Where the cutting part of a blade is in the world right now: from where it leaves the
+//  handle to the tip, along the middle of the blade (half way between the back and the edge).
+bool AGRArsenal::BladeEnds(const UStaticMeshComponent* Part, FVector& Base, FVector& Tip) const
+{
+	if (!Part || !Part->GetStaticMesh())
+	{
+		return false;
+	}
+	const FTransform T = Part->GetComponentTransform();
+	const UStaticMesh* M = Part->GetStaticMesh();
+	const UStaticMeshSocket* TipS = M->FindSocket(TEXT("Tip"));
+	const UStaticMeshSocket* BaseS = M->FindSocket(TEXT("Base"));
+	const UStaticMeshSocket* EdgeS = M->FindSocket(TEXT("Edge"));
+	if (TipS && BaseS && EdgeS)
+	{
+		const FVector Axis = TipS->RelativeLocation.GetSafeNormal();
+		const FVector Half = (EdgeS->RelativeLocation - Axis * FVector::DotProduct(EdgeS->RelativeLocation, Axis)) * 0.5f;
+		Base = T.TransformPosition(BaseS->RelativeLocation + Half);
+		Tip = T.TransformPosition(TipS->RelativeLocation + Half);
+		return true;
+	}
+	const FVector X = SwordFrame(Part).GetAxisX();
+	const float Len = M->GetBoundingBox().GetSize().GetMax();
+	Base = T.TransformPosition(X * Len * 0.15f);
+	Tip = T.TransformPosition(X * Len * 0.9f);
+	return true;
+}
+
+//  Desktop moves for the twin blades. Each move is a few "key poses" for the RIGHT blade
+//  (where it is in front of your eyes and how it is turned); the left blade does the mirror
+//  image. Between keys the pose eases smoothly (Slerp = smooth turning between two rotations).
+//    Slash (left click)  : wind up out to the side, sweep across in front of you, recover.
+//                          The blades take turns, so clicking fast gives right-left-right.
+//    Cross-cut (right)   : both blades raised high, then driven down across each other: an X.
+//  Rotations: Pitch = tip up/down, Yaw = tip right/left, Roll = turns the edge (90 = edge
+//  leading a right-to-left swing).
+void AGRArsenal::AnimateSwords(float Dt, const FVector& ExtraLoc, const FRotator& ExtraTurn)
+{
+	const FGRWeapon& W = Weapons[Current];
+	struct FKey { float T; FVector L; FRotator R; };
+	const FKey Ready{ 0.f, W.HipOffset, W.HipTurn };
+	const TArray<FKey> Slash = {
+		Ready,
+		{ 0.22f, FVector(22.f, 48.f, -2.f),  FRotator(10.f, 78.f, 90.f) },    // wound up, out to the right
+		{ 0.42f, FVector(58.f, 8.f, -8.f),   FRotator(0.f, 5.f, 90.f) },      // through the middle, arm extended
+		{ 0.62f, FVector(40.f, -32.f, -20.f), FRotator(-12.f, -72.f, 90.f) }, // follow-through, out to the left
+		{ 1.f, Ready.L, Ready.R } };
+	const TArray<FKey> Cross = {
+		Ready,
+		{ 0.30f, FVector(14.f, 30.f, 30.f),  FRotator(72.f, 15.f, 0.f) },     // both blades raised high
+		{ 0.55f, FVector(50.f, -14.f, -34.f), FRotator(-60.f, -25.f, 0.f) },  // driven down across each other
+		{ 1.f, Ready.L, Ready.R } };
+
+	auto Pose = [](const TArray<FKey>& Keys, float P, FVector& OutL, FQuat& OutQ)
+	{
+		for (int32 i = 1; i < Keys.Num(); ++i)
+		{
+			if (P <= Keys[i].T || i == Keys.Num() - 1)
+			{
+				const float A = FMath::SmoothStep(0.f, 1.f, FMath::Clamp((P - Keys[i - 1].T) / FMath::Max(0.001f, Keys[i].T - Keys[i - 1].T), 0.f, 1.f));
+				OutL = FMath::Lerp(Keys[i - 1].L, Keys[i].L, A);
+				OutQ = FQuat::Slerp(Keys[i - 1].R.Quaternion(), Keys[i].R.Quaternion(), A);
+				return;
+			}
+		}
+	};
+
+	// Timing (and the actor/vine hit half way, for things that aren't cuttable scenery).
+	float P = -1.f;
+	if (MeleeTime >= 0.f)
+	{
+		MeleeTime += Dt;
+		P = FMath::Clamp(MeleeTime / (bHeavy ? StabSeconds : SlashSeconds), 0.f, 1.f);
+		if (!bMeleeHit && P >= 0.45f)
+		{
+			MeleeHit();
+		}
+		if (P >= 1.f)
+		{
+			MeleeTime = -1.f;
+		}
+	}
+	for (int32 Side = 0; Side < 2; ++Side)   // 0 = left, 1 = right
+	{
+		UStaticMeshComponent* Part = Side == 1 ? RightMesh.Get() : LeftMesh.Get();
+		if (!Part || !Part->IsVisible())
+		{
+			continue;
+		}
+		const bool bSwinging = P >= 0.f && (bHeavy || (Side == 0) == bLeftBlade);
+		FVector L = Ready.L;
+		FQuat Q = Ready.R.Quaternion();
+		if (bSwinging)
+		{
+			Pose(bHeavy ? Cross : Slash, P, L, Q);
+		}
+		if (Side == 0)
+		{
+			// The left blade is the mirror image: flip it to the other side (Y), and flip which
+			// way it points sideways (Yaw) and which way the edge leans (Roll).
+			FRotator M = Q.Rotator();
+			M.Yaw = -M.Yaw;
+			M.Roll = -M.Roll;
+			L.Y = -L.Y;
+			Q = M.Quaternion();
+		}
+		L += ExtraLoc;
+		Q = ExtraTurn.Quaternion() * Q;
+		Part->SetRelativeLocationAndRotation(L, Q * SwordFrame(Part).Inverse());
+	}
+}
+
+//  Close a hand round a blade's grip.
+//  1. In the hand's "grasp" pose each finger is curled, so its three joints sit on a circle
+//     round the hollow of the fist. The middle of that circle ("circumcentre") is on the line
+//     the grip must run along. Doing this for all four fingers gives four points on that line.
+//  2. The line runs from the little finger to the index finger: the blade comes out above
+//     the index finger and thumb. The middle knuckles say which way the sharp edge faces
+//     (sword fighters line the edge up with them).
+//  3. Move and turn the hand so that this "fist line" sits exactly on the sword's grip.
+void AGRArsenal::FitHandToBlade(USkeletalMeshComponent* Hand, const UStaticMeshComponent* Blade)
+{
+	if (!Hand || !Blade)
+	{
+		return;
+	}
+	const TArray<FTransform>& Bones = Hand->GetComponentSpaceTransforms();
+	if (Bones.Num() == 0)
+	{
+		return;
+	}
+	const FVector S = Hand->GetComponentScale();   // (1,-1,1) for the mirrored left hand
+	auto At = [&](const FString& Name, FVector& Out)
+	{
+		const int32 I = Hand->GetBoneIndex(FName(*Name));
+		if (I == INDEX_NONE || !Bones.IsValidIndex(I))
+		{
+			return false;
+		}
+		Out = Bones[I].GetLocation() * S;
+		return true;
+	};
+	auto Circumcentre = [](const FVector& A, const FVector& B, const FVector& C)
+	{
+		const FVector AB = A - C, BC = B - C;
+		const FVector N = FVector::CrossProduct(AB, BC);
+		const double Den = 2.0 * N.SizeSquared();
+		if (Den < 1e-6)
+		{
+			return (A + B + C) / 3.f;   // joints in a straight line (open hand): use their middle
+		}
+		return C + FVector::CrossProduct(BC * AB.SizeSquared() - AB * BC.SizeSquared(), N) / Den;
+	};
+	const TCHAR* Fingers[4] = { TEXT("index"), TEXT("middle"), TEXT("ring"), TEXT("pinky") };
+	FVector Centres[4];
+	FVector Knuckles = FVector::ZeroVector;
+	for (int32 F = 0; F < 4; ++F)
+	{
+		FVector J1, J2, J3;
+		if (!At(FString::Printf(TEXT("%s_01_r"), Fingers[F]), J1) || !At(FString::Printf(TEXT("%s_02_r"), Fingers[F]), J2)
+			|| !At(FString::Printf(TEXT("%s_03_r"), Fingers[F]), J3))
+		{
+			return;   // not the hand model we expect
+		}
+		Centres[F] = Circumcentre(J1, J2, J3);
+		Knuckles += J2 / 4.f;
+	}
+	const FVector Origin = (Centres[0] + Centres[1] + Centres[2] + Centres[3]) / 4.f;
+	const FVector Axis = (Centres[0] - Centres[3]).GetSafeNormal();                     // little finger -> index finger
+	FVector Edge = Knuckles - Origin;
+	Edge = (Edge - Axis * FVector::DotProduct(Edge, Axis)).GetSafeNormal();            // toward the middle knuckles
+	const FQuat Fist = FRotationMatrix::MakeFromXZ(Axis, -Edge).ToQuat();             // same layout as SwordFrame
+
+	// The sword's grip in the world, with the tuning knobs (slide along it, twist round it).
+	const FQuat Grip = Blade->GetComponentQuat() * SwordFrame(Blade) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(GripTwist));
+	const FVector GripAt = Blade->GetComponentLocation() + Grip.GetAxisX() * GripSlide;
+	const FQuat HandRot = Grip * Fist.Inverse();
+	Hand->SetWorldLocationAndRotation(GripAt - HandRot.RotateVector(Origin), HandRot);
+}
+
+//  Every frame: give the cutter the path each blade took since last frame, while it is
+//  swinging (desktop: during the strike part of a slash; headset: whenever the tip moves
+//  faster than MinCutSpeed). Then show chips / sparks / leaves and give a little kick.
+void AGRArsenal::CutWithBlades(float Dt)
+{
+	AGrappleRig* R = Rig.Get();
+	const FGRWeapon* W = Held();
+	const bool bVR = R && R->IsUsingVR();
+	APlayerController* PC = R ? R->GetPlayerController() : nullptr;
+	for (int32 Side = 0; Side < 2; ++Side)   // fade out any buzz
+	{
+		if (HapticLeft[Side] > 0.f && (HapticLeft[Side] -= Dt) <= 0.f && PC)
+		{
+			PC->SetHapticsByValue(0.f, 0.f, Side == 0 ? EControllerHand::Left : EControllerHand::Right);
+		}
+	}
+	if (!R || !W || !IsBlade(W->Kind) || Pending != -1)
+	{
+		bBladePrevValid[0] = bBladePrevValid[1] = false;
+		return;
+	}
+	if (!Cutter.IsValid())
+	{
+		TActorIterator<AGRCutter> It(GetWorld());
+		Cutter = It ? *It : GetWorld()->SpawnActor<AGRCutter>();
+	}
+	AGRCutter* C = Cutter.Get();
+	if (!C)
+	{
+		return;
+	}
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		UStaticMeshComponent* Part = Side == 1 ? RightMesh.Get() : LeftMesh.Get();
+		FVector A, B;
+		if (!Part || !Part->IsVisible() || Part->bHiddenInGame || !BladeEnds(Part, A, B))
+		{
+			bBladePrevValid[Side] = false;
+			continue;
+		}
+		bool bActive = false;
+		if (bVR)
+		{
+			const float TipSpeed = bBladePrevValid[Side] ? FVector::Dist(B, BladePrev[Side][1]) / FMath::Max(0.001f, Dt) : 0.f;
+			bActive = TipSpeed > MinCutSpeed;
+			if (bActive && !bVRSwinging[Side])
+			{
+				SwingIds[Side] = NextSwingId++;   // a new real-life swing
+			}
+			bVRSwinging[Side] = bActive;
+		}
+		else if (MeleeTime >= 0.f)
+		{
+			const float P = MeleeTime / (bHeavy ? StabSeconds : SlashSeconds);
+			const bool bThisBlade = bHeavy || (Side == 0) == bLeftBlade || W->Kind == EGRWeaponKind::Knife;
+			bActive = bThisBlade && P > 0.12f && P < 0.8f;   // the strike, not the wind-up or recovery
+		}
+		if (bActive && bBladePrevValid[Side])
+		{
+			TArray<FGRCutResult> Hits;
+			C->BladePass(BladePrev[Side][0], BladePrev[Side][1], A, B, bHeavy && !bVR ? 1.5f : 1.f, SwingIds[Side], Hits);
+			for (const FGRCutResult& H : Hits)
+			{
+				// Bits flying off: green for plants, pale wood for trees, sparks for the rest.
+				const FLinearColor Col = H.bSoft ? FLinearColor(0.35f, 0.9f, 0.3f) : (H.bTree ? FLinearColor(0.8f, 0.55f, 0.3f) : FLinearColor(1.f, 0.8f, 0.45f));
+				for (int32 k = 0; k < (H.bCut ? 6 : 3); ++k)
+				{
+					const FVector Dir = (FMath::VRand() + FVector(0.f, 0.f, 0.6f)).GetSafeNormal();
+					ShowEffect(H.Point, H.Point + Dir * FMath::FRandRange(12.f, 35.f), 2.5f, 0.22f, Col);
+				}
+				if (bVR && PC)
+				{
+					PC->SetHapticsByValue(0.6f, H.bCut ? 1.f : 0.55f, Side == 0 ? EControllerHand::Left : EControllerHand::Right);
+					HapticLeft[Side] = H.bCut ? 0.12f : 0.07f;
+				}
+				else if (!bVR && H.bTree)
+				{
+					R->AddLookKick(H.bCut ? 0.8f : 0.4f, 0.f);   // a hack into wood jolts the view a touch
+				}
+			}
+		}
+		BladePrev[Side][0] = A;
+		BladePrev[Side][1] = B;
+		bBladePrevValid[Side] = true;
+	}
+}
+
+// =====================================================================================
 //  Tick: every frame
 // =====================================================================================
 void AGRArsenal::Tick(float DeltaSeconds)
@@ -1452,6 +1838,7 @@ void AGRArsenal::Tick(float DeltaSeconds)
 
 	Animate(DeltaSeconds);
 	UpdateHands(DeltaSeconds);
+	CutWithBlades(DeltaSeconds);   // the blades slice whatever they pass through
 	VRReload();
 	UpdateEffects(DeltaSeconds);
 
