@@ -61,10 +61,8 @@ def log(text):
 # ---------------------------------------------------------------- 1. find the models
 registry = unreal.AssetRegistryHelpers.get_asset_registry()
 found = {g: [] for g, _ in GROUPS}
-# Our photoscanned Project Nature plants (banana, pandanus, fern, tropical ground plants) are
-# used for the plant clumps too, so every island top gets dense, real-looking jungle.
-for root in ("/Game/Fab", "/Game/Megascans", "/Game/PN_Banana", "/Game/PN_Pandanus", "/Game/PN_Fern",
-             "/Game/PN_tropicalGroundPlants"):
+# Our photoscanned Project Nature ferns (the bushes Naomi liked) are used for the plant clumps too.
+for root in ("/Game/Fab", "/Game/Megascans", "/Game/PN_Fern"):   # 12 Nov: no banana/pandanus/tropical (Naomi didn't like them)
     if not unreal.EditorAssetLibrary.does_directory_exist(root):
         continue
     for data in registry.get_assets_by_path(root, recursive=True):
