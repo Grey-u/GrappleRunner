@@ -134,6 +134,7 @@ class GRAPPLERUNNER_API AGRArsenal : public AActor
 
 public:
 	AGRArsenal();
+	void ApplyTuning(bool bArms, const FVector& Location, const FRotator& Turn);   // gr.Arms / gr.Gun console commands
 	virtual void Tick(float DeltaSeconds) override;
 
 	// The slots. Keys 1-9 and 0 pick the first ten; the mouse wheel steps through all of them.
@@ -169,7 +170,7 @@ public:
 		TSoftObjectPtr<class USkeletalMesh>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Hands/Female/SKM_FirstPersonHand_Female.SKM_FirstPersonHand_Female")));
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TSoftObjectPtr<class USkeletalMesh> GlovesModel =
 		TSoftObjectPtr<class USkeletalMesh>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Hands/Female/SKM_GlovesHalf_Female.SKM_GlovesHalf_Female")));
-	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FVector ArmsOffset = FVector(0.f, 0.f, -160.f);   // from the eyes (arms mesh origin is at the feet)
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FVector ArmsOffset = FVector(-30.f, 0.f, -150.f);   // from the eyes (arms mesh origin is at the feet)
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FRotator ArmsTurn = FRotator(0.f, -90.f, 0.f);
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FName GunBone = TEXT("hand_r");                 // where the gun is held
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> ArmsAnims;    // Idle, Draw, Holster, Fire, ADSPose, ADSFire, Reload, ReloadEmpty

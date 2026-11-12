@@ -36,6 +36,7 @@
 #include "Engine/StaticMeshSocket.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 #include "GameFramework/DamageType.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -68,6 +69,44 @@ namespace
 	const FName SightSocket(TEXT("Sight"));
 	const FName MuzzleSocket(TEXT("Muzzle"));
 	constexpr int32 EffectCount = 14;   // tracers + sparks on screen at once
+}
+
+// =====================================================================================
+//  Tuning commands (type in the game console, the ` key, while playing):
+//    gr.Arms  X Y Z  Pitch Yaw Roll   - where the animated arms sit, from the eyes
+//    gr.Gun   X Y Z  Pitch Yaw Roll   - the rigged gun's offset in the right hand
+//  Lets us line the hands and gun up live, then copy the numbers into the defaults.
+// =====================================================================================
+static void GRTuneTransform(const TArray<FString>& Args, UWorld* World, bool bArms)
+{
+	if (!World || Args.Num() < 6)
+	{
+		return;
+	}
+	const FVector L(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]), FCString::Atof(*Args[2]));
+	const FRotator T(FCString::Atof(*Args[3]), FCString::Atof(*Args[4]), FCString::Atof(*Args[5]));
+	for (TActorIterator<AGRArsenal> It(World); It; ++It)
+	{
+		It->ApplyTuning(bArms, L, T);
+	}
+}
+static FAutoConsoleCommandWithWorldAndArgs GRArmsCmd(TEXT("gr.Arms"), TEXT("gr.Arms X Y Z Pitch Yaw Roll"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W) { GRTuneTransform(A, W, true); }));
+static FAutoConsoleCommandWithWorldAndArgs GRGunCmd(TEXT("gr.Gun"), TEXT("gr.Gun X Y Z Pitch Yaw Roll"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W) { GRTuneTransform(A, W, false); }));
+
+void AGRArsenal::ApplyTuning(bool bArms, const FVector& L, const FRotator& T)
+{
+	if (bArms)
+	{
+		ArmsOffset = L;
+		ArmsTurn = T;
+	}
+	else if (ArmsGun)
+	{
+		ArmsGun->SetRelativeLocationAndRotation(L, T);
+	}
+	UE_LOG(LogTemp, Log, TEXT("Grapple Runner tuning: %s %s %s"), bArms ? TEXT("arms") : TEXT("gun"), *L.ToString(), *T.ToString());
 }
 
 // =====================================================================================
