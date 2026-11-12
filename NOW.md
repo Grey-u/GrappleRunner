@@ -1,47 +1,44 @@
-# NOW (updated 11 Nov 2026)
+# NOW (updated 12 Nov 2026)
 
 ## Works
-- UE 5.8.4 project (VR / OpenXR template), level `L_FloatingIslands_2`: 47 islands, 70 overgrown ruin clusters, about 1,550 plants, 250 snappable vines, rose atmosphere, Aeloria music.
-- Start menu (`L_MainMenu`): EXIT SUIT cover title card, then Endless Runner / 1v1 / 2v2 / 3v3 / 5v5 / PvE, then a loading screen. Every mode plays solo for now.
-- `GrappleRig`: twin hooks (auto-pull, Shift = swing), soft flexible rope, swing exaggeration, wind, Kwang body with ODM gear on the hips, vines snap when you fly through.
-- **New 11 Nov (compiled and tested in Play):**
-  - `GREndlessSpawner` (endless island chunks, distance score)
-  - `GRDayNight` (each match runs dawn to night)
-  - `GRPlanets` (4 planets, glow at night)
-  - `GRArsenal`: 11 weapons. ODM swords, then Kuronami Rifle, SMG, Marksman, Revolver and Blade, then Araxys Rifle, Burst, Sniper, Sidearm and Knife. Each has switching, aim, scope, fire, tracers, recoil, reload, slash and stab.
-- Desktop controls: Q/E hooks, LMB fire or slash, RMB aim or stab, 1-0 or the wheel to switch, X holster, T reload, Shift swing, Space jump/boost, R respawn.
-- Testing: telemetry CSV, `gr.Test snap|reel|catch|swing|perf`, T-01 to T-14 in `Docs/TESTS.md`.
+- UE 5.8.4 project (VR / OpenXR template), level `L_FloatingIslands_2`, start menu `L_MainMenu`, Endless Runner mode, day/night match clock, 4 planets, pollen/spores (`GRAmbientLife`), haptic glove bridge (`GRHandFeel`, untested without gloves).
+- `GrappleRig`: twin hooks, soft rope, swing, Kwang body with ODM gear, vines snap.
+- Weapons (`GRArsenal`): 1 twin ODM blades (new, see below), 2 rifle with the animated arms pack (draw/fire/reload montages), 3 bolt-action sniper. Desktop hands reload; VR manual reload written for the headset.
+- 8,709 plants swapped to Project Nature photoscans in four colour zones, 680 glowing at night.
 
-## Half done
-- Aim down sights and the scope are written but not yet checked by hand. Hold RMB with the rifle, then with the Araxys Sniper (key 9). Tune `HipOffset` / `AimDistance` per weapon in the Details of the spawned `GRArsenal` (or in `SetDefaultWeapons`).
-- Endless Runner: start it from the menu (or press Play) and swing past the last island to check that chunks appear. Not yet played end to end.
-- Day/night: watch a full 12 min match once and check that night isn't too dark.
-- **Bug:** "InverseFast non-invertible matrix" logged every frame during Play, since the 10 Nov vines work. Find the zero-size piece (vines or rope links).
-- Weapons in VR: they are held by the controllers, but trigger-to-fire waits for the headset step.
-- ODM model licence: get the Sketchfab link from Naomi. The Kuronami and Araxys models are fan models of Riot designs: private prototype only.
-- Beech trees use 8K textures: cap them at 2048 for VR (needs Naomi's OK, it changes pack assets).
-- Restore Packages prompt on start: M_VineLeaf / M_VineStem autosaves from the crash. Skipped; the saved versions are fine.
+## Half done (12 Nov: written, copied to the PC, NOT compiled yet)
+- **Twin blades + cutting + one pair of hands.** New files `GRCutter.h/.cpp`; changes in `GRArsenal`, `GrappleRig`, `GrappleRunner.Build.cs` (+ `ProceduralMeshComponent`), `GrappleRunner.uproject` (+ ProceduralMeshComponent plugin). Model: `Art/Weapons/SM_ODMSword.fbx`.
+- **To build it (Naomi, about 5 minutes):**
+  1. Close Unreal.
+  2. Double-click `GrappleRunner.uproject`. It says modules are missing or out of date: click **Yes** to rebuild. (If it fails, open `GrappleRunner.slnx` in Visual Studio and press Build, then send Claude the error lines.)
+  3. When the editor opens: Output Log, Python box, paste
+     `exec(open("C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/import_odm_swords.py").read())`
+     The log should say `sockets = Tip, Base, Edge`.
+  4. Press Play. Key 1 = blades. Left click slashes (alternating), right click cross-cuts. Hit a plant (1 hit), a tree trunk (2-5 hacks).
+- **What to look for:** do the fists close round the grips? If the hand sits too high or low on the grip, change `GripSlide` on the spawned GRArsenal (Details panel, Arsenal|Blades); if it's turned, `GripTwist`.
+- **Cutting in a packaged build** needs "Allow CPU Access" ticked on each cuttable mesh (in the editor it works without, with a warning). Ask Naomi before changing pack assets.
+- Kwang's arms, sword and head are hidden (`HiddenBodyBones` on the rig). Check there is now only one pair of hands.
+- The arms pack offsets read from the demo (hands (7, 0, -162.6) turn (0, -90, 0); gun on hand_r (-8.66, 2.84, 0.83) turn (-10.45, 167.6, 11.11)) still need baking into the defaults; until then use `gr.Arms` / `gr.Gun` in Play.
+- **Bug:** "InverseFast non-invertible matrix" logged every frame since the 10 Nov vines work.
 
 ## Decided
-- Art direction (11 Nov, replaces "sepia haze"): **living Pandora**. Realistic rendering with a semi-realistic, cinematic style, lush GREEN, alive but fantastical (Avatar films and the animated series); clean daylight, humid blue-green distance, bioluminescence at night. `color_grade.py` MOOD = "pandora".
-- First person is the main view. Optional third person later with no advantage (CLAUDE.md camera rule). Shots trace from the eyes.
-- A match runs from day to night instead of a countdown timer.
-- Third-party models stay out of the public repo.
-- Auto-pull is the default.
+- **Game objective (12 Nov, Claude Doc "Grapple Runner: game objective"):** keep the run alive as long as you can. Score = metres × flow multiplier (×1-×5, rises with hooks in a row without touching ground). Gas drains with reel/boost; slicing glowing gas pods refills it; trees take several hacks and felling one opens a route. One second-wind canister per run. Runs of 3-8 min, three missions at a time, a daily run with the same islands for everyone. No kill quotas.
+- Graphics are a selling point: move from forward shading to deferred + Lumen Lite + Nanite for PC VR (RTX 4070 Ti). Waiting on Naomi's go-ahead; turn instanced stereo off first (5.8 bug).
+- Free assets only for now (12 Nov). Shortlist: Claude Sheets "Grapple Runner asset shortlist".
+- Art direction: living Pandora / Log Horizon (giant plants, ivy-covered ruins, colour zones, glowing at night), rendered as realistically as PC VR allows.
+- First person is the main view; third person later with no advantage. Shots and cuts trace from the eyes/hands.
+- Third-party models stay out of the public repo (`.gitignore` now lists every Fab pack folder).
 
 ## Next
-- 12 Nov: waiting on Naomi to sign in to Fab in the Claude browser pane, then add (all free, photoscanned): Project Nature tropical Ground Plants / Banana / Pandanus / Fern Collection / Dynamic Ivy, Megascans Xanadu, Broadleaf Lady Palm, Wild Grass And Ferns, Megaplants Giant Bamboo; weapons: PStudio "B&W Arms" sci-fi rifle + sniper, a sci-fi knife. Then a swap script (Brushify plants -> new ones, colour zones per island, some glowing at night) and import the 3 weapons to /Game/GrappleRunner/Weapons/Arsenal/SM_Rifle|SM_Sniper|SM_Knife (the slots already point there; Valorant meshes are only the fallback).
-- Look target: Log Horizon (giant trees and ivy reclaiming ruins, different colours per area, glowing plants at night) rendered like Ready Player One.
-- Desktop hands are on the weapons but their angle needs tuning (RightHandTurn / LeftHandTurn in the spawned GRArsenal).
-0. Pandora look: Brushify island rocks and hanging moss are red-tinted by their own materials; the grade now mutes red (re-run color_grade.py to apply), but the real fix is our own green material instances for the islands (ask Naomi first: touches pack content) and replacing the plants with photoreal ones from Fab (Quixel Megaplants, free, UE 5.7+). Haptic gloves: GRHandFeel built (LucidGloves via OpenGloves pipe); needs gloves plus SteamVR to test.
-1. Hand-check aim and scope, and tune hip/aim offsets (one weapon at a time).
-2. Fix the per-frame InverseFast error.
-3. PvE: one Adversaries monster that chases you and takes damage from `GRArsenal` (ApplyPointDamage is already sent), then blood VFX, then slicing.
-4. In-world ammo counter on the weapon, gas gauge on the hip (VR comfort rule: no screen HUD).
-5. Performance: `gr.Test perf` (T-15), cap beech textures.
+1. Build and test the blades (steps above). Fix compile errors if any.
+2. Rendering switch: deferred + Lumen Lite + Nanite + virtual shadow maps (commit first; Naomi's OK).
+3. "Too bare": add the free Megascans cliffs/rocks/roots under and around the islands, Goddess Temple / Dark Ruins pieces, scanned tropical plants and vines, Megaplants ginkgo and cherry; denser scatter near the route. Convert the 8,709 plant actors to instanced foliage (memory warning).
+4. Objective, step 1: gas gauge on the hip + gas drain + glowing gas pods to slice + flow multiplier on the wrist.
+5. Fix the InverseFast error.
 
 ## Tried and dropped
-- Physical Sky Atmosphere: it renders black below the horizon in this setup, so we use Brushify's sky dome.
-- "Islands have no collision" was the wrong guess for the fall-through bug; the cause was the solid sky dome.
-- Typing editor commands with select-all and backspace is unsafe. Paste from the clipboard instead. The Output Log box is in Python mode, so use `exec(open("...py").read())`, not `py "..."`.
-- Weapon orientation by "the thin end is the barrel" alone: it got the revolver and the burst rifle backwards. It's now decided by the grip and magazine.
+- Physical Sky Atmosphere (renders black below the horizon here).
+- Typing editor commands with select-all/backspace (unsafe); the Output Log box needs `exec(open("...py").read())`.
+- Weapon orientation from "the thin end is the barrel" alone.
+- A left hand playing the right-hand grasp animation: it stays open. Use the right hand mirrored.
+- Hitting things with a ball swept out from the eyes: it can't reach plants (no collision) and doesn't know the blade's angle. Replaced by tracing the blade's own path (`GRCutter`).

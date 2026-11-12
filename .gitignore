@@ -40,3 +40,28 @@ Art/Characters/
 
 # Portfolio build output (embeds the third-party gear render)
 Docs/Portfolio/Out/
+
+# Fab / Megascans / Epic sample packs added Nov 2026: licensed to Naomi, local only, never commit
+Content/Lighting/
+Content/MSPresets/
+Content/Realistic_Starter_VFX_Pack_Vol2/
+Content/PN_Banana/
+Content/PN_Pandanus/
+Content/PN_Fern/
+Content/PN_tropicalGroundPlants/
+Content/FirstPersonRifleAnimations/
+Content/SampleMap/
+Content/InfinityBladeAdversaries/
+Content/InfinityBladeGrassLands/
+Content/ParagonKwang/
+Content/ParagonGrux/
+Content/ParagonProps/
+Content/KiteDemo/
+Content/EuropeanBeech/
+Content/Megascans/
+Content/Fab/
+# Visual Studio solution files Unreal regenerates
+*.slnx
+
+# A second copy of the repo cloned inside the project folder: not part of the game
+/GrappleRunner/
