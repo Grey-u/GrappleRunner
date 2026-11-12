@@ -115,6 +115,11 @@ void AGRArsenal::ApplyTuning(bool bArms, const FVector& L, const FRotator& T)
 // =====================================================================================
 //  Constructor: build the parts that always exist (root, muzzle light, effect pool)
 // =====================================================================================
+// Testing helpers (file-scope so they can be changed with Live Coding): F9 slow motion, and a
+// count of cuts shown in the desktop status line.
+static bool GSlowMo = false;
+static int32 GCutCount = 0;
+
 AGRArsenal::AGRArsenal()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -231,8 +236,8 @@ void AGRArsenal::SetDefaultWeapons()
 	Blades.Mesh = Sword;
 	Blades.LeftMesh = Sword;
 	Blades.Scale = 1.f;                                   // modelled at real size: 95 cm of blade
-	Blades.HipOffset = FVector(34.f, 24.f, -26.f);         // ready stance: fists low and wide...
-	Blades.HipTurn = FRotator(30.f, -12.f, 0.f);           // ...blades angled up and slightly in, edge forward
+	Blades.HipOffset = FVector(40.f, 21.f, -17.f);         // ready stance: fists in view, chest height...
+	Blades.HipTurn = FRotator(38.f, -14.f, 0.f);           // ...blades angled up and slightly in, edge forward
 	Blades.Reach = 190.f;
 	Weapons.Add(Blades);                                                                        // key 1
 
@@ -525,6 +530,12 @@ void AGRArsenal::ReadInput(float Dt)
 		{
 			StartSwitch(i);
 		}
+	}
+	// F9: slow motion on/off (10% speed), to watch a swing or a cut closely while testing.
+	if (P->WasInputKeyJustPressed(EKeys::F9))
+	{
+		GSlowMo = !GSlowMo;
+		UGameplayStatics::SetGlobalTimeDilation(this, GSlowMo ? 0.1f : 1.f);
 	}
 	// Mouse wheel: the next (or previous) slot that has something in it.
 	const int32 Step = P->WasInputKeyJustPressed(EKeys::MouseScrollUp) ? -1 : (P->WasInputKeyJustPressed(EKeys::MouseScrollDown) ? 1 : 0);
@@ -1775,6 +1786,7 @@ void AGRArsenal::CutWithBlades(float Dt)
 			C->BladePass(BladePrev[Side][0], BladePrev[Side][1], A, B, bHeavy && !bVR ? 1.5f : 1.f, SwingIds[Side], Hits);
 			for (const FGRCutResult& H : Hits)
 			{
+				GCutCount += H.bCut ? 1 : 0;
 				// Bits flying off: green for plants, pale wood for trees, sparks for the rest.
 				const FLinearColor Col = H.bSoft ? FLinearColor(0.35f, 0.9f, 0.3f) : (H.bTree ? FLinearColor(0.8f, 0.55f, 0.3f) : FLinearColor(1.f, 0.8f, 0.45f));
 				for (int32 k = 0; k < (H.bCut ? 6 : 3); ++k)
@@ -1861,7 +1873,8 @@ void AGRArsenal::Tick(float DeltaSeconds)
 		}
 		else
 		{
-			Status = FString::Printf(TEXT("%s   |  LMB slash  RMB heavy stab  X holster  Q/E hooks"), *W->Name);
+			Status = FString::Printf(TEXT("%s   |  LMB slash  RMB cross-cut  X holster  Q/E hooks  F9 slow-mo   (swing %.2f, cuts %d)"),
+				*W->Name, MeleeTime, GCutCount);
 		}
 		GEngine->AddOnScreenDebugMessage(4202, 0.f, FColor(255, 200, 120), Status);
 	}
