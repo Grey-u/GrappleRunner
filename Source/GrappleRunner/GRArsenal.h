@@ -121,6 +121,10 @@ struct FGRWeapon
 	UPROPERTY(EditAnywhere, Category = "Weapon|Reload") FVector BoltPoint = FVector(-2.f, 4.f, 5.f);      // the bolt handle (bolt-action rifles)
 	UPROPERTY(EditAnywhere, Category = "Weapon|Reload") bool bBoltAction = false;   // pull the bolt after every shot
 	UPROPERTY(EditAnywhere, Category = "Weapon|Reload") TSoftObjectPtr<UStaticMesh> MagazineMesh;   // optional: the magazine shown in the hand
+
+	// ---- Animated arms (First Person Rifle Animation pack): real hands + rigged gun, real reload ----
+	UPROPERTY(EditAnywhere, Category = "Weapon|Arms") bool bAnimatedArms = false;
+	UPROPERTY(EditAnywhere, Category = "Weapon|Arms") TSoftObjectPtr<class USkeletalMesh> ArmsWeapon;   // rigged gun (magazine and bolt move)
 };
 
 UCLASS()
@@ -159,6 +163,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") FRotator LeftHandTurn = FRotator(-25.f, 0.f, -90.f);
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") FVector BeltPoint = FVector(10.f, -16.f, -60.f);   // left hip pouch, from the eyes (desktop)
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") float BoltSeconds = 0.7f;
+
+	// ---- Animated arms: hands, gloves and the animations they play (from the Fab pack) ----
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TSoftObjectPtr<class USkeletalMesh> ArmsModel =
+		TSoftObjectPtr<class USkeletalMesh>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Hands/Female/SKM_FirstPersonHand_Female.SKM_FirstPersonHand_Female")));
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TSoftObjectPtr<class USkeletalMesh> GlovesModel =
+		TSoftObjectPtr<class USkeletalMesh>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Hands/Female/SKM_GlovesHalf_Female.SKM_GlovesHalf_Female")));
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FVector ArmsOffset = FVector(0.f, 0.f, -160.f);   // from the eyes (arms mesh origin is at the feet)
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FRotator ArmsTurn = FRotator(0.f, -90.f, 0.f);
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FName GunBone = TEXT("hand_r");                 // where the gun is held
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> ArmsAnims;    // Idle, Draw, Holster, Fire, ADSPose, ADSFire, Reload, ReloadEmpty
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> GunAnims;     // Idle, Fire, Reload, ReloadEmpty
 
 	// Glowing material for tracers and sparks (made by Scripts/import_skin_weapons.py).
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Effects") TSoftObjectPtr<UMaterialInterface> GlowMaterial =
@@ -216,6 +231,14 @@ private:
 	UPROPERTY() TObjectPtr<class USkeletalMeshComponent> HandR;     // the hands
 	UPROPERTY() TObjectPtr<class USkeletalMeshComponent> HandL;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> HeldMag;           // magazine in the left hand during a reload
+	UPROPERTY() TObjectPtr<class USkeletalMeshComponent> Arms;      // animated first-person arms
+	UPROPERTY() TObjectPtr<class USkeletalMeshComponent> Gloves;
+	UPROPERTY() TObjectPtr<class USkeletalMeshComponent> ArmsGun;   // the rigged gun in the arms' right hand
+	FName ArmsState;              // which arms animation is playing
+	float ArmsOneShotLeft = 0.f;  // time left in a one-off animation (fire, reload, draw) before going back to idle
+	bool UsingArms() const;
+	void PlayArms(FName Anim, bool bLoop, bool bAlsoGun = true);
+	void UpdateArms(float Dt, const FVector& LocDelta, const FRotator& TurnDelta);
 	void UpdateHands(float Dt);   // place the hands on the weapon (and do the reload / bolt choreography)
 	void VRReload();              // the manual VR reload (headset only)
 

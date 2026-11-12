@@ -29,6 +29,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Animation/AnimationAsset.h"
+#include "Animation/AnimSequenceBase.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/StaticMesh.h"
@@ -90,6 +91,24 @@ AGRArsenal::AGRArsenal()
 	MuzzleLight->SetCastShadows(false);
 
 	SetDefaultWeapons();
+
+	// The First Person Rifle Animation pack's animations (arms) and the gun's own (magazine, bolt).
+	auto Anim = [](const TCHAR* Path)
+	{
+		return TSoftObjectPtr<UAnimSequenceBase>(FSoftObjectPath(Path));
+	};
+	ArmsAnims.Add(TEXT("Idle"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Idle.AS_Rifle_Idle")));
+	ArmsAnims.Add(TEXT("Draw"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Draw.AS_Rifle_Draw")));
+	ArmsAnims.Add(TEXT("Holster"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Holster.AS_Rifle_Holster")));
+	ArmsAnims.Add(TEXT("Fire"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Fire.AS_Rifle_Fire")));
+	ArmsAnims.Add(TEXT("ADSPose"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_ADS_Pose.AS_Rifle_ADS_Pose")));
+	ArmsAnims.Add(TEXT("ADSFire"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_ADS_Fire.AS_Rifle_ADS_Fire")));
+	ArmsAnims.Add(TEXT("Reload"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Reload.AS_Rifle_Reload")));
+	ArmsAnims.Add(TEXT("ReloadEmpty"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Reload_Empty.AS_Rifle_Reload_Empty")));
+	GunAnims.Add(TEXT("Idle"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/Weapons/AS_Weapon_Rifle_Idle.AS_Weapon_Rifle_Idle")));
+	GunAnims.Add(TEXT("Fire"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/Weapons/AS_Weapon_Rifle_Fire.AS_Weapon_Rifle_Fire")));
+	GunAnims.Add(TEXT("Reload"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/Weapons/AS_Weapon_Rifle_Reload.AS_Weapon_Rifle_Reload")));
+	GunAnims.Add(TEXT("ReloadEmpty"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/Weapons/AS_Weapon_Rifle_Reload_Empty.AS_Weapon_Rifle_Reload_Empty")));
 }
 
 // =====================================================================================
@@ -156,6 +175,8 @@ void AGRArsenal::SetDefaultWeapons()
 	FGRWeapon Rifle = Gun(TEXT("Rifle"), TEXT("SM_Kuronami_Rifle"), EGRWeaponKind::Rifle, 40.f, 9.75f, 25, 2.4f, 2.f, 0.25f, 0.7f, 70.f, Tracer);
 	Rifle.FallbackMesh = Rifle.Mesh;
 	Rifle.Mesh = Ours(TEXT("SM_Rifle"));
+	Rifle.bAnimatedArms = true;   // real hands and a rigged rifle with real draw / fire / reload animations
+	Rifle.ArmsWeapon = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Meshes/Weapon/SKM_Weapon_Full.SKM_Weapon_Full")));
 	Weapons.Add(Rifle);                                                                         // key 2
 
 	FGRWeapon Sniper = Gun(TEXT("Sniper"), TEXT("SM_Araxys_Sniper"), EGRWeaponKind::Sniper, 150.f, 0.6f, 5, 3.2f, 5.f, 0.f, 3.5f, 25.f, Tracer);
@@ -351,6 +372,52 @@ void AGRArsenal::ShowSlot(int32 Slot)
 	};
 	Show(RightMesh, W.Mesh, 1);
 	Show(LeftMesh, W.LeftMesh, 0);
+
+	// Animated arms: real hands holding a rigged gun (desktop). Made once, reused.
+	USkeletalMesh* ArmsMesh = (W.bAnimatedArms && !R->IsUsingVR()) ? ArmsModel.LoadSynchronous() : nullptr;
+	USkeletalMesh* GunMesh = ArmsMesh && !W.ArmsWeapon.IsNull() ? W.ArmsWeapon.LoadSynchronous() : nullptr;
+	if (ArmsMesh && GunMesh && R->GetEyes())
+	{
+		auto MakeSkel = [this](TObjectPtr<USkeletalMeshComponent>& Comp)
+		{
+			if (!Comp)
+			{
+				Comp = NewObject<USkeletalMeshComponent>(this);
+				Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				Comp->SetCastShadow(false);
+				Comp->RegisterComponent();
+				AddInstanceComponent(Comp);
+			}
+		};
+		MakeSkel(Arms);
+		MakeSkel(Gloves);
+		MakeSkel(ArmsGun);
+		Arms->SetSkeletalMesh(ArmsMesh);
+		Arms->AttachToComponent(R->GetEyes(), FAttachmentTransformRules::KeepRelativeTransform);
+		Arms->SetRelativeLocationAndRotation(ArmsOffset, ArmsTurn);
+		Gloves->SetSkeletalMesh(GlovesModel.LoadSynchronous());
+		Gloves->AttachToComponent(Arms, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		Gloves->SetLeaderPoseComponent(Arms);   // the gloves copy every move the hands make
+		ArmsGun->SetSkeletalMesh(GunMesh);
+		ArmsGun->AttachToComponent(Arms, FAttachmentTransformRules::SnapToTargetNotIncludingScale, GunBone);
+		for (USkeletalMeshComponent* C : { Arms.Get(), Gloves.Get(), ArmsGun.Get() })
+		{
+			C->SetVisibility(true);
+			C->SetHiddenInGame(false);
+		}
+		RightMesh->SetVisibility(false);   // the static stand-in isn't needed
+		PlayArms(TEXT("Draw"), false);
+	}
+	else
+	{
+		for (USkeletalMeshComponent* C : { Arms.Get(), Gloves.Get(), ArmsGun.Get() })
+		{
+			if (C)
+			{
+				C->SetVisibility(false);
+			}
+		}
+	}
 	if (W.LeftMesh.IsNull() && LeftMesh)
 	{
 		LeftMesh->SetVisibility(false);
@@ -519,6 +586,10 @@ void AGRArsenal::Fire()
 	SnapVinesAlong(Start, HitPoint, 12.f);
 
 	// 3. What you see: tracer from the barrel, a flash of light, the gun kicking back.
+	if (UsingArms())
+	{
+		PlayArms(AimAlpha > 0.5f ? FName(TEXT("ADSFire")) : FName(TEXT("Fire")), false);
+	}
 	const FVector Muzzle = MuzzleWorld();
 	ShowEffect(Muzzle, HitPoint, W.Kind == EGRWeaponKind::Sniper ? 2.5f : 1.2f, W.Kind == EGRWeaponKind::Sniper ? 0.15f : 0.06f, W.TracerColour);
 	MuzzleLight->SetWorldLocation(Muzzle);
@@ -549,6 +620,12 @@ void AGRArsenal::StartReload()
 		return;
 	}
 	ReloadLeft = W->ReloadSeconds;
+	if (UsingArms())
+	{
+		const FName Which = Ammo[Current] <= 0 ? FName(TEXT("ReloadEmpty")) : FName(TEXT("Reload"));
+		PlayArms(Which, false);
+		ReloadLeft = FMath::Max(0.3f, ArmsOneShotLeft);   // the reload lasts exactly as long as the animation
+	}
 	BurstLeft = 0;
 }
 
@@ -712,6 +789,17 @@ FVector AGRArsenal::SightPoint(const UStaticMeshComponent* Part) const
 
 FVector AGRArsenal::MuzzleWorld() const
 {
+	if (UsingArms() && ArmsGun)
+	{
+		for (const TCHAR* Name : { TEXT("Muzzle"), TEXT("muzzle"), TEXT("SOCKET_Muzzle"), TEXT("b_gun_muzzleflash") })
+		{
+			if (ArmsGun->DoesSocketExist(Name))
+			{
+				return ArmsGun->GetSocketLocation(Name);
+			}
+		}
+		return ArmsGun->GetComponentLocation() + ArmsGun->GetForwardVector() * 60.f;
+	}
 	if (!RightMesh)
 	{
 		return GetActorLocation();
@@ -761,6 +849,10 @@ void AGRArsenal::Animate(float Dt)
 				{
 					bHolstered = true;                      // put away: hands are empty now
 					RightMesh->SetVisibility(false);
+					for (USkeletalMeshComponent* C : { Arms.Get(), Gloves.Get(), ArmsGun.Get() })
+					{
+						if (C) { C->SetVisibility(false); }
+					}
 					if (LeftMesh) { LeftMesh->SetVisibility(false); }
 				}
 				else
@@ -902,6 +994,11 @@ void AGRArsenal::Animate(float Dt)
 
 	// ---- Put it all on the meshes ----
 	const bool bSwingRight = !(W.Kind == EGRWeaponKind::Swords && bLeftBlade && !bHeavy);
+	if (UsingArms())
+	{
+		UpdateArms(Dt, FVector::ZeroVector, FRotator::ZeroRotator);
+		return;   // the animated arms carry the gun; the procedural pose below is for the other weapons
+	}
 	RightMesh->SetRelativeLocationAndRotation(Loc + (bSwingRight ? SwingLoc : FVector::ZeroVector),
 		Turn + (bSwingRight ? SwingTurn : FRotator::ZeroRotator));
 	if (LeftMesh && LeftMesh->IsVisible())
@@ -971,6 +1068,12 @@ void AGRArsenal::UpdateHands(float Dt)
 		return;
 	}
 	const FGRWeapon* W = Held();
+	if (UsingArms())
+	{
+		HandR->SetHiddenInGame(true);   // the animated arms are the hands now
+		HandL->SetHiddenInGame(true);
+		return;
+	}
 	const bool bScopedIn = W && W->bScope && AimAlpha > 0.92f;   // looking through the scope: no gun, no hands
 	const bool bShow = W && RightMesh && RightMesh->IsVisible() && !bHolstered && !bScopedIn;
 	HandR->SetHiddenInGame(!bShow);
@@ -1135,6 +1238,80 @@ void AGRArsenal::VRReload()
 	{
 		bBoltHeld = false;
 	}
+}
+
+// =====================================================================================
+//  Animated arms (First Person Rifle Animation pack)
+//  The arms play one animation at a time ("single node" mode): a looping Idle (or the aim
+//  pose while the right mouse button is held) and one-off clips for Draw, Fire and Reload.
+//  The gun plays its matching clip at the same moment, so the magazine drops and the bolt
+//  moves exactly with the hands. When a one-off clip ends, the arms go back to Idle.
+// =====================================================================================
+bool AGRArsenal::UsingArms() const
+{
+	const FGRWeapon* W = Held();
+	return W && W->bAnimatedArms && Arms && Arms->IsVisible() && ArmsGun && Rig.IsValid() && !Rig->IsUsingVR();
+}
+
+void AGRArsenal::PlayArms(FName Anim, bool bLoop, bool bAlsoGun)
+{
+	if (!Arms)
+	{
+		return;
+	}
+	const TSoftObjectPtr<UAnimSequenceBase>* Soft = ArmsAnims.Find(Anim);
+	UAnimSequenceBase* Clip = Soft ? Soft->LoadSynchronous() : nullptr;
+	if (!Clip)
+	{
+		return;
+	}
+	Arms->PlayAnimation(Clip, bLoop);
+	ArmsState = Anim;
+	ArmsOneShotLeft = bLoop ? 0.f : Clip->GetPlayLength();
+	if (bAlsoGun && ArmsGun)
+	{
+		// The gun's own clip: fire / reload / reload-empty, otherwise its idle.
+		FName GunClip = TEXT("Idle");
+		if (Anim == TEXT("Fire") || Anim == TEXT("ADSFire")) { GunClip = TEXT("Fire"); }
+		else if (Anim == TEXT("Reload")) { GunClip = TEXT("Reload"); }
+		else if (Anim == TEXT("ReloadEmpty")) { GunClip = TEXT("ReloadEmpty"); }
+		const TSoftObjectPtr<UAnimSequenceBase>* GunSoft = GunAnims.Find(GunClip);
+		if (UAnimSequenceBase* G = GunSoft ? GunSoft->LoadSynchronous() : nullptr)
+		{
+			ArmsGun->PlayAnimation(G, GunClip == TEXT("Idle"));
+		}
+	}
+}
+
+void AGRArsenal::UpdateArms(float Dt, const FVector& LocDelta, const FRotator& TurnDelta)
+{
+	// 1. When a one-off clip ends, go back to idle (or the aim pose).
+	if (ArmsOneShotLeft > 0.f)
+	{
+		ArmsOneShotLeft -= Dt;
+		if (ArmsOneShotLeft <= 0.f)
+		{
+			PlayArms(bWantAim ? FName(TEXT("ADSPose")) : FName(TEXT("Idle")), true);
+		}
+	}
+	else
+	{
+		const FName Want = bWantAim ? FName(TEXT("ADSPose")) : FName(TEXT("Idle"));
+		if (ArmsState != Want)
+		{
+			PlayArms(Want, true);
+		}
+	}
+	// 2. Small extra motion on top of the animation: recoil push, mouse sway, switching dip.
+	const float Down = Pending != -1 ? FMath::Clamp(1.f - FMath::Abs(SwitchTime / FMath::Max(0.01f, SwitchSeconds) - 0.5f) * 2.f, 0.f, 1.f) : 0.f;
+	const FVector Extra = FVector(-RecoilBack, Sway.X * 0.3f, -16.f * Down) + LocDelta;
+	const FRotator Tilt = FRotator(Sway.Y * 0.5f - 20.f * Down, Sway.X * 0.5f, 0.f) + TurnDelta;
+	Arms->SetRelativeLocationAndRotation(ArmsOffset + Extra, (Tilt.Quaternion() * ArmsTurn.Quaternion()).Rotator());
+	// Scoped in (sniper) hides the arms like it hides the gun.
+	const bool bScopedIn = Held() && Held()->bScope && AimAlpha > 0.92f;
+	Arms->SetHiddenInGame(bScopedIn);
+	Gloves->SetHiddenInGame(bScopedIn);
+	ArmsGun->SetHiddenInGame(bScopedIn);
 }
 
 // =====================================================================================
