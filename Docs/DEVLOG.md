@@ -191,3 +191,20 @@ One entry per work session: what was built, what broke, and what was learned. Ne
   - **Build fixes in 5.8:**
     - `HeadMountedDisplayFunctionLibrary.h` isn't available, so the code uses `IXRTrackingSystem`.
     - `FOverlapResult` needs `Engine/OverlapResult.h`.
+
+## 12 Nov 2026 (early hours): Three weapons with hands that reload, a living atmosphere, and the plant hunt
+- **Weapons cut to three** (Naomi's call): 1 knife, 2 rifle, 3 sniper. Switching is now a quick eased dip (16 cm down, a small roll) instead of a big 50° flip.
+- **Hands:** the VR template's hand models are drawn on the weapon, right hand on the grip and left on the foregrip.
+  - **Desktop reload:** the left hand grabs the magazine, drops to the belt, comes back with a fresh one and slaps it in.
+  - **Sniper:** bolt action; the left hand works the bolt after every shot.
+- **VR manual reload** (ready for the headset):
+  - grip near the magazine and pull it out;
+  - let go to drop it;
+  - grip at the left hip for a fresh one;
+  - bring it to the magwell and it clicks in;
+  - grab the sniper bolt and pull it back.
+  - Haptic clicks on each step. Grip state comes from the rig (`IsGripping`).
+- **`GRAmbientLife`:** 350 tiny specks drift with the wind around the player as one instanced mesh. By day they're pollen and dust; at night they turn into glowing, twinkling spores (reads the day/night clock).
+- **Plant hunt on Fab** (Megascans became free on 6 Nov 2026). Shortlisted photoscanned packs: Project Nature tropical and fern sets with wind and touch interaction, Megascans palms and ferns, Megaplants bamboo, plus a matching sci-fi weapon set.
+  - Blocked on signing in to Fab in the agent's browser. Claude doesn't type passwords, and the launcher's Fab search box didn't accept automated typing.
+- **Play started at dawn,** whose warm light turned the island rock red. The match now starts mid-morning (`StartAt` 0.18), and the dawn light is less orange.

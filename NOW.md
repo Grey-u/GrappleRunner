@@ -30,6 +30,9 @@
 - Auto-pull is the default.
 
 ## Next
+- 12 Nov: waiting on Naomi to sign in to Fab in the Claude browser pane, then add (all free, photoscanned): Project Nature tropical Ground Plants / Banana / Pandanus / Fern Collection / Dynamic Ivy, Megascans Xanadu, Broadleaf Lady Palm, Wild Grass And Ferns, Megaplants Giant Bamboo; weapons: PStudio "B&W Arms" sci-fi rifle + sniper, a sci-fi knife. Then a swap script (Brushify plants -> new ones, colour zones per island, some glowing at night) and import the 3 weapons to /Game/GrappleRunner/Weapons/Arsenal/SM_Rifle|SM_Sniper|SM_Knife (the slots already point there; Valorant meshes are only the fallback).
+- Look target: Log Horizon (giant trees and ivy reclaiming ruins, different colours per area, glowing plants at night) rendered like Ready Player One.
+- Desktop hands are on the weapons but their angle needs tuning (RightHandTurn / LeftHandTurn in the spawned GRArsenal).
 0. Pandora look: Brushify island rocks and hanging moss are red-tinted by their own materials; the grade now mutes red (re-run color_grade.py to apply), but the real fix is our own green material instances for the islands (ask Naomi first: touches pack content) and replacing the plants with photoreal ones from Fab (Quixel Megaplants, free, UE 5.7+). Haptic gloves: GRHandFeel built (LucidGloves via OpenGloves pipe); needs gloves plus SteamVR to test.
 1. Hand-check aim and scope, and tune hip/aim offsets (one weapon at a time).
 2. Fix the per-frame InverseFast error.

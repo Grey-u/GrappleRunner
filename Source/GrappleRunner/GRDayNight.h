@@ -52,7 +52,7 @@ public:
 	// How long one day (one match) lasts, in minutes.
 	UPROPERTY(EditAnywhere, Category = "Day and Night") float MatchMinutes = 12.f;
 	// Where in the day play starts (0 = dawn, 0.3 = noon, 0.6 = dusk, 0.75 = night).
-	UPROPERTY(EditAnywhere, Category = "Day and Night") float StartAt = 0.02f;
+	UPROPERTY(EditAnywhere, Category = "Day and Night") float StartAt = 0.18f;   // start mid-morning: clean daylight, true greens (dawn light turned the island rock red)
 	// The direction the sun rises from (degrees round the sky; it sets on the opposite side).
 	UPROPERTY(EditAnywhere, Category = "Day and Night") float SunriseYaw = -60.f;
 	UPROPERTY(EditAnywhere, Category = "Day and Night") float HighestSun = 50.f;   // degrees above the horizon at noon
