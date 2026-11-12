@@ -170,10 +170,18 @@ public:
 		TSoftObjectPtr<class USkeletalMesh>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Hands/Female/SKM_FirstPersonHand_Female.SKM_FirstPersonHand_Female")));
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TSoftObjectPtr<class USkeletalMesh> GlovesModel =
 		TSoftObjectPtr<class USkeletalMesh>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Hands/Female/SKM_GlovesHalf_Female.SKM_GlovesHalf_Female")));
-	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FVector ArmsOffset = FVector(-30.f, 0.f, -150.f);   // from the eyes (arms mesh origin is at the feet)
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FVector ArmsOffset = FVector(-5.f, 0.f, -155.f);   // from the eyes (arms mesh origin is at the feet)
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FRotator ArmsTurn = FRotator(0.f, -90.f, 0.f);
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") FName GunBone = TEXT("hand_r");                 // where the gun is held
-	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> ArmsAnims;    // Idle, Draw, Holster, Fire, ADSPose, ADSFire, Reload, ReloadEmpty
+	// The pack's own animation blueprints run the idle / walk / aim layers; we play its montages
+	// (one-off clips: draw, fire, reload) on top, exactly like the pack's demo character does.
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TSoftClassPtr<class UAnimInstance> ArmsAnimBP =
+		TSoftClassPtr<class UAnimInstance>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Demo/FirstPersonArms/Animations/FirstPerson_AnimBP.FirstPerson_AnimBP_C")));
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TSoftClassPtr<class UAnimInstance> GunAnimBP =
+		TSoftClassPtr<class UAnimInstance>(FSoftObjectPath(TEXT("/Game/FirstPersonRifleAnimations/Animations/Weapons/ABP_Weapon_Rifle.ABP_Weapon_Rifle_C")));
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimMontage>> ArmsMontages;   // Draw, Holster, Fire, ADSFire, Reload, ReloadEmpty
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimMontage>> GunMontages;    // Fire, Reload, ReloadEmpty
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> ArmsAnims;    // fallback clips if the blueprint is missing
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> GunAnims;     // Idle, Fire, Reload, ReloadEmpty
 
 	// Glowing material for tracers and sparks (made by Scripts/import_skin_weapons.py).

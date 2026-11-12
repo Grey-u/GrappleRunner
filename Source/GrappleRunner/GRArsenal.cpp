@@ -30,6 +30,8 @@
 #include "Engine/SkeletalMesh.h"
 #include "Animation/AnimationAsset.h"
 #include "Animation/AnimSequenceBase.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimInstance.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/StaticMesh.h"
@@ -136,7 +138,21 @@ AGRArsenal::AGRArsenal()
 	{
 		return TSoftObjectPtr<UAnimSequenceBase>(FSoftObjectPath(Path));
 	};
-	ArmsAnims.Add(TEXT("Idle"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Idle.AS_Rifle_Idle")));
+	auto Montage = [](const TCHAR* Path)
+	{
+		return TSoftObjectPtr<UAnimMontage>(FSoftObjectPath(Path));
+	};
+	const FString A = TEXT("/Game/FirstPersonRifleAnimations/Animations/");
+	ArmsMontages.Add(TEXT("Draw"), Montage(*(A + TEXT("AM_Rifle_Draw_Montage.AM_Rifle_Draw_Montage"))));
+	ArmsMontages.Add(TEXT("Holster"), Montage(*(A + TEXT("AM_Rifle_Holster_Montage.AM_Rifle_Holster_Montage"))));
+	ArmsMontages.Add(TEXT("Fire"), Montage(*(A + TEXT("AM_Rifle_Fire_Montage.AM_Rifle_Fire_Montage"))));
+	ArmsMontages.Add(TEXT("ADSFire"), Montage(*(A + TEXT("AM_Rifle_ADS_Fire_Montage.AM_Rifle_ADS_Fire_Montage"))));
+	ArmsMontages.Add(TEXT("Reload"), Montage(*(A + TEXT("AM_Rifle_Reload_Montage.AM_Rifle_Reload_Montage"))));
+	ArmsMontages.Add(TEXT("ReloadEmpty"), Montage(*(A + TEXT("AM_Rifle_Reload_Empty_Montage.AM_Rifle_Reload_Empty_Montage"))));
+	GunMontages.Add(TEXT("Fire"), Montage(*(A + TEXT("Weapons/AM_Weapon_Rifle_Fire_Montage.AM_Weapon_Rifle_Fire_Montage"))));
+	GunMontages.Add(TEXT("Reload"), Montage(*(A + TEXT("Weapons/AM_Weapon_Rifle_Reload_Montage.AM_Weapon_Rifle_Reload_Montage"))));
+	GunMontages.Add(TEXT("ReloadEmpty"), Montage(*(A + TEXT("Weapons/AM_Weapon_Rifle_Reload_Empty_Montage.AM_Weapon_Rifle_Reload_Empty_Montage"))));
+	ArmsAnims.Add(TEXT("Idle"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Idle_Pose.AS_Rifle_Idle_Pose")));
 	ArmsAnims.Add(TEXT("Draw"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Draw.AS_Rifle_Draw")));
 	ArmsAnims.Add(TEXT("Holster"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Holster.AS_Rifle_Holster")));
 	ArmsAnims.Add(TEXT("Fire"), Anim(TEXT("/Game/FirstPersonRifleAnimations/Animations/AS_Rifle_Fire.AS_Rifle_Fire")));
@@ -439,6 +455,18 @@ void AGRArsenal::ShowSlot(int32 Slot)
 		Gloves->SetLeaderPoseComponent(Arms);   // the gloves copy every move the hands make
 		ArmsGun->SetSkeletalMesh(GunMesh);
 		ArmsGun->AttachToComponent(Arms, FAttachmentTransformRules::SnapToTargetNotIncludingScale, GunBone);
+		// The pack's animation blueprints: they keep the arms in a proper rifle hold (idle,
+		// breathing, walk) and the gun's magazine/bolt bones in place. Montages play on top.
+		if (UClass* ArmsBP = ArmsAnimBP.LoadSynchronous())
+		{
+			Arms->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+			Arms->SetAnimInstanceClass(ArmsBP);
+		}
+		if (UClass* GunBP = GunAnimBP.LoadSynchronous())
+		{
+			ArmsGun->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+			ArmsGun->SetAnimInstanceClass(GunBP);
+		}
 		for (USkeletalMeshComponent* C : { Arms.Get(), Gloves.Get(), ArmsGun.Get() })
 		{
 			C->SetVisibility(true);
@@ -1298,6 +1326,32 @@ void AGRArsenal::PlayArms(FName Anim, bool bLoop, bool bAlsoGun)
 	{
 		return;
 	}
+	// With the pack's blueprint running: idle is the blueprint's job; one-offs are montages.
+	if (UAnimInstance* AI = Arms->GetAnimInstance(); AI && Arms->GetAnimationMode() == EAnimationMode::AnimationBlueprint)
+	{
+		ArmsState = Anim;
+		ArmsOneShotLeft = 0.f;
+		if (const TSoftObjectPtr<UAnimMontage>* M = ArmsMontages.Find(Anim))
+		{
+			if (UAnimMontage* Montage = M->LoadSynchronous())
+			{
+				AI->Montage_Play(Montage);
+				ArmsOneShotLeft = Montage->GetPlayLength();
+			}
+		}
+		if (bAlsoGun && ArmsGun && ArmsGun->GetAnimInstance())
+		{
+			const FName GunClip = (Anim == TEXT("ADSFire")) ? FName(TEXT("Fire")) : Anim;
+			if (const TSoftObjectPtr<UAnimMontage>* GM = GunMontages.Find(GunClip))
+			{
+				if (UAnimMontage* GunMontage = GM->LoadSynchronous())
+				{
+					ArmsGun->GetAnimInstance()->Montage_Play(GunMontage);
+				}
+			}
+		}
+		return;
+	}
 	const TSoftObjectPtr<UAnimSequenceBase>* Soft = ArmsAnims.Find(Anim);
 	UAnimSequenceBase* Clip = Soft ? Soft->LoadSynchronous() : nullptr;
 	if (!Clip)
@@ -1324,8 +1378,14 @@ void AGRArsenal::PlayArms(FName Anim, bool bLoop, bool bAlsoGun)
 
 void AGRArsenal::UpdateArms(float Dt, const FVector& LocDelta, const FRotator& TurnDelta)
 {
-	// 1. When a one-off clip ends, go back to idle (or the aim pose).
-	if (ArmsOneShotLeft > 0.f)
+	// 1. When a one-off clip ends, go back to idle (or the aim pose). (With the pack's
+	//    blueprint, idle runs by itself; we only count down the montage.)
+	const bool bBlueprint = Arms->GetAnimationMode() == EAnimationMode::AnimationBlueprint;
+	if (bBlueprint)
+	{
+		ArmsOneShotLeft = FMath::Max(0.f, ArmsOneShotLeft - Dt);
+	}
+	else if (ArmsOneShotLeft > 0.f)
 	{
 		ArmsOneShotLeft -= Dt;
 		if (ArmsOneShotLeft <= 0.f)
