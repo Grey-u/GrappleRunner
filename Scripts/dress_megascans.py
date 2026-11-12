@@ -166,13 +166,14 @@ for island in islands:
             counts["underside"] += 1
 
     # ---- 4. rims: boulders round the edge of the top
-    for i in range(random.randint(*RIM_ROCKS) if found["rock"] else 0):
+    rim_set = found["rock"] or found["cliff"]          # no separate boulders? small cliff pieces work too
+    for i in range(random.randint(*RIM_ROCKS) if rim_set else 0):
         ang = random.uniform(0, 360)
         for frac in (0.85, 0.75, 0.65):
             p = ground(island, origin.x + math.cos(math.radians(ang)) * ext.x * frac,
                        origin.y + math.sin(math.radians(ang)) * ext.y * frac)
             if p and is_clear(p, 300):
-                path = random.choice(found["rock"])
+                path = random.choice(rim_set)
                 s = size_of(path)
                 scale = max(0.3, min(3.0, random.uniform(150, 450) / max(s.x, s.y, s.z, 1.0)))
                 if spawn(path, unreal.Vector(p.x, p.y, p.z - 20), unreal.Rotator(roll=0.0, pitch=0.0, yaw=random.uniform(0, 360)),

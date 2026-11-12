@@ -45,7 +45,7 @@ else:
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
     mesh = unreal.load_asset(DEST + "/SM_ODMSword")
     # 3. Check the marker points came through.
-    names = [str(s.get_editor_property("socket_name")) for s in mesh.get_editor_property("sockets")] if mesh else []
+    names = [n for n in ("Tip", "Base", "Edge") if mesh and mesh.find_socket(n)]
     unreal.log("Grapple Runner blades: imported SM_ODMSword, sockets = " + ", ".join(names))
     if not all(n in names for n in ("Tip", "Base", "Edge")):
         unreal.log_warning("Grapple Runner blades: sockets missing; the game will guess the blade direction from the model's box")
