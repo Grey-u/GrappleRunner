@@ -880,7 +880,7 @@ void AGrappleRig::Simulate(float Dt)
 	// Reeling in: shorten the rope, and tug the player toward the anchor. The rope ALWAYS
 	// pulls you toward where you hooked (Naomi, 14 Nov). The reel burns gas; with an empty
 	// tank it still pulls, but only at EmptyPullStrength (half speed), so gas still matters.
-	const float Pull = Gas > 0.f ? 1.f : EmptyPullStrength;
+	const float ReelPower = Gas > 0.f ? 1.f : EmptyPullStrength;   // 1 = full pull, less when the tank is empty
 	bool bVaultDone[2] = {false, false};
 	const bool bAnyReel = (Hooks[0].bAttached && bReel[0]) || (Hooks[1].bAttached && bReel[1]);
 	if (bAnyReel && Gas > 0.f)
@@ -899,7 +899,7 @@ void AGrappleRig::Simulate(float Dt)
 			H.Length = FMath::Max(H.Length, static_cast<float>(FVector::Dist(H.VaultTarget, H.Anchor)));
 			// Steer toward the top: faster when far, easing off as you arrive. A little lift
 			// while you're still below it makes the path arc up and over the edge.
-			const FVector Want = (ToTop.GetSafeNormal() * FMath::Clamp(D * 2.2f, 500.f, 1800.f) + FVector(0.f, 0.f, ToTop.Z > 0.f ? 250.f : 0.f)) * Pull;
+			const FVector Want = (ToTop.GetSafeNormal() * FMath::Clamp(D * 2.2f, 500.f, 1800.f) + FVector(0.f, 0.f, ToTop.Z > 0.f ? 250.f : 0.f)) * ReelPower;
 			Velocity = FMath::VInterpTo(Velocity, Want, Dt, 4.5f);
 			Velocity.Z += Gravity * Dt;   // cancel this frame's gravity while the rope carries you
 			StepTension[i] += PlayerMass * ReelPullAccel / 100.f;
@@ -911,14 +911,14 @@ void AGrappleRig::Simulate(float Dt)
 		}
 		if (H.bAttached && bReel[i])
 		{
-			H.Length = FMath::Max(MinRopeLength, H.Length - ReelSpeed * Pull * Dt);
+			H.Length = FMath::Max(MinRopeLength, H.Length - ReelSpeed * ReelPower * Dt);
 			if (bSoftRope)
 			{
 				// Soft rope: don't wind the rope more than ReelStallStretch shorter than the
 				// player's actual distance, or the stretched rope would act like a catapult.
 				H.Length = FMath::Max(H.Length, static_cast<float>(FVector::Dist(C, H.Anchor)) - ReelStallStretch);
 			}
-			Velocity += (H.Anchor - C).GetSafeNormal() * ReelPullAccel * Pull * Dt;   // GetSafeNormal = direction only, length 1
+			Velocity += (H.Anchor - C).GetSafeNormal() * ReelPullAccel * ReelPower * Dt;   // GetSafeNormal = direction only, length 1
 			// The reel's tug travels through the rope too, so it counts as rope pull (newtons).
 			StepTension[i] += PlayerMass * ReelPullAccel / 100.f;
 		}
