@@ -482,6 +482,12 @@ void AGRStylizedNature::ScatterOnLevel()
 		Targets.Add({ A, FBox(O - E, O + E), FVector::Dist(O, From) });
 	}
 	Targets.Sort([](const FTarget& L, const FTarget& R) { return L.Dist < R.Dist; });
+	TSet<const AActor*> Ground;            // every actor that counts as ground
+	for (const FTarget& T : Targets)
+	{
+		Ground.Add(T.Actor);
+	}
+	TSet<FIntPoint> Done;                  // one clump per 40 cm square, even where islands overlap
 
 	int32 Traces = 0;
 	const int32 MaxTraces = 2500000;      // baked in the editor, so it can take its time
@@ -503,11 +509,18 @@ void AGRStylizedNature::ScatterOnLevel()
 				FHitResult Hit;
 				++Traces;
 				// The first thing hit from above must be part of THIS actor, and flat enough.
+				// Any ground actor counts (an island can be made of several pieces), not just this one.
 				if (!GroundTrace(GetWorld(), Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), Params, Hit)
-					|| Hit.GetActor() != T.Actor || Hit.ImpactNormal.Z < MinFlatness)
+					|| !Ground.Contains(Hit.GetActor()) || Hit.ImpactNormal.Z < MinFlatness)
 				{
 					continue;
 				}
+				const FIntPoint Cell(FMath::FloorToInt(Hit.ImpactPoint.X / GrassSpacing), FMath::FloorToInt(Hit.ImpactPoint.Y / GrassSpacing));
+				if (Done.Contains(Cell))
+				{
+					continue;
+				}
+				Done.Add(Cell);
 				if (FMath::PerlinNoise2D(FVector2D(Hit.ImpactPoint.X, Hit.ImpactPoint.Y) * 0.0021f) < -0.55f)
 				{
 					continue;   // the odd bare patch, so it looks natural, not carpeted
