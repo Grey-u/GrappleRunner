@@ -43,7 +43,7 @@ public:
 	// Where it floats on desktop, measured from your eyes (turning with your body):
 	UPROPERTY(EditAnywhere, Category = "Gauge") float Ahead = 60.f;      // in front of you
 	UPROPERTY(EditAnywhere, Category = "Gauge") float Side = 0.f;        // centred, between your hands (minus = left)
-	UPROPERTY(EditAnywhere, Category = "Gauge") float Down = 22.f;       // below eye level (low enough to stay out of the way, high enough to stay in view)
+	UPROPERTY(EditAnywhere, Category = "Gauge") float Down = 14.f;       // below eye level: just under the centre of your view (Naomi: must be easy to see)
 	UPROPERTY(EditAnywhere, Category = "Gauge") float WidthCm = 16.f;    // how wide it is in the world
 
 	// The gauge colour for a tank this full (0 = empty, 1 = full). Used for the burst too.
