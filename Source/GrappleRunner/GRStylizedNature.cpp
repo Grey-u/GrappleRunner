@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/Paths.h"
 
@@ -65,6 +66,7 @@ AGRStylizedNature::AGRStylizedNature()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	RootComponent->SetMobility(EComponentMobility::Static);   // so baked (static) grass can hang off it
 }
 
 AGRStylizedNature* AGRStylizedNature::Get()
@@ -86,20 +88,25 @@ FVector AGRStylizedNature::Viewer() const
 //   bHierarchical = the "HISM" kind, which can skip whole groups of far-away copies (best for
 //   thousands of grass clumps that never move). Birds, clouds and butterflies move every
 //   frame, so they use the plain kind.
-UInstancedStaticMeshComponent* AGRStylizedNature::MakeInstancer(UStaticMesh* Mesh, USceneComponent* AttachTo, bool bHierarchical, bool bShadows, float CullStart, float CullEnd)
+UInstancedStaticMeshComponent* AGRStylizedNature::MakeInstancer(UStaticMesh* Mesh, USceneComponent* AttachTo, bool bHierarchical, bool bShadows, float CullStart, float CullEnd, bool bForSaving)
 {
 	if (!Mesh || !AttachTo)
 	{
 		return nullptr;
 	}
 	AActor* Holder = AttachTo->GetOwner();
+	const EObjectFlags Flags = bForSaving ? RF_Transactional : RF_NoFlags;   // saved with the level when baked in the editor
 	UInstancedStaticMeshComponent* C = bHierarchical
-		? NewObject<UHierarchicalInstancedStaticMeshComponent>(Holder)
-		: NewObject<UInstancedStaticMeshComponent>(Holder);
+		? NewObject<UHierarchicalInstancedStaticMeshComponent>(Holder, NAME_None, Flags)
+		: NewObject<UInstancedStaticMeshComponent>(Holder, NAME_None, Flags);
+	if (bForSaving)
+	{
+		C->CreationMethod = EComponentCreationMethod::Instance;
+	}
 	C->SetStaticMesh(Mesh);
 	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // you swing through grass and clouds
 	C->SetCastShadow(bShadows);
-	C->SetMobility(EComponentMobility::Movable);
+	C->SetMobility(bForSaving ? EComponentMobility::Static : EComponentMobility::Movable);
 	C->SetUsingAbsoluteLocation(true);                        // instances are given in world space
 	C->SetUsingAbsoluteRotation(true);
 	C->SetUsingAbsoluteScale(true);
@@ -171,12 +178,11 @@ FTransform AGRStylizedNature::MossTransform(const FVector& At, const FVector& No
 	return FTransform(Lie * Spin, At - Normal * 2.f, FVector(S));
 }
 
-void AGRStylizedNature::BeginPlay()
+// Load the meshes for each kind (StyleHex first, ours as fallback) and how much to scale each.
+bool AGRStylizedNature::LoadMeshes()
 {
-	Super::BeginPlay();
-	Instance = this;
-	Rng.Initialize(1234);   // same grass every time on the same level
-
+	Meshes.Reset();
+	KindScale.Reset();
 	for (const FKindSource& K : KindSources)
 	{
 		UStaticMesh* M = LoadPackMesh(K.Pack);
@@ -193,7 +199,56 @@ void AGRStylizedNature::BeginPlay()
 		}
 		KindScale.Add(Scale);
 	}
-	if (!Meshes[0])
+	return Meshes.Num() > 0 && Meshes[0] != nullptr;
+}
+
+// Make one instanced component per kind of plant, then plant the whole level.
+//   bForSaving = called in the editor (PlantGrassNow): the components are made so they're
+//   saved with the level, and don't move (cheaper).
+void AGRStylizedNature::PlantLevelGrass(bool bForSaving)
+{
+	for (UInstancedStaticMeshComponent* Old : LevelGrass)
+	{
+		if (Old)
+		{
+			RemoveInstanceComponent(Old);
+			Old->DestroyComponent();
+		}
+	}
+	LevelGrass.Reset();
+	Spots.Reset();
+	Planted = 0;
+	Rng.Initialize(1234);   // same grass every time on the same level
+	for (int32 k = 0; k < static_cast<int32>(EKind::Count); ++k)
+	{
+		const bool bSmall = k <= static_cast<int32>(EKind::FlowerBlue) || k >= static_cast<int32>(EKind::MossA);   // grass, flowers, moss
+		UInstancedStaticMeshComponent* C = MakeInstancer(Meshes[k], RootComponent, true, !bSmall,
+			bSmall ? GrassCullStart : GrassCullStart * 3.f, bSmall ? GrassCullEnd : GrassCullEnd * 3.f, bForSaving);
+		LevelGrass.Add(C);
+	}
+	ScatterOnLevel();
+}
+
+void AGRStylizedNature::PlantGrassNow()
+{
+	if (!LoadMeshes())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Stylized nature: meshes not found. Run Scripts/import_stylized.py first."));
+		return;
+	}
+	Modify();
+	PlantLevelGrass(true);
+	bBaked = true;
+	UE_LOG(LogTemp, Log, TEXT("Stylized nature: baked %d clumps into the level"), Planted);
+}
+
+void AGRStylizedNature::BeginPlay()
+{
+	Super::BeginPlay();
+	Instance = this;
+	Rng.Initialize(1234);   // same grass every time on the same level
+
+	if (!LoadMeshes())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Stylized nature: meshes not found. Run Scripts/import_stylized.py in the editor once."));
 		SetActorTickEnabled(false);
@@ -201,13 +256,25 @@ void AGRStylizedNature::BeginPlay()
 	}
 
 	// ---- 1. the level's grass ----
-	for (int32 k = 0; k < static_cast<int32>(EKind::Count); ++k)
+	if (bBaked)
 	{
-		const bool bSmall = k <= static_cast<int32>(EKind::FlowerBlue) || k >= static_cast<int32>(EKind::MossA);   // grass, flowers, moss
-		LevelGrass.Add(MakeInstancer(Meshes[k], RootComponent, true, !bSmall,
-			bSmall ? GrassCullStart : GrassCullStart * 3.f, bSmall ? GrassCullEnd : GrassCullEnd * 3.f));
+		// Planted in the editor already (PlantGrassNow, run by bake_grass.py): it's saved in the
+		// level, so just note where it is, for the butterflies.
+		for (UInstancedStaticMeshComponent* Set : LevelGrass)
+		{
+			for (int32 i = 0; Set && i < Set->GetInstanceCount() && Spots.Num() < 40000; i += 3)
+			{
+				FTransform T;
+				Set->GetInstanceTransform(i, T, true);
+				Spots.Add(T.GetLocation());
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("Stylized nature: using the grass baked into the level"));
 	}
-	ScatterOnLevel();
+	else
+	{
+		PlantLevelGrass(false);
+	}
 
 	const FVector Eye = Viewer();
 	FlockFollow = Eye;
@@ -292,39 +359,61 @@ void AGRStylizedNature::ScatterOnLevel()
 	TArray<TArray<FTransform>> ByKind;   // collected first, then added in one go per kind (much faster)
 	ByKind.SetNum(static_cast<int32>(EKind::Count));
 
-	const APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0);
-	const FVector From = Me ? Me->GetActorLocation() : Viewer();
-	struct FTarget { UStaticMeshComponent* Comp; double Dist; };
+	// Where to start: the player start (editor) or you (playing).
+	FVector From = GetActorLocation();
+	if (const APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0))
+	{
+		From = Me->GetActorLocation();
+	}
+	else
+	{
+		for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+		{
+			From = It->GetActorLocation();
+			break;
+		}
+	}
+
+	// Every visible, solid, still actor you could stand on: islands (also the ones built from
+	// instanced pieces, which the first version skipped), rocks, ruins, ledges.
+	struct FTarget { AActor* Actor; FBox Box; double Dist; };
 	TArray<FTarget> Targets;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		AActor* A = *It;
-		if (A == this || A->IsHidden() || A->ActorHasTag(FName(TEXT("NoGrass"))))
+		if (A == this || A->IsHidden() || A->ActorHasTag(FName(TEXT("NoGrass"))) || A->IsA<APawn>() || !A->GetRootComponent()
+			|| A->GetRootComponent()->Mobility == EComponentMobility::Movable || A->GetClass()->GetName().Contains(TEXT("Foliage")))
 		{
 			continue;
 		}
-		TArray<UStaticMeshComponent*> Comps;
-		A->GetComponents(Comps);
-		for (UStaticMeshComponent* C : Comps)
+		bool bSolid = false;
+		TArray<UPrimitiveComponent*> Prims;
+		A->GetComponents(Prims);
+		for (const UPrimitiveComponent* P : Prims)
 		{
-			if (!C || C->Mobility == EComponentMobility::Movable || !C->IsVisible() || C->bHiddenInGame || !C->IsCollisionEnabled()
-				|| C->GetCollisionResponseToChannel(ECC_Visibility) != ECR_Block || C->IsA<UInstancedStaticMeshComponent>())
+			if (P && P->IsVisible() && P->IsCollisionEnabled() && P->GetCollisionResponseToChannel(ECC_Visibility) == ECR_Block)
 			{
-				continue;   // moving things, invisible things, things you can't stand on, and other foliage get no grass
+				bSolid = true;
+				break;
 			}
-			const FVector Size = C->Bounds.GetBox().GetSize();
-			if (Size.X < 150.f || Size.Y < 150.f || Size.X > 120000.f || Size.Y > 120000.f)
-			{
-				continue;   // too small to stand on, or a giant floor / sky dome
-			}
-			Targets.Add({ C, FVector::Dist(C->Bounds.Origin, From) });
 		}
+		if (!bSolid)
+		{
+			continue;
+		}
+		FVector O, E;
+		A->GetActorBounds(true, O, E);
+		if (E.X < 75.f || E.Y < 75.f || E.X > 60000.f || E.Y > 60000.f)
+		{
+			continue;   // too small to stand on, or a giant floor / sky dome
+		}
+		Targets.Add({ A, FBox(O - E, O + E), FVector::Dist(O, From) });
 	}
 	Targets.Sort([](const FTarget& L, const FTarget& R) { return L.Dist < R.Dist; });
 
 	int32 Traces = 0;
-	const int32 MaxTraces = 400000;       // about half a second of work when the level loads
-	const int32 MaxPerMesh = 6000;        // traces any one mesh may use (big ones get wider spacing)
+	const int32 MaxTraces = 500000;
+	const int32 MaxPerActor = 9000;       // traces any one actor may use (big ones get wider spacing)
 	FCollisionQueryParams Params(TEXT("GRGrass"), true);   // true = trace the real shape, not a rough box
 	for (const FTarget& T : Targets)
 	{
@@ -332,27 +421,23 @@ void AGRStylizedNature::ScatterOnLevel()
 		{
 			break;
 		}
-		UStaticMeshComponent* C = T.Comp;
-		const FBox Box = C->Bounds.GetBox();
+		const FBox& Box = T.Box;
 		const FVector Size = Box.GetSize();
-		const float Gap = FMath::Max(GrassSpacing, FMath::Sqrt(static_cast<float>(Size.X * Size.Y) / MaxPerMesh));
+		const float Gap = FMath::Max(GrassSpacing, FMath::Sqrt(static_cast<float>(Size.X * Size.Y) / MaxPerActor));
 		for (float X = Box.Min.X; X < Box.Max.X && Traces < MaxTraces; X += Gap)
 		{
 			for (float Y = Box.Min.Y; Y < Box.Max.Y && Traces < MaxTraces; Y += Gap)
 			{
-				const FVector Jitter(Rng.FRandRange(-0.45f, 0.45f) * Gap, Rng.FRandRange(-0.45f, 0.45f) * Gap, 0.f);
-				const FVector Top = FVector(X, Y, Box.Max.Z + 50.f) + Jitter;
-				const FVector Bottom = FVector(Top.X, Top.Y, Box.Min.Z - 50.f);
+				const FVector Top = FVector(X + Rng.FRandRange(-0.45f, 0.45f) * Gap, Y + Rng.FRandRange(-0.45f, 0.45f) * Gap, Box.Max.Z + 50.f);
 				FHitResult Hit;
 				++Traces;
-				// The first thing hit from above must be THIS mesh (so grass isn't planted
-				// under another rock), and the ground must be flat enough.
-				if (!GetWorld()->LineTraceSingleByChannel(Hit, Top, Bottom, ECC_Visibility, Params)
-					|| Hit.GetComponent() != C || Hit.ImpactNormal.Z < MinFlatness)
+				// The first thing hit from above must be part of THIS actor, and flat enough.
+				if (!GetWorld()->LineTraceSingleByChannel(Hit, Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), ECC_Visibility, Params)
+					|| Hit.GetActor() != T.Actor || Hit.ImpactNormal.Z < MinFlatness)
 				{
 					continue;
 				}
-				if (FMath::PerlinNoise2D(FVector2D(Hit.ImpactPoint.X, Hit.ImpactPoint.Y) * 0.0021f) < -0.5f)
+				if (FMath::PerlinNoise2D(FVector2D(Hit.ImpactPoint.X, Hit.ImpactPoint.Y) * 0.0021f) < -0.55f)
 				{
 					continue;   // the odd bare patch, so it looks natural, not carpeted
 				}
@@ -362,6 +447,11 @@ void AGRStylizedNature::ScatterOnLevel()
 					ByKind[static_cast<int32>(K)].Add(ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal, K));
 					Spots.Add(Hit.ImpactPoint);
 					++Planted;
+				}
+				if (Rng.FRand() < MossUnderGrass)
+				{
+					const int32 M = static_cast<int32>(Rng.FRand() < 0.5f ? EKind::MossA : EKind::MossB);
+					ByKind[M].Add(MossTransform(Hit.ImpactPoint, Hit.ImpactNormal));
 				}
 			}
 		}
@@ -373,7 +463,7 @@ void AGRStylizedNature::ScatterOnLevel()
 			LevelGrass[k]->AddInstances(ByKind[k], false, true);   // (transforms, don't need the numbers back, world space)
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("Stylized nature: %d meshes looked at, %d traces"), Targets.Num(), Traces);
+	UE_LOG(LogTemp, Log, TEXT("Stylized nature: %d actors looked at, %d traces, %d clumps"), Targets.Num(), Traces, Planted);
 }
 
 // Rocks and islands spawned while playing (endless mode): same idea, but only that actor,

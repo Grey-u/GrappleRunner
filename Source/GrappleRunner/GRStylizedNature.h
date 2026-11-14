@@ -60,6 +60,11 @@ public:
 	// MaxOnIt = most clumps on this one actor (rocks ~220, islands more).
 	void DressRock(AActor* Rock, int32 MaxOnIt = 700);
 
+	// EDITOR: plant the grass into the level now, so it's saved with it and visible in the
+	// editor too (Scripts/bake_grass.py calls this). Run it again after changing the level.
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Nature") void PlantGrassNow();
+	UPROPERTY(VisibleAnywhere, Category = "Nature") bool bBaked = false;   // true = grass already planted in the level
+
 	// ---- grass ----
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassSpacing = 80.f;       // gap between clumps (smaller = denser)
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MinFlatness = 0.72f;       // 1 = only perfectly flat ground, 0 = walls too
@@ -104,14 +109,16 @@ private:
 	EKind PickKind(const FVector& At);
 	FTransform ClumpTransform(const FVector& At, const FVector& Normal, EKind Kind);
 	FTransform MossTransform(const FVector& At, const FVector& Normal);   // lies flat on any slope
-	UInstancedStaticMeshComponent* MakeInstancer(UStaticMesh* Mesh, USceneComponent* AttachTo, bool bHierarchical, bool bShadows, float CullStart, float CullEnd);
+	UInstancedStaticMeshComponent* MakeInstancer(UStaticMesh* Mesh, USceneComponent* AttachTo, bool bHierarchical, bool bShadows, float CullStart, float CullEnd, bool bForSaving = false);
+	bool LoadMeshes();
+	void PlantLevelGrass(bool bForSaving);
 	void ScatterOnLevel();
 	FVector Viewer() const;
 	void PlaceCloud(int32 i, const FVector& Near, bool bFar);
 
 	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMesh>> Meshes;                          // by EKind
 	TArray<float> KindScale;                                                             // by EKind: size so it's the right height
-	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> LevelGrass;     // by EKind
+	UPROPERTY() TArray<TObjectPtr<UInstancedStaticMeshComponent>> LevelGrass;              // by EKind (saved when baked)
 	TArray<FVector> Spots;                                            // where grass was planted (butterflies visit)
 	int32 Planted = 0;
 	FRandomStream Rng;
