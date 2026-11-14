@@ -43,46 +43,65 @@ namespace
 	};
 	#undef GR_SH
 
-	// Is this actor a plant (tree, fern, bush, vine...)? Plants are never ground: the grass
-	// trace looks straight through them (it used to plant grass on top of the trees).
-	bool IsPlant(const AActor* A)
+	// Plant words: a mesh or actor with one of these in its name is a plant (tree, fern, bush,
+	// vine...), never ground. The grass trace looks straight through plants.
+	bool HasPlantWord(const FString& S)
 	{
 		static const TCHAR* Words[] = { TEXT("Tree"), TEXT("Fern"), TEXT("Plant"), TEXT("Foliage"), TEXT("Beech"), TEXT("Bush"),
 			TEXT("Grass"), TEXT("Vine"), TEXT("Root"), TEXT("Leaf"), TEXT("Leaves"), TEXT("Ivy"), TEXT("Flower"), TEXT("Banana"),
 			TEXT("Pandanus"), TEXT("Palm"), TEXT("Fol_"), TEXT("PN_"), TEXT("Moss") };
-		auto Has = [](const FString& S)
+		for (const TCHAR* W : Words)
 		{
-			for (const TCHAR* W : Words)
+			if (S.Contains(W))
 			{
-				if (S.Contains(W))
-				{
-					return true;
-				}
+				return true;
 			}
-			return false;
-		};
-		if (Has(A->GetClass()->GetName()))
+		}
+		return false;
+	}
+
+	// A whole actor that is a plant (by its class or its name in the Outliner). NOT by what's
+	// on it: a Brushify island carries ferns and bushes but is still ground (that mistake
+	// made the start island get no grass, 14 Nov).
+	bool IsPlant(const AActor* A)
+	{
+		if (HasPlantWord(A->GetClass()->GetName()))
 		{
 			return true;
 		}
 #if WITH_EDITOR
-		if (Has(A->GetActorLabel(false)))   // the name shown in the editor's Outliner
+		if (HasPlantWord(A->GetActorLabel(false)))   // the name shown in the editor's Outliner
 		{
 			return true;
 		}
 #endif
-		TArray<UStaticMeshComponent*> Comps;
-		A->GetComponents(Comps);
-		int32 Plants = 0, All = 0;
-		for (const UStaticMeshComponent* C : Comps)
+		return false;
+	}
+
+	// One piece (a fern on an island, a tree) is a plant if its mesh's name says so.
+	bool IsPlantPiece(const UPrimitiveComponent* C)
+	{
+		const UStaticMeshComponent* SM = Cast<UStaticMeshComponent>(C);
+		return SM && SM->GetStaticMesh() && HasPlantWord(SM->GetStaticMesh()->GetPathName());
+	}
+
+	// Trace down to the GROUND: if the first thing hit is a plant piece, look through it and
+	// keep going (up to 8 layers of leaves).
+	bool GroundTrace(UWorld* World, const FVector& From, const FVector& To, FCollisionQueryParams& Params, FHitResult& Hit)
+	{
+		for (int32 Layer = 0; Layer < 8; ++Layer)
 		{
-			if (C && C->GetStaticMesh())
+			if (!World->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params))
 			{
-				++All;
-				Plants += Has(C->GetStaticMesh()->GetPathName()) ? 1 : 0;
+				return false;
 			}
+			if (!IsPlantPiece(Hit.GetComponent()))
+			{
+				return true;
+			}
+			Params.AddIgnoredComponent(Hit.GetComponent());   // see through this plant from now on
 		}
-		return All > 0 && Plants * 2 >= All;   // mostly plant meshes = a plant
+		return false;
 	}
 
 	UStaticMesh* LoadPackMesh(const TCHAR* Path)
@@ -484,7 +503,7 @@ void AGRStylizedNature::ScatterOnLevel()
 				FHitResult Hit;
 				++Traces;
 				// The first thing hit from above must be part of THIS actor, and flat enough.
-				if (!GetWorld()->LineTraceSingleByChannel(Hit, Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), ECC_Visibility, Params)
+				if (!GroundTrace(GetWorld(), Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), Params, Hit)
 					|| Hit.GetActor() != T.Actor || Hit.ImpactNormal.Z < MinFlatness)
 				{
 					continue;
@@ -558,7 +577,7 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 		{
 			const FVector Top(X + Rng.FRandRange(-0.4f, 0.4f) * Gap, Y + Rng.FRandRange(-0.4f, 0.4f) * Gap, Box.Max.Z + 50.f);
 			FHitResult Hit;
-			if (!GetWorld()->LineTraceSingleByChannel(Hit, Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), ECC_Visibility, Params)
+			if (!GroundTrace(GetWorld(), Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), Params, Hit)
 				|| Hit.GetActor() != Rock || Hit.ImpactNormal.Z < MinFlatness)
 			{
 				continue;
