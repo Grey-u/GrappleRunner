@@ -619,8 +619,9 @@ void AGRMenu::ReadInput()
 	{
 		const FVector From = Ray->GetComponentLocation();
 		const FVector To = From + Ray->GetForwardVector() * Pointer->InteractionDistance;
-		FCollisionQueryParams Params(TEXT("GRMenuPointer"), false, this);
-		Params.AddIgnoredActor(R);
+		// Ignore the player's own body (so the ray doesn't stop on your arm), but NOT this menu actor:
+		// the panel belongs to this actor, so ignoring it would make the panel impossible to hit.
+		FCollisionQueryParams Params(TEXT("GRMenuPointer"), false, R);
 		bHit = GetWorld()->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params) && Hit.GetComponent() == Panel;
 	}
 	Pointer->SetCustomHitResult(bHit ? Hit : FHitResult());
