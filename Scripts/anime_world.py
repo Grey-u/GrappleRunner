@@ -73,26 +73,43 @@ float3 col = lerp(pick, toon, ToonAmount * nearW * (1.0 - sky));
 float g = dot(col, lw);
 col = lerp(float3(g, g, g), col, Saturation);
 
-// 4. anime sky
+// 4. anime sky (Genshin-style: cobalt overhead, crisp puffy clouds with white tops and
+//    blue bases, a sea of clouds below the horizon). Previewed against Grey's references.
+struct GRNoise
+{
+    float h(float2 p) { return frac(abs(sin(dot(p, float2(127.1, 311.7))) * 43758.5453)); }
+    float fbm(float2 q)
+    {
+        float n = 0.0; float a = 0.5;
+        for (int o = 0; o < 5; o++)
+        {
+            float2 i = floor(q); float2 f = frac(q); f = f * f * (3.0 - 2.0 * f);
+            n += a * lerp(lerp(h(i), h(i + float2(1, 0)), f.x), lerp(h(i + float2(0, 1)), h(i + float2(1, 1)), f.x), f.y);
+            q = q * 2.03 + 11.7; a *= 0.5;
+        }
+        return n;
+    }
+};
+GRNoise N;
 float3 dir = -normalize(V);
 float up = dir.z;
 float3 skyCol = lerp(HorizonColor.rgb, ZenithColor.rgb, pow(saturate(up * 1.3), 0.55));
-skyCol = lerp(skyCol, float3(0.90, 0.95, 1.0), saturate(-up * 2.5));    // a pale sea of cloud below
-float2 q = dir.xy / max(up + 0.18, 0.05) * 0.9 + float2(T * 0.004, T * 0.002);
-float n = 0.0; float amp = 0.5;
-[unroll] for (int oc = 0; oc < 5; oc++)
-{
-    float2 ip = floor(q); float2 fp = frac(q); fp = fp * fp * (3.0 - 2.0 * fp);
-    float h00 = frac(sin(dot(ip, float2(127.1, 311.7))) * 43758.5453);
-    float h10 = frac(sin(dot(ip + float2(1, 0), float2(127.1, 311.7))) * 43758.5453);
-    float h01 = frac(sin(dot(ip + float2(0, 1), float2(127.1, 311.7))) * 43758.5453);
-    float h11 = frac(sin(dot(ip + float2(1, 1), float2(127.1, 311.7))) * 43758.5453);
-    n += amp * lerp(lerp(h00, h10, fp.x), lerp(h01, h11, fp.x), fp.y);
-    q = q * 2.03 + 11.7; amp *= 0.5;
-}
-float cloud = smoothstep(0.53, 0.58, n) * saturate(up * 4.0 + 0.1) * CloudAmount;   // crisp edges, like Genshin
-float3 cloudCol = lerp(float3(0.62, 0.76, 0.93), float3(1.0, 1.0, 1.0), smoothstep(0.56, 0.68, n));   // cool blue shading, white tops
-skyCol = lerp(skyCol, cloudCol, cloud);
+float2 drift = float2(T * 0.006, T * 0.003);
+float2 q = dir.xy / max(up + 0.12, 0.04) * 0.85 + drift;          // clouds above: a layer overhead
+float n = N.fbm(q);
+float nb = N.fbm(q + float2(0.0, 0.10));                           // a step towards the horizon
+float cm = smoothstep(0.535, 0.55, n) * smoothstep(-0.02, 0.10, up) * CloudAmount;   // crisp edges
+float lit = smoothstep(-0.03, 0.05, n - nb);                       // tops white, bases blue
+float3 cc = lerp(float3(0.60, 0.74, 0.93), float3(1.0, 1.0, 1.0), 0.25 + 0.75 * lit);
+skyCol = lerp(skyCol, cc, cm * 0.97);
+float2 p2 = dir.xy / max(-up + 0.03, 0.03) * 0.35 + drift * 0.5;  // the sea of clouds below
+float n2 = N.fbm(p2);
+float nb2 = N.fbm(p2 - float2(0.0, 0.12));
+float m2 = smoothstep(0.40, 0.42, n2);
+float lit2 = smoothstep(-0.03, 0.06, n2 - nb2);
+float3 sea = lerp(float3(0.50, 0.68, 0.92), lerp(float3(0.70, 0.82, 0.96), float3(1.0, 1.0, 1.0), 0.3 + 0.7 * lit2), m2);
+sea = lerp(sea, HorizonColor.rgb, (1.0 - smoothstep(0.0, 0.25, -up)) * 0.75);   // hazy near the horizon
+skyCol = lerp(skyCol, sea, 1.0 - smoothstep(-0.02, 0.0, up));
 float bright = saturate(dot(scene, lw) * 1.8);     // follows the day/night clock
 skyCol = lerp(scene, skyCol * lerp(0.35, 1.0, bright), lerp(0.4, 1.0, bright) * SkyAmount);
 col = lerp(col, skyCol, sky);

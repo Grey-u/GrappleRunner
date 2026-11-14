@@ -44,11 +44,16 @@ AGREndlessSpawner::AGREndlessSpawner()
 		RuinMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(
 			TEXT("/Game/InfinityBladeGrassLands/Environments/Plains/Env_Plains_Ruins/StaticMesh/%s.%s"), R, R))));
 	}
-	// Caves are built from the free Megascans rock formation (big, craggy, mossy) and the grapple rocks.
+	// Caves are built from Brushify's cliffs and rocks (solid all the way round).
 	// (Only rocks that are solid all the way round. The Granite and Nordic "cliff" scans are
 	// open at the back, so from behind they look like paper: Grey, 14 Nov. Not used.)
+	// (anime_world.py measured them: these Brushify cliffs and rocks have no open edges. The
+	// Megascans scans, including the mossy rock formation, are open shells.)
 	const TCHAR* CaveParts[] = {
-		TEXT("/Game/Fab/Megascans/3D/Mossy_Rock_Formation_plFhY/High/plFhY_tier_1/StaticMeshes/plFhY_tier_1.plFhY_tier_1") };
+		TEXT("/Game/Brushify/Meshes/Cliffs/Meshes/Cliff_Spiky_01/S_Cliff_Spiky_01.S_Cliff_Spiky_01"),
+		TEXT("/Game/Brushify/Meshes/Cliffs/Meshes/Cliff_Spiky_02/S_Cliff_Spiky_02.S_Cliff_Spiky_02"),
+		TEXT("/Game/Brushify/Meshes/Cliffs/Meshes/Cliff_Large_02/S_Cliff_Large_02.S_Cliff_Large_02"),
+		TEXT("/Game/Brushify/Materials/Landscape/ProceduralMeshes/Rocks/Rock_01/S_Rock_01.S_Rock_01") };
 	for (const TCHAR* Path : CaveParts)
 	{
 		CaveMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(Path)));
@@ -113,9 +118,9 @@ void AGREndlessSpawner::BeginPlay()
 		GetWorld()->SpawnActor<AGRCompanion>();
 	}
 
-	// Never build caves from the open-backed cliff scans (they look like paper from behind),
+	// Never build caves from the open-backed Megascans scans (they look like paper from behind),
 	// even if an older copy of this spawner saved in a level still lists them.
-	CaveMeshes.RemoveAll([](const TSoftObjectPtr<UStaticMesh>& M) { return M.ToSoftObjectPath().ToString().Contains(TEXT("Cliff")); });
+	CaveMeshes.RemoveAll([](const TSoftObjectPtr<UStaticMesh>& M) { return M.ToSoftObjectPath().ToString().Contains(TEXT("/Fab/Megascans/")); });
 
 	// Use the same rock as the existing grapple rocks.
 	if (RockMeshes.Num() == 0)
