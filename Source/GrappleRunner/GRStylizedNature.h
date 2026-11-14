@@ -68,15 +68,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") int32 MaxClumps = 90000;         // safety cap on the whole level
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassCullStart = 5500.f;   // grass starts fading out here...
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassCullEnd = 8000.f;     // ...and is gone here
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") FVector2D ClumpScale = FVector2D(0.8f, 1.5f);
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossUnderGrass = 0.45f;    // chance of a moss cushion under each clump
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossOnSides = 0.8f;        // how thickly moss covers rock sides
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") FVector2D ClumpScale = FVector2D(1.3f, 2.2f);   // lush, knee-high anime grass
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossUnderGrass = 0.2f;     // chance of a moss cushion under each clump
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossOnSides = 0.f;           // how thickly moss covers rock sides
 
 	// ---- clouds ----
 	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") int32 CloudCount = 60;
-	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") float CloudNear = 5000.f;      // closest a new cloud appears (horizontally)
-	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") float CloudFar = 28000.f;       // clouds further than this are moved ahead
-	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") FVector2D CloudHeight = FVector2D(-9000.f, 3500.f);   // relative to you
+	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") float CloudNear = 15000.f;      // closest a new cloud appears (horizontally)
+	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") float CloudFar = 40000.f;       // clouds further than this are moved ahead
+	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") FVector2D CloudHeight = FVector2D(-16000.f, -5000.f);   // always well below you (one blocked the view, 14 Nov)   // relative to you
 	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") FVector2D CloudScale = FVector2D(1.5f, 4.f);
 	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") FVector Wind = FVector(60.f, 25.f, 0.f);
 

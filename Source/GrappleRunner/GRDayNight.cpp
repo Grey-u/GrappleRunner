@@ -141,6 +141,14 @@ void AGRDayNight::Tick(float DeltaSeconds)
 		const float Darkness = FMath::Clamp(FMath::Clamp((Progress - 0.6f) / 0.12f, 0.f, 1.f) + FMath::Clamp((0.08f - Progress) / 0.08f, 0.f, 1.f), 0.f, 1.f);
 		UKismetMaterialLibrary::SetScalarParameterValue(this, Params, TEXT("Night"), Darkness);
 	}
+	// The painterly trees light themselves from this (lime facing the sun, teal away): tell
+	// them where the sun is. (MPC_GRToon is made by Scripts/import_stylized.py.)
+	static TSoftObjectPtr<UMaterialParameterCollection> ToonParams(FSoftObjectPath(TEXT("/Game/GrappleRunner/Nature/MPC_GRToon.MPC_GRToon")));
+	if (UMaterialParameterCollection* ToonP = ToonParams.LoadSynchronous())
+	{
+		const FVector ToSun = -Dir.Vector();   // the light shines along Dir, so the sun is the other way
+		UKismetMaterialLibrary::SetVectorParameterValue(this, ToonP, TEXT("SunDir"), FLinearColor(ToSun.X, ToSun.Y, ToSun.Z, 0.f));
+	}
 	if (Fog.IsValid())
 	{
 		Fog->SetFogInscatteringColor(K.FogColor);

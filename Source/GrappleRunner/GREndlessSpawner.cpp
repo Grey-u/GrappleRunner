@@ -27,13 +27,18 @@ AGREndlessSpawner::AGREndlessSpawner()
 	{
 		IslandTypes.Add(TSoftClassPtr<AActor>(FSoftObjectPath(FString::Printf(
 			TEXT("/Game/Brushify/Meshes/FloatingIslands/FloatingIsland_0%d/BP_FloatingIsland_0%d.BP_FloatingIsland_0%d_C"), i, i, i))));
-		TreeMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(
-			TEXT("/Game/EuropeanBeech/Geometry/SimpleWind/SM_EuropeanBeech_Forest_0%d.SM_EuropeanBeech_Forest_0%d"), i, i))));
+	}
+	// Trees and bushes: our own painterly anime ones (make_painterly_trees.py), not photoscans.
+	for (const TCHAR* T : { TEXT("SM_GR_Tree_A"), TEXT("SM_GR_Tree_B"), TEXT("SM_GR_Tree_C") })
+	{
+		TreeMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(TEXT("/Game/GrappleRunner/Nature/%s.%s"), T, T))));
+	}
+	for (const TCHAR* B : { TEXT("SM_GR_LeafBush_A"), TEXT("SM_GR_LeafBush_B") })
+	{
+		FernMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(TEXT("/Game/GrappleRunner/Nature/%s.%s"), B, B))));
 	}
 	for (int32 i = 1; i <= 3; ++i)
 	{
-		FernMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(
-			TEXT("/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_0%d.SM_Fern_0%d"), i, i))));
 		RootMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(
 			TEXT("/Game/Brushify/Meshes/FloatingIslands/Dressing/Roots_0%d/S_Roots_0%d.S_Roots_0%d"), i, i, i))));
 	}
@@ -308,18 +313,23 @@ void AGREndlessSpawner::BuildChunk()
 			AddAnchorRock(Pick(RockMeshes), At + FVector(Rng.FRandRange(-200.f, 200.f), SideWays, Rng.FRandRange(-300.f, 300.f)),
 				Rng.FRandRange(AnchorSize.X, AnchorSize.Y) * 0.85f, C);
 		}
+		if (Rng.FRand() < HighRockChance)   // a higher rock above the line: more to swing on, and a high road
+		{
+			AddAnchorRock(Pick(RockMeshes), At + FVector(Rng.FRandRange(-300.f, 300.f), Rng.FRandRange(-700.f, 700.f), Rng.FRandRange(700.f, 1100.f)),
+				Rng.FRandRange(AnchorSize.X, AnchorSize.Y) * 0.8f, C);
+		}
 	}
 	if (bCave)
 	{
 		BuildCave(FMath::Lerp(LastTop, Top, CaveFrom), FMath::Lerp(LastTop, Top, CaveTo), C);
 	}
 
-	// ---- a gas canister to slice, at swinging height somewhere along the gap
-	if (Rng.FRand() < PodChance || bCave)
+	// ---- glowing gas canisters to slice, at swinging height along the gap (a cave gets one inside)
+	const int32 PodCount = Rng.RandRange(PodsPerGap.X, PodsPerGap.Y);
+	for (int32 i = 0; i < PodCount; ++i)
 	{
-		const float T = bCave ? 0.5f : Rng.FRandRange(0.3f, 0.75f);
-		const FVector At = FMath::Lerp(LastTop, Top, T) + FVector(0.f, Rng.FRandRange(-350.f, 350.f),
-			bCave ? 700.f : Rng.FRandRange(PodHeight.X, PodHeight.Y));
+		const float T = (i + Rng.FRandRange(0.25f, 0.75f)) / FMath::Max(1, PodCount);
+		const FVector At = FMath::Lerp(LastTop, Top, T) + FVector(0.f, Rng.FRandRange(-450.f, 450.f), Rng.FRandRange(PodHeight.X, PodHeight.Y));
 		if (AGRGasPod* Pod = GetWorld()->SpawnActor<AGRGasPod>(At, FRotator::ZeroRotator))
 		{
 			C.Actors.Add(Pod);
@@ -342,7 +352,7 @@ void AGREndlessSpawner::BuildChunk()
 	FVector Spot;
 	for (int32 i = 0; i < TreesPerIsland; ++i)
 	{
-		if (RandomTop(Spot) && SpawnMesh(Pick(TreeMeshes), Spot, FRotator(0.f, Rng.FRandRange(0.f, 360.f), 0.f), Rng.FRandRange(1300.f, 1700.f), true, C))
+		if (RandomTop(Spot) && SpawnMesh(Pick(TreeMeshes), Spot, FRotator(0.f, Rng.FRandRange(0.f, 360.f), 0.f), Rng.FRandRange(800.f, 1400.f), true, C))
 		{
 			TreeSpots.Add(Spot);
 		}
@@ -351,7 +361,7 @@ void AGREndlessSpawner::BuildChunk()
 	{
 		if (RandomTop(Spot))
 		{
-			SpawnMesh(Pick(FernMeshes), Spot, FRotator(0.f, Rng.FRandRange(0.f, 360.f), 0.f), Rng.FRandRange(80.f, 140.f), false, C);
+			SpawnMesh(Pick(FernMeshes), Spot, FRotator(0.f, Rng.FRandRange(0.f, 360.f), 0.f), Rng.FRandRange(110.f, 200.f), false, C);
 		}
 	}
 	if (RandomTop(Spot))
@@ -422,7 +432,7 @@ void AGREndlessSpawner::BuildCave(const FVector& From, const FVector& To, FChunk
 	const FVector Dir = (To - From).GetSafeNormal2D();
 	const FVector Right = FVector::CrossProduct(FVector::UpVector, Dir);
 	const float Length = static_cast<float>(FVector::Dist2D(From, To));
-	const float Radius = Rng.FRandRange(900.f, 1200.f);                  // 18-24 m across inside
+	const float Radius = Rng.FRandRange(1700.f, 2100.f);                 // 34-42 m across inside (was 18-24: too tight)
 	CaveCentres.Add(Mid);
 	for (float S = -Length * 0.5f; S <= Length * 0.5f; S += 520.f)
 	{
@@ -433,8 +443,11 @@ void AGREndlessSpawner::BuildCave(const FVector& From, const FVector& To, FChunk
 			const float A = FMath::DegreesToRadians(-150.f + k * 37.5f);
 			const FVector Out = FVector::UpVector * FMath::Cos(A) + Right * FMath::Sin(A);
 			const float Size = Rng.FRandRange(900.f, 1400.f);
-			const FVector At = RingCentre + Out * (Radius + Size * 0.35f);
-			AActor* Part = SpawnMesh(Pick(CaveMeshes), At, FRotator(Rng.FRandRange(0.f, 360.f), Rng.FRandRange(0.f, 360.f), Rng.FRandRange(0.f, 360.f)), -Size, true, Into);
+			const FVector At = RingCentre + Out * (Radius + Size * 0.6f);
+			// lay each rock's long side ALONG the ring (not pointing inward), so the opening stays clear
+			const FVector Round = FVector::CrossProduct(Dir, Out);
+			const FRotator Lie = FRotationMatrix::MakeFromZX(Round, Out).Rotator() + FRotator(0.f, 0.f, Rng.FRandRange(-20.f, 20.f));
+			AActor* Part = SpawnMesh(Pick(CaveMeshes), At, Lie, -Size, true, Into);
 			if (!Part)
 			{
 				continue;

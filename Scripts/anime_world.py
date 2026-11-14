@@ -17,7 +17,8 @@
 #       - HAZE: slight soft-blue atmospheric fog that thickens with distance (HazeAmount,
 #         HazeDistance = metres x100 for it to reach ~63%)
 #       - OUTLINES: thin coloured lines where depth jumps, near you only
-#       - CHARACTERS: a warm rim light round anyone with custom depth (you, the partner)
+#       - CHARACTERS (custom depth: you, the partner) are left out: they stay semi-realistic
+#         3D anime like Final Fantasy, no cel shading
 #  2. Puts it on both levels in place of M_GenshinToon / M_AnimeOutline, and thins the fog.
 #  3. PAPER ROCKS: finds rocks that are open shells (scanned cliff faces with no back, or
 #     flat slabs) and swaps each for a rock that's solid all the way round, the same size.
@@ -49,6 +50,10 @@ float3 lw = float3(0.299, 0.587, 0.114);
 float3 scene = SceneTextureLookup(uv, 14, false).rgb + (Scene.r + CD.r + BC.r + SD.r) * 0.0;
 float d = SceneTextureLookup(uvD, 1, false).r;
 float sky = d > 380000.0 ? 1.0 : 0.0;              // the sky dome is 4 km away
+// Characters (anything with custom depth: you, the partner, later other players) stay
+// semi-realistic 3D anime, like Final Fantasy: no toon, no outlines (Grey, 14 Nov).
+float cdep = SceneTextureLookup(uvC, 13, false).r;
+float isChar = (cdep < 100000.0 && cdep <= d + 5.0) ? 1.0 : 0.0;
 
 // 1. painterly (Kuwahara): of 4 little squares round the pixel, take the calmest one's average
 float3 pick = scene;
@@ -72,11 +77,12 @@ float best = 1e9;
 // 2. toon light: light = what you see / the surface's own colour, snapped to two tones
 float3 alb = pow(max(SceneTextureLookup(uvB, 5, false).rgb, 0.0001), 1.0 / 2.2);
 float shade = dot(pick, lw) / max(dot(alb, lw), 0.04);
-float band = smoothstep(Threshold - 0.08, Threshold + 0.08, shade);
+float band = smoothstep(Threshold - 0.04, Threshold + 0.04, shade);   // crisp cel edge
 float3 toon = alb * lerp(ShadowTint.rgb * ShadowLevel, float3(LitLevel, LitLevel, LitLevel), band);
-toon = lerp(toon, pick, 0.35);                      // keep a little real light so shapes read
+toon = lerp(toon, pick, 0.2);                       // keep a little real light so shapes read
 float nearW = 1.0 - smoothstep(FadeStart, FadeEnd, d);
 float3 col = lerp(pick, toon, ToonAmount * nearW * (1.0 - sky));
+col = lerp(col, scene, isChar);   // characters keep their own shading
 
 // 3. richer colour
 float g = dot(col, lw);
@@ -135,28 +141,20 @@ float t = SceneTextureLookup(uvD + float2(0, -pxD.y) * Thickness, 1, false).r;
 float b = SceneTextureLookup(uvD + float2(0,  pxD.y) * Thickness, 1, false).r;
 float mn = min(min(l, r), min(t, b)); float mx = max(max(l, r), max(t, b));
 float edge = saturate((mx - mn) / max(mn, 1.0) * 4.0 - EdgeThreshold) * (1.0 - smoothstep(2500.0, 6000.0, d)) * (1.0 - sky);
-col = lerp(col, col * 0.35 + Ink.rgb, edge * Outline);
+col = lerp(col, col * 0.35 + Ink.rgb, edge * Outline * (1.0 - isChar));
 
-// 7. characters: warm rim light (custom depth)
-float c = SceneTextureLookup(uvC, 13, false).r;
-float isChar = (c < 100000.0 && c <= d + 5.0) ? 1.0 : 0.0;
-float2 rp = pxC * 4.0;
-float farR = max(max(SceneTextureLookup(uvC + float2(-rp.x, 0), 13, false).r, SceneTextureLookup(uvC + float2(rp.x, 0), 13, false).r), SceneTextureLookup(uvC + float2(0, -rp.y), 13, false).r);
-float rim = isChar * saturate((farR - c) / max(c, 1.0) * 4.0 - 0.3);
-col += RimColor.rgb * rim * RimStrength;
 return col;
 """
 
 PARAMS = [  # name, kind, default
     ("Brush", "s", 1.0), ("Threshold", "s", 0.55), ("ShadowLevel", "s", 0.62), ("LitLevel", "s", 1.06),
-    ("ToonAmount", "s", 0.7), ("FadeStart", "s", 8000.0), ("FadeEnd", "s", 40000.0), ("Saturation", "s", 1.3),
+    ("ToonAmount", "s", 0.9), ("FadeStart", "s", 8000.0), ("FadeEnd", "s", 40000.0), ("Saturation", "s", 1.3),
     ("SkyAmount", "s", 1.0), ("CloudAmount", "s", 0.9), ("HazeAmount", "s", 0.55), ("HazeDistance", "s", 45000.0),
-    ("Thickness", "s", 1.0), ("EdgeThreshold", "s", 0.6), ("Outline", "s", 0.55), ("RimStrength", "s", 0.35),
+    ("Thickness", "s", 1.0), ("EdgeThreshold", "s", 0.6), ("Outline", "s", 0.55), 
     ("ShadowTint", "v", unreal.LinearColor(0.72, 0.80, 0.98, 1)),
     ("ZenithColor", "v", unreal.LinearColor(0.12, 0.40, 0.86, 1)),
     ("HorizonColor", "v", unreal.LinearColor(0.80, 0.92, 0.99, 1)),
     ("Ink", "v", unreal.LinearColor(0.03, 0.03, 0.06, 1)),
-    ("RimColor", "v", unreal.LinearColor(1.0, 0.94, 0.84, 1)),
 ]
 
 # ---------------- 1. the material ----------------

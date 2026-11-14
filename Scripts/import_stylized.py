@@ -11,6 +11,11 @@
 #    M_GR_Cloud     soft white clouds, lifted so their shadows stay pastel, not grey
 #    M_GR_Bird      wings flap up and down (wing tips marked by vertex alpha)
 #    M_GR_Butterfly the same, small and fast
+#    M_GR_ToonLeaves / M_GR_ToonBark  the painterly trees and leafy bushes (make_painterly_trees.py):
+#                   their own two-tone light from the sun direction (lime facing the sun, teal
+#                   away), painted leaf texture with see-through edges, wind sway
+#    MPC_GRToon     a 'parameter collection' holding the sun's direction; the day/night clock
+#                   (GRDayNight) updates it every frame so the trees' light follows the sun
 #  The game code (GRStylizedNature) then plants and flies them when a level starts.
 #
 #  TWEAKING: open a material in Content/GrappleRunner/Nature and change the numbers in its
@@ -80,11 +85,117 @@ def make_material(name, two_sided, glow, wpo_code=None, wpo_inputs=()):
 
 eal.make_directory(DEST)
 M = {
-    "Foliage": make_material("M_GR_Foliage", True, 0.18, WIND, ("A", "T", "P")),
-    "Cloud": make_material("M_GR_Cloud", False, 0.45),
-    "Bird": make_material("M_GR_Bird", True, 0.25, FLAP_BIRD, ("A", "T", "R")),
-    "Butterfly": make_material("M_GR_Butterfly", True, 0.3, FLAP_FLY, ("A", "T", "R")),
+    "Foliage": make_material("M_GR_Foliage", True, 0.0, WIND, ("A", "T", "P")),
+    "Cloud": make_material("M_GR_Cloud", False, 0.0),
+    "Bird": make_material("M_GR_Bird", True, 0.0, FLAP_BIRD, ("A", "T", "R")),
+    "Butterfly": make_material("M_GR_Butterfly", True, 0.0, FLAP_FLY, ("A", "T", "R")),
 }
+
+# ---- 1b. the painted leaf texture, the sun-direction collection, the toon tree materials ----
+TEX_SRC = os.path.join(SRC, "Textures", "T_GR_LeafBrush.png")
+tt = unreal.AssetImportTask()
+tt.set_editor_property("filename", TEX_SRC); tt.set_editor_property("destination_path", DEST)
+tt.set_editor_property("automated", True); tt.set_editor_property("replace_existing", True); tt.set_editor_property("save", True)
+tools.import_asset_tasks([tt])
+leaf_tex = unreal.load_asset(DEST + "/T_GR_LeafBrush")
+
+MPC_PATH = DEST + "/MPC_GRToon"
+if eal.does_asset_exist(MPC_PATH):
+    mpc = unreal.load_asset(MPC_PATH)
+else:
+    mpc = tools.create_asset("MPC_GRToon", DEST, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
+    vp = unreal.CollectionVectorParameter()
+    vp.set_editor_property("parameter_name", "SunDir")
+    vp.set_editor_property("default_value", unreal.LinearColor(0.45, -0.35, 0.82, 0.0))
+    mpc.set_editor_property("vector_parameters", [vp])
+    eal.save_loaded_asset(mpc)
+
+TOON = r"""
+float d = dot(normalize(N), normalize(S.xyz));          // facing the sun = 1, away = -1
+float lit = smoothstep(0.05, 0.16, d);                  // crisp edge between the two tones
+float mid = smoothstep(-0.10, 0.05, d) * (1.0 - lit);   // a thin mid tone just before the edge
+float3 c = lerp(Shadow.rgb, Lit.rgb, lit) + (lerp(Shadow.rgb, Lit.rgb, 0.5) - Shadow.rgb) * mid;
+return c * lerp(0.8, 1.05, Tex.r) * lerp(0.7, 1.0, AO.r);
+"""
+
+def toon_material(name, lit, shadow, leaves):
+    path = DEST + "/" + name
+    if eal.does_asset_exist(path):
+        return unreal.load_asset(path)
+    mat = tools.create_asset(name, DEST, unreal.Material, unreal.MaterialFactoryNew())
+    mat.set_editor_property("used_with_instanced_static_meshes", True)
+    if leaves:
+        mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+        mat.set_editor_property("two_sided", True)
+    vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -900, 0)
+    nrm = mel.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -900, 150)
+    sun = mel.create_material_expression(mat, unreal.MaterialExpressionCollectionParameter, -900, 250)
+    sun.set_editor_property("collection", mpc); sun.set_editor_property("parameter_name", "SunDir")
+    c = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -450, 0)
+    c.set_editor_property("code", TOON)
+    c.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    ins = []
+    for n in ("N", "S", "Tex", "AO", "Lit", "Shadow"):
+        ci = unreal.CustomInput(); ci.set_editor_property("input_name", n); ins.append(ci)
+    c.set_editor_property("inputs", ins)
+    mel.connect_material_expressions(nrm, "", c, "N")
+    mel.connect_material_expressions(sun, "", c, "S")
+    mel.connect_material_expressions(vc, "", c, "AO")
+    for i, (pname, val) in enumerate((("Lit", lit), ("Shadow", shadow))):
+        v = mel.create_material_expression(mat, unreal.MaterialExpressionVectorParameter, -900, 400 + i * 100)
+        v.set_editor_property("parameter_name", pname); v.set_editor_property("default_value", val)
+        mel.connect_material_expressions(v, "", c, pname)
+    if leaves:
+        tx = mel.create_material_expression(mat, unreal.MaterialExpressionTextureSample, -900, 650)
+        tx.set_editor_property("texture", leaf_tex)
+        mel.connect_material_expressions(tx, "", c, "Tex")
+        mel.connect_material_property(tx, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
+    else:
+        one = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -900, 650)
+        one.set_editor_property("r", 1.0)
+        mel.connect_material_expressions(one, "", c, "Tex")
+    mel.connect_material_property(c, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    glow = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -200, 150)
+    glow.set_editor_property("const_b", 0.0)            # no glow: the level's bright fixed exposure turned any glow white
+    mel.connect_material_expressions(c, "", glow, "A")
+    mel.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -200, 300)
+    rough.set_editor_property("r", 0.9)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    w = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -450, 500)
+    w.set_editor_property("code", WIND.replace("9.0", "14.0").replace("5.0", "8.0") if leaves else "return float3(0, 0, 0);")
+    w.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    wi = []
+    for n in ("A", "T", "P"):
+        ci = unreal.CustomInput(); ci.set_editor_property("input_name", n); wi.append(ci)
+    w.set_editor_property("inputs", wi)
+    mel.connect_material_expressions(vc, "A", w, "A")
+    mel.connect_material_expressions(mel.create_material_expression(mat, unreal.MaterialExpressionTime, -900, 800), "", w, "T")
+    mel.connect_material_expressions(mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -900, 900), "", w, "P")
+    mel.connect_material_property(w, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    return mat
+
+M["ToonLeaves"] = toon_material("M_GR_ToonLeaves", unreal.LinearColor(0.78, 1.0, 0.16, 1), unreal.LinearColor(0.20, 0.38, 0.42, 1), True)
+M["ToonBark"] = toon_material("M_GR_ToonBark", unreal.LinearColor(0.62, 0.54, 0.50, 1), unreal.LinearColor(0.30, 0.28, 0.32, 1), False)
+
+# ---- 1c. NO GLOW (14 Nov): the level uses a very bright fixed exposure, so even a little glow
+#      blew our colours out to white (white clouds, pale moss, invisible grass). Turn it off
+#      in materials made by earlier runs of this script too.
+for n in ("M_GR_Foliage", "M_GR_Cloud", "M_GR_Bird", "M_GR_Butterfly", "M_GR_ToonLeaves", "M_GR_ToonBark"):
+    m = unreal.load_asset(DEST + "/" + n)
+    if not m:
+        continue
+    try:
+        node = mel.get_material_property_input_node(m, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        if node and isinstance(node, unreal.MaterialExpressionMultiply):
+            node.set_editor_property("const_b", 0.0)
+            mel.recompile_material(m)
+            eal.save_loaded_asset(m)
+            print("no glow:", n)
+    except Exception as ex:
+        print("could not turn glow off in", n, ex)
 
 # ---- 2. meshes ----
 # Use the classic FBX importer for this (it keeps the options below exactly), then put the
@@ -103,6 +214,7 @@ for f in sorted(glob.glob(os.path.join(SRC, "*.fbx"))):
     sm.set_editor_property("vertex_color_import_option", unreal.VertexColorImportOption.REPLACE)
     sm.set_editor_property("auto_generate_collision", False)
     sm.set_editor_property("generate_lightmap_u_vs", False)
+    sm.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)   # keep the painted-look normals
     t = unreal.AssetImportTask()
     t.set_editor_property("filename", f)
     t.set_editor_property("destination_path", DEST)
@@ -121,6 +233,12 @@ for f in sorted(glob.glob(os.path.join(SRC, "*.fbx"))):
     mesh = unreal.load_asset(DEST + "/" + name)
     if not mesh:
         print("NOT IMPORTED:", name); continue
+    if name.startswith("SM_GR_Tree") or name.startswith("SM_GR_LeafBush"):
+        mesh.set_material(0, M["ToonBark"])      # slot 0 = trunk and branches
+        mesh.set_material(1, M["ToonLeaves"])    # slot 1 = leaf cards
+        eal.save_loaded_asset(mesh)
+        done += 1
+        continue
     kind = "Cloud" if "Cloud" in name else "Bird" if "Bird" in name else "Butterfly" if "Butterfly" in name else "Foliage"
     mesh.set_material(0, M[kind])
     eal.save_loaded_asset(mesh)

@@ -398,6 +398,10 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 	const float MossGap = Gap * 1.1f;
 	for (const FVector& Dir : Sides)
 	{
+		if (MossOnSides <= 0.f)
+		{
+			break;   // side moss is off (Grey didn't like it, 14 Nov)
+		}
 		const FVector Across(-Dir.Y, Dir.X, 0.f);
 		const float Wide = static_cast<float>(FMath::Abs(Across.X) * Extent.X + FMath::Abs(Across.Y) * Extent.Y);
 		const float Reach = static_cast<float>(FMath::Abs(Dir.X) * Extent.X + FMath::Abs(Dir.Y) * Extent.Y) + 50.f;
@@ -427,8 +431,8 @@ void AGRStylizedNature::PlaceCloud(int32 i, const FVector& Near, bool bFar)
 	FCloud& C = Clouds[i];
 	const float A = Rng.FRandRange(0.f, 2.f * PI);
 	const float D = bFar ? Rng.FRandRange(CloudFar * 0.75f, CloudFar * 0.95f) : Rng.FRandRange(CloudNear, CloudFar * 0.9f);
-	// Most clouds sit below you (a sea of clouds under the islands); a few are at your height.
-	const float Z = Rng.FRand() < 0.7f ? Rng.FRandRange(CloudHeight.X, CloudHeight.X * 0.3f) : Rng.FRandRange(CloudHeight.X * 0.3f, CloudHeight.Y);
+	// Clouds sit below you: a sea of clouds under the islands (never in your way).
+	const float Z = Rng.FRandRange(CloudHeight.X, CloudHeight.Y);
 	C.Pos = Near + FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, Z);
 	C.Scale = Rng.FRandRange(CloudScale.X, CloudScale.Y);
 	C.Yaw = Rng.FRandRange(0.f, 360.f);

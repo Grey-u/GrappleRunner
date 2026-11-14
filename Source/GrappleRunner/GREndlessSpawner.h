@@ -59,11 +59,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Endless") float SideDrift = 2500.f;                              // sideways wander
 	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D AnchorHeight = FVector2D(1100.f, 2100.f);
 	// 14 Nov (Naomi): more rocks, closer together, big enough to aim at easily.
-	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D AnchorSpacing = FVector2D(450.f, 950.f);   // was 7-16 m apart
+	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D AnchorSpacing = FVector2D(320.f, 650.f);   // 3-6.5 m apart (Grey: more to swing on)
 	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D AnchorSize = FVector2D(500.f, 850.f);      // rock width in cm (was 2.5-4.5 m)
-	UPROPERTY(EditAnywhere, Category = "Endless") float SideRockChance = 0.5f;   // chance of an extra rock off to one side, for choice
+	UPROPERTY(EditAnywhere, Category = "Endless") float SideRockChance = 0.85f;  // chance of an extra rock off to one side, for choice
+	UPROPERTY(EditAnywhere, Category = "Endless") float HighRockChance = 0.4f;   // chance of a higher rock above the line
 	// Gas canisters: the fuel you slice to keep going.
-	UPROPERTY(EditAnywhere, Category = "Endless") float PodChance = 0.8f;        // chance of a canister in each gap
+	UPROPERTY(EditAnywhere, Category = "Endless") FIntPoint PodsPerGap = FIntPoint(2, 3);   // glowing canisters in each gap (Grey: more of them)
 	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D PodHeight = FVector2D(500.f, 1100.f);   // above the island-to-island line
 	// Floating caves and tunnels: every few gaps, a tube of rock to swing through.
 	UPROPERTY(EditAnywhere, Category = "Endless") int32 CaveEvery = 3;          // one every 3 gaps
