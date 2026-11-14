@@ -25,6 +25,7 @@
 #include "Components/WidgetComponent.h"
 #include "Components/WidgetInteractionComponent.h"
 #include "Engine/Texture2D.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
@@ -556,6 +557,8 @@ void AGRMenu::Open()
 	Place();
 	Panel->SetVisibility(true);
 	Panel->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	Panel->SetCollisionResponseToAllChannels(ECR_Ignore);
+	Panel->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);   // only the pointer's ray stops on it
 	SelectCategory(Category);
 }
 
@@ -621,6 +624,11 @@ void AGRMenu::ReadInput()
 		bHit = GetWorld()->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params) && Hit.GetComponent() == Panel;
 	}
 	Pointer->SetCustomHitResult(bHit ? Hit : FHitResult());
+	if (GEngine && !R->IsUsingVR())
+	{
+		GEngine->AddOnScreenDebugMessage(4310, 0.f, FColor(160, 200, 140), bHit ? FString::Printf(TEXT("Menu: pointing at %.0f, %.0f"),
+			Hit.Location.X, Hit.Location.Y) : FString(TEXT("Menu: look at a button, left-click to pick it")));
+	}
 
 	// Click: left mouse on desktop, the right trigger in VR.
 	bool bDown = PC->IsInputKeyDown(EKeys::LeftMouseButton);
