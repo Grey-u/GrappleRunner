@@ -52,14 +52,14 @@ namespace
 
 	// Colours (Red, Green, Blue, see-through-ness 0..1)
 	// Dark mode (Naomi, 14 Nov): charcoal panels with a hint of green, light writing, sage highlights.
-	const FLinearColor PanelTint(0.035f, 0.045f, 0.04f, 0.90f);  // see-through charcoal panels
-	const FLinearColor Button(0.075f, 0.09f, 0.08f, 0.95f);     // round buttons and pills, a step lighter
+	const FLinearColor PanelTint(0.006f, 0.009f, 0.007f, 0.94f);   // see-through charcoal panels
+	const FLinearColor Button(0.018f, 0.024f, 0.02f, 0.97f);     // round buttons and pills, a step lighter
 	const FLinearColor TextMain(0.88f, 0.91f, 0.86f, 1.f);      // soft off-white writing
 	const FLinearColor IconGrey(0.62f, 0.68f, 0.60f, 1.f);      // icons that aren't picked
-	const FLinearColor SlotEmpty(0.05f, 0.06f, 0.055f, 0.9f);   // gear slots with nothing in them
+	const FLinearColor SlotEmpty(0.012f, 0.016f, 0.013f, 0.95f);  // gear slots with nothing in them
 	const FLinearColor Disabled(0.04f, 0.04f, 0.04f, 0.5f);     // greyed-out buttons (Party, for now)
 	const FLinearColor Divider(0.22f, 0.27f, 0.21f, 1.f);       // thin lines between sections
-	const FLinearColor HoverTint(0.16f, 0.22f, 0.13f, 0.97f);   // deep sage glow under the pointer
+	const FLinearColor HoverTint(0.06f, 0.095f, 0.045f, 0.98f);   // deep sage glow under the pointer
 
 	// Buttons with no look of their own (we paint the shapes ourselves, inside them).
 	const FButtonStyle& PlainButton()
@@ -115,8 +115,8 @@ AGRMenu::AGRMenu()
 	Panel->SetCollisionProfileName(TEXT("UI"));               // the pointer's ray can hit it
 	Panel->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // ...but only while it's open
 	Panel->SetVisibility(false);
-	// The scene's bright colour grade lifts a world-space panel a little; a slight dim keeps
-	// the dark panels properly dark.
+	// The scene's exposure brightens a world-space panel (more so in shade), so the colours
+	// above are set very dark to still read as dark on screen.
 	Panel->SetTintColorAndOpacity(FLinearColor(0.85f, 0.85f, 0.85f, 1.f));
 
 	// The pointer: we tell it exactly what it's pointing at each frame ("Custom").
@@ -300,7 +300,7 @@ TSharedRef<SWidget> AGRMenu::BuildStatusAndGear()
 				SNew(SOverlay)
 				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 40.f, 0.f, 0.f)
 				[
-					SNew(SImage).Image(BodyBrush.Get()).ColorAndOpacity(FLinearColor(0.20f, 0.24f, 0.19f, 0.95f))
+					SNew(SImage).Image(BodyBrush.Get()).ColorAndOpacity(FLinearColor(0.07f, 0.09f, 0.065f, 0.95f))
 				]
 				+ SOverlay::Slot() [ Gear ]
 				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(16.f, 0.f, 16.f, 20.f)
