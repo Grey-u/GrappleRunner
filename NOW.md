@@ -1,4 +1,4 @@
-# NOW (updated 14 Nov 2026)
+# NOW (updated 14 Nov 2026, afternoon)
 
 ## Works
 - UE 5.8.4 project (VR / OpenXR template), level `L_FloatingIslands_2`, start menu `L_MainMenu`, Endless Runner mode, day/night match clock, 4 planets, pollen/spores (`GRAmbientLife`), haptic glove bridge (`GRHandFeel`, untested without gloves).
@@ -7,6 +7,9 @@
 - 8,709 plants swapped to Project Nature photoscans in four colour zones, 680 glowing at night.
 
 ## Half done
+- **Endless run (14 Nov pm), built, needs a full play-test:** gas runs out, canisters to slice, gauge, closer rocks, caves, vault onto lower points, AI partner with CSV lines, start-up/menu flow, L_Endless. Check: the spawner says "active 1" in the log on L_Endless; canisters burst; vault feels right; partner keeps up; gauge readable.
+- **VR loading splash** still to add (its header moved in 5.8).
+- **Writer:** Naomi's film friend could replace the placeholder partner lines (brief in the portfolio doc).
 - **Menu (`GRMenu`, 14 Nov):** SAO-style floating menu, dark mode with sage-green highlights. Tab/M/VR menu button. Opens and renders correctly; hover + click now use our own hit test (`FindUnder`): confirm it in Play, then in the headset with the right-hand ray. Remove the temporary read-out if any remains.
 - **Characters:** Naomi wants semi-realistic anime (realistic shading on anime proportions), original characters. Options: a MetaHuman sculpted toward anime proportions with a custom groom, or a free stylised character from Fab. Not started; needs her pick.
 - **Blades work** (built and tested 12 Nov): key 1, LMB/V slash, RMB/C cross-cut, F9 slow motion. Cutting works on plants. Still to check by hand: felling a tree (2-5 hacks on the trunk), the grip with `GripSlide` 4, and how it feels at full speed with a real mouse.
