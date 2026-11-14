@@ -84,7 +84,7 @@ private:
 	int32 HoverEntry = -1;        // which list entry the pointer is over
 	int32 HoverSlot = -1;         // which gear slot the pointer is over
 	int32 HoverIcon = -1;         // which round icon the pointer is over
-	bool bPointerDown = false;    // VR trigger held last frame (to spot a fresh press)
+	bool bPointerDown = false;    // click button / trigger held last frame (to spot a fresh press)
 
 	// One row in the list on the right of the icons.
 	struct FEntry
@@ -113,4 +113,12 @@ private:
 	AGRArsenal* FindArsenal() const;
 	TSharedPtr<class SVerticalBox> ListBox;
 	void RefreshList();
+
+	// The clickable things, kept so we can test "is the pointer inside this one?" ourselves.
+	// (Slate's own hover/click events don't reach a panel floating in the 3D world reliably,
+	// so the menu does its own hit test: one rectangle check per button, every frame.)
+	TArray<TSharedPtr<SWidget>> IconButtons;   // the round icons, in category order
+	TArray<TSharedPtr<SWidget>> SlotButtons;   // the gear slot circles on the body outline
+	TArray<TSharedPtr<SWidget>> EntryButtons;  // the list pills (rebuilt with the list)
+	static int32 FindUnder(const TArray<TSharedPtr<SWidget>>& Buttons, const FVector2D& AbsolutePoint);
 };

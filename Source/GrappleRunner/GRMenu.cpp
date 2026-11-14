@@ -7,8 +7,10 @@
 //    BuildUI        the whole layout, left to right (status + gear | icons | list | info)
 //    SelectCategory fills the list for the round icon you picked
 //    Place          puts the panel 1.2 m in front of your eyes, facing you
-//    ReadInput      Tab / M / VR menu button opens and closes; clicks go to the pointer
-//    Tick           the pop-in animation, and moving the pointer to what you point at
+//    ReadInput      Tab / M / VR menu button opens and closes. Every frame it casts a ray
+//                   (centre of view on desktop, right hand in VR), finds which button the
+//                   ray lands on (FindUnder), and on a fresh click runs that button's action
+//    Tick           the pop-in animation
 //
 //  READING SLATE CODE
 //  Slate describes UI as nested boxes. "SNew(SVerticalBox) + SVerticalBox::Slot() [ ... ]"
@@ -49,12 +51,15 @@ namespace
 	const FVector2D PanelPixels(1600.f, 900.f);
 
 	// Colours (Red, Green, Blue, see-through-ness 0..1)
-	const FLinearColor PanelTint(0.94f, 0.94f, 0.95f, 0.96f); // soft white panels
-	const FLinearColor Button(0.97f, 0.97f, 0.98f, 0.97f);    // round buttons and pills
-	const FLinearColor TextDark(0.12f, 0.13f, 0.15f, 1.f);    // dark grey writing (the panel is brightened by the scene's lighting)
-	const FLinearColor IconGrey(0.32f, 0.33f, 0.37f, 1.f);
-	const FLinearColor SlotEmpty(0.80f, 0.80f, 0.83f, 0.9f);
-	const FLinearColor HoverTint(FColor(214, 228, 204));        // pale sage under the pointer
+	// Dark mode (Naomi, 14 Nov): charcoal panels with a hint of green, light writing, sage highlights.
+	const FLinearColor PanelTint(0.035f, 0.045f, 0.04f, 0.90f);  // see-through charcoal panels
+	const FLinearColor Button(0.075f, 0.09f, 0.08f, 0.95f);     // round buttons and pills, a step lighter
+	const FLinearColor TextMain(0.88f, 0.91f, 0.86f, 1.f);      // soft off-white writing
+	const FLinearColor IconGrey(0.62f, 0.68f, 0.60f, 1.f);      // icons that aren't picked
+	const FLinearColor SlotEmpty(0.05f, 0.06f, 0.055f, 0.9f);   // gear slots with nothing in them
+	const FLinearColor Disabled(0.04f, 0.04f, 0.04f, 0.5f);     // greyed-out buttons (Party, for now)
+	const FLinearColor Divider(0.22f, 0.27f, 0.21f, 1.f);       // thin lines between sections
+	const FLinearColor HoverTint(0.16f, 0.22f, 0.13f, 0.97f);   // deep sage glow under the pointer
 
 	// Buttons with no look of their own (we paint the shapes ourselves, inside them).
 	const FButtonStyle& PlainButton()
@@ -110,9 +115,9 @@ AGRMenu::AGRMenu()
 	Panel->SetCollisionProfileName(TEXT("UI"));               // the pointer's ray can hit it
 	Panel->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // ...but only while it's open
 	Panel->SetVisibility(false);
-	// The scene's bright lighting and colour grade wash a world-space panel out; dim it a
-	// little so white reads as soft white and the writing stays sharp.
-	Panel->SetTintColorAndOpacity(FLinearColor(0.62f, 0.62f, 0.64f, 1.f));
+	// The scene's bright colour grade lifts a world-space panel a little; a slight dim keeps
+	// the dark panels properly dark.
+	Panel->SetTintColorAndOpacity(FLinearColor(0.85f, 0.85f, 0.85f, 1.f));
 
 	// The pointer: we tell it exactly what it's pointing at each frame ("Custom").
 	Pointer = CreateDefaultSubobject<UWidgetInteractionComponent>(TEXT("Pointer"));
@@ -163,8 +168,8 @@ void AGRMenu::BuildBrushes()
 {
 	// Rounded boxes: white, so each use can tint them (white, sage green, grey).
 	CircleBrush = FSlateRoundedBoxBrush(FLinearColor::White, 52.f);
-	PillBrush = FSlateRoundedBoxBrush(FLinearColor::White, 29.f, FLinearColor(0.f, 0.f, 0.f, 0.08f), 1.f);
-	PanelBrush = FSlateRoundedBoxBrush(FLinearColor::White, 18.f, FLinearColor(1.f, 1.f, 1.f, 0.6f), 2.f);
+	PillBrush = FSlateRoundedBoxBrush(FLinearColor::White, 29.f, FLinearColor(1.f, 1.f, 1.f, 0.06f), 1.f);   // faint light rim
+	PanelBrush = FSlateRoundedBoxBrush(FLinearColor::White, 18.f, FLinearColor(0.55f, 0.65f, 0.47f, 0.45f), 2.f);   // thin sage rim
 	BarBackBrush = FSlateRoundedBoxBrush(FLinearColor(0.2f, 0.22f, 0.25f, 0.5f), 7.f);
 	BarBrush = FSlateRoundedBoxBrush(FLinearColor::White, 7.f);
 	WhiteBrush = FSlateRoundedBoxBrush(FLinearColor::White, 2.f);
@@ -218,11 +223,10 @@ TSharedRef<SWidget> AGRMenu::BuildStatusAndGear()
 	for (int32 i = 0; i < static_cast<int32>(UE_ARRAY_COUNT(GearSlots)); ++i)
 	{
 		const FGearSlot& G = GearSlots[i];
+		TSharedPtr<SButton> Btn;
 		Gear->AddSlot().Position(G.At).Size(FVector2D(60.f, 60.f))
 		[
-			SNew(SButton).ButtonStyle(&PlainButton())
-			.OnHovered_Lambda([this, i] { HoverSlot = i; })
-			.OnUnhovered_Lambda([this, i] { if (HoverSlot == i) { HoverSlot = -1; } })
+			SAssignNew(Btn, SButton).ButtonStyle(&PlainButton())
 			[
 				SNew(SImage).Image(&CircleBrush)
 				.ColorAndOpacity_Lambda([this, i]
@@ -237,6 +241,7 @@ TSharedRef<SWidget> AGRMenu::BuildStatusAndGear()
 				})
 			]
 		];
+		SlotButtons.Add(Btn);   // remembered for our own hit test
 	}
 
 	return SNew(SVerticalBox)
@@ -248,7 +253,7 @@ TSharedRef<SWidget> AGRMenu::BuildStatusAndGear()
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				SNew(STextBlock).Text(FText::FromString(PlayerName)).Font(Font(30, TEXT("Regular"))).ColorAndOpacity(TextDark)
+				SNew(STextBlock).Text(FText::FromString(PlayerName)).Font(Font(30, TEXT("Regular"))).ColorAndOpacity(TextMain)
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f, 0.f, 4.f)
 			[
@@ -275,7 +280,7 @@ TSharedRef<SWidget> AGRMenu::BuildStatusAndGear()
 			]
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				SNew(STextBlock).Font(Font(17)).ColorAndOpacity(TextDark)
+				SNew(STextBlock).Font(Font(17)).ColorAndOpacity(TextMain)
 				.Text_Lambda([this]
 				{
 					const AGrappleRig* R = Rig.Get();
@@ -295,12 +300,12 @@ TSharedRef<SWidget> AGRMenu::BuildStatusAndGear()
 				SNew(SOverlay)
 				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 40.f, 0.f, 0.f)
 				[
-					SNew(SImage).Image(BodyBrush.Get()).ColorAndOpacity(FLinearColor(0.72f, 0.73f, 0.77f, 0.9f))
+					SNew(SImage).Image(BodyBrush.Get()).ColorAndOpacity(FLinearColor(0.20f, 0.24f, 0.19f, 0.95f))
 				]
 				+ SOverlay::Slot() [ Gear ]
 				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(16.f, 0.f, 16.f, 20.f)
 				[
-					SNew(STextBlock).Font(Font(17)).ColorAndOpacity(TextDark).AutoWrapText(true).Justification(ETextJustify::Center)
+					SNew(STextBlock).Font(Font(17)).ColorAndOpacity(TextMain).AutoWrapText(true).Justification(ETextJustify::Center)
 					.Text_Lambda([this]
 					{
 						return HoverSlot >= 0 ? FText::FromString(GearSlots[HoverSlot].Name) : LOCTEXT("GearHint", "Point at a slot");
@@ -318,12 +323,10 @@ TSharedRef<SWidget> AGRMenu::BuildIconColumn()
 	for (int32 i = 0; i < NumCategories; ++i)
 	{
 		const bool bEnabled = i != 1;   // Party comes with multiplayer
+		TSharedPtr<SButton> Btn;
 		Column->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 14.f)
 		[
-			SNew(SButton).ButtonStyle(&PlainButton()).IsEnabled(bEnabled)
-			.OnClicked_Lambda([this, i] { SelectCategory(i); return FReply::Handled(); })
-			.OnHovered_Lambda([this, i] { HoverIcon = i; })
-			.OnUnhovered_Lambda([this, i] { if (HoverIcon == i) { HoverIcon = -1; } })
+			SAssignNew(Btn, SButton).ButtonStyle(&PlainButton()).IsEnabled(bEnabled)
 			[
 				SNew(SBox).WidthOverride(96.f).HeightOverride(96.f)
 				[
@@ -334,7 +337,7 @@ TSharedRef<SWidget> AGRMenu::BuildIconColumn()
 						{
 							if (Category == i) { return FSlateColor(Accent); }
 							if (HoverIcon == i) { return FSlateColor(HoverTint); }
-							return FSlateColor(bEnabled ? Button : FLinearColor(0.85f, 0.85f, 0.87f, 0.6f));
+							return FSlateColor(bEnabled ? Button : Disabled);
 						})
 					]
 					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
@@ -347,6 +350,7 @@ TSharedRef<SWidget> AGRMenu::BuildIconColumn()
 				]
 			]
 		];
+		IconButtons.Add(Btn);   // remembered for our own hit test (click handled in ReadInput)
 	}
 	return Column;
 }
@@ -377,22 +381,14 @@ void AGRMenu::RefreshList()
 		return;
 	}
 	ListBox->ClearChildren();
+	EntryButtons.Reset();
 	HoverEntry = -1;
 	for (int32 i = 0; i < Entries.Num(); ++i)
 	{
+		TSharedPtr<SButton> Btn;
 		ListBox->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)
 		[
-			SNew(SButton).ButtonStyle(&PlainButton())
-			.OnClicked_Lambda([this, i]
-			{
-				if (Entries.IsValidIndex(i) && Entries[i].Action)
-				{
-					Entries[i].Action();
-				}
-				return FReply::Handled();
-			})
-			.OnHovered_Lambda([this, i] { HoverEntry = i; })
-			.OnUnhovered_Lambda([this, i] { if (HoverEntry == i) { HoverEntry = -1; } })
+			SAssignNew(Btn, SButton).ButtonStyle(&PlainButton())
 			[
 				SNew(SBorder).BorderImage(&PillBrush).Padding(FMargin(26.f, 0.f)).VAlign(VAlign_Center)
 				.BorderBackgroundColor_Lambda([this, i]
@@ -407,12 +403,13 @@ void AGRMenu::RefreshList()
 						.ColorAndOpacity_Lambda([this, i]
 						{
 							const bool bOn = Entries.IsValidIndex(i) && Entries[i].IsOn && Entries[i].IsOn();
-							return FSlateColor(bOn ? FLinearColor::White : TextDark);
+							return FSlateColor(bOn ? FLinearColor::White : TextMain);
 						})
 					]
 				]
 			]
 		];
+		EntryButtons.Add(Btn);   // remembered for our own hit test (click handled in ReadInput)
 	}
 }
 
@@ -431,7 +428,7 @@ TSharedRef<SWidget> AGRMenu::BuildInfo()
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 			[
-				SNew(STextBlock).Font(Font(28, TEXT("Regular"))).ColorAndOpacity(TextDark)
+				SNew(STextBlock).Font(Font(28, TEXT("Regular"))).ColorAndOpacity(TextMain)
 				.Text_Lambda([this]
 				{
 					return Entries.IsValidIndex(HoverEntry) ? Entries[HoverEntry].Label : LOCTEXT("QuestTitle", "Quest");
@@ -440,11 +437,11 @@ TSharedRef<SWidget> AGRMenu::BuildInfo()
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f)
 		[
-			SNew(SBox).HeightOverride(2.f) [ SNew(SImage).Image(&WhiteBrush).ColorAndOpacity(FLinearColor(0.75f, 0.76f, 0.8f, 1.f)) ]
+			SNew(SBox).HeightOverride(2.f) [ SNew(SImage).Image(&WhiteBrush).ColorAndOpacity(Divider) ]
 		]
 		+ SVerticalBox::Slot().FillHeight(1.f)
 		[
-			SNew(STextBlock).Font(Font(20)).ColorAndOpacity(TextDark).AutoWrapText(true)
+			SNew(STextBlock).Font(Font(20)).ColorAndOpacity(TextMain).AutoWrapText(true)
 			.Text_Lambda([this]
 			{
 				return Entries.IsValidIndex(HoverEntry) ? Entries[HoverEntry].Info
@@ -564,18 +561,13 @@ void AGRMenu::Open()
 
 void AGRMenu::Close()
 {
-	AGrappleRig* R = Rig.Get();
 	if (!bOpen)
 	{
 		return;
 	}
 	bOpen = false;
-	Panel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	if (Pointer)
-	{
-		Pointer->ReleasePointerKey(EKeys::LeftMouseButton);
-	}
-	(void)R;
+	Panel->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // the ray passes through it again
+	HoverIcon = HoverSlot = HoverEntry = -1;
 }
 
 // =====================================================================================
@@ -626,7 +618,19 @@ void AGRMenu::ReadInput()
 	}
 	Pointer->SetCustomHitResult(bHit ? Hit : FHitResult());
 
-	// Click: left mouse on desktop, the right trigger in VR.
+	// Which button is under the pointer? Get2DHitLocation is the spot on the panel in
+	// pixels (0..1600 across, 0..900 down). We turn that into Slate's "absolute" space and
+	// check each button's rectangle.
+	HoverIcon = HoverSlot = HoverEntry = -1;
+	if (bHit && Root.IsValid())
+	{
+		const FVector2D Abs = Root->GetTickSpaceGeometry().LocalToAbsolute(Pointer->Get2DHitLocation());
+		HoverIcon = FindUnder(IconButtons, Abs);
+		HoverSlot = FindUnder(SlotButtons, Abs);
+		HoverEntry = FindUnder(EntryButtons, Abs);
+	}
+
+	// Click: left mouse on desktop, the right trigger in VR. We act on the moment it goes down.
 	bool bDown = PC->IsInputKeyDown(EKeys::LeftMouseButton);
 	for (const TCHAR* Name : { TEXT("Vive_Right_Trigger_Click"), TEXT("OculusTouch_Right_Trigger_Click"), TEXT("MotionController_Right_Trigger") })
 	{
@@ -635,23 +639,28 @@ void AGRMenu::ReadInput()
 	}
 	if (bDown && !bPointerDown)
 	{
-		Pointer->PressPointerKey(EKeys::LeftMouseButton);
-	}
-	else if (!bDown && bPointerDown)
-	{
-		Pointer->ReleasePointerKey(EKeys::LeftMouseButton);
+		if (HoverIcon >= 0 && IconButtons[HoverIcon]->IsEnabled())
+		{
+			SelectCategory(HoverIcon);                     // switch the list to that icon's category
+		}
+		else if (Entries.IsValidIndex(HoverEntry) && Entries[HoverEntry].Action)
+		{
+			Entries[HoverEntry].Action();                  // e.g. equip that weapon
+		}
 	}
 	bPointerDown = bDown;
+}
 
-	// Temporary test read-out (top-left on desktop): where on the panel you're pointing, in pixels.
-	if (GEngine && !R->IsUsingVR())
+int32 AGRMenu::FindUnder(const TArray<TSharedPtr<SWidget>>& Buttons, const FVector2D& AbsolutePoint)
+{
+	for (int32 i = 0; i < Buttons.Num(); ++i)
 	{
-		const FVector2D Px = Pointer->Get2DHitLocation();
-		GEngine->AddOnScreenDebugMessage(4310, 0.f, FColor(160, 200, 140), bHit
-			? FString::Printf(TEXT("Menu: panel pixel %.0f, %.0f  over button %d  entry %d icon %d  click %d"),
-				Px.X, Px.Y, Pointer->IsOverInteractableWidget() ? 1 : 0, HoverEntry, HoverIcon, bDown ? 1 : 0)
-			: FString(TEXT("Menu: look at a button, left-click to pick it")));
+		if (Buttons[i].IsValid() && Buttons[i]->GetTickSpaceGeometry().IsUnderLocation(AbsolutePoint))
+		{
+			return i;
+		}
 	}
+	return -1;
 }
 
 void AGRMenu::Tick(float DeltaSeconds)
