@@ -290,3 +290,9 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - Clouds only 150-400 m away and 50-160 m below you. Grass clumps bigger (knee-high). Side moss off, less moss under grass (Grey: moss looked terrible).
 - **More to swing on:** rocks 3-6.5 m apart (was 4.5-9.5), a side rock 85% of the time, a higher rock 40%. **2-3 glowing canisters per gap** (was 0-1). **Caves** 34-42 m wide inside (was 18-24) with the rocks lying along the ring instead of poking in.
 - **Characters** (you, the partner, later players) are left out of the toon post-process: Grey wants them semi-realistic 3D anime, like Final Fantasy. Toon on the world is stronger and crisper.
+
+## 14 Nov 2026 (night, 4): Grey's Fab packs, loot, gas warning
+- **StyleHex Stylized Forest pack** (added by Grey): its grass clumps (5), flower clumps (3), bushes and stones now carpet the islands and rocks, sized by height (knee-high grass); its birch and broadleaf trees and bushes are mixed with our painterly ones on endless islands. Our own meshes are the fallback if the pack is missing.
+- **Loot** (MayuOrbs + Free Spells packs): new `GRLootOrb`, a glowing Niagara orb that homes in on you within 9 m and gives 4 gas. A sliced canister now bursts with the Free Spells explosion and drops 3 orbs; half the gaps have a trail of 6 orbs on a swing arc; distance milestones (100, 250, 500 m, every 500 m) play the level-up effect. Orbs collected show on the distance line. Build.cs now uses Niagara.
+- **Gas warning:** the edges of the view pulse orange at 25% gas or less, and flash red faster at 10% or empty (GRGasGauge -> MPC_GRToon GasWarn -> M_AnimeWorld).
+- Floating weapon display racks removed from the levels (anime_world.py). Texture streaming pool raised to 3 GB.

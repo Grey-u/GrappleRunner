@@ -20,6 +20,8 @@
 #       - CHARACTERS (custom depth: you, the partner) are left out: they stay semi-realistic
 #         3D anime like Final Fantasy, no cel shading
 #  2. Puts it on both levels in place of M_GenshinToon / M_AnimeOutline, and thins the fog.
+#     Also removes the floating weapon display racks (Grey, 14 Nov), and draws the gas warning
+#     (orange / red glow round the edges of the view, from MPC_GRToon GasWarn).
 #  3. PAPER ROCKS: finds rocks that are open shells (scanned cliff faces with no back, or
 #     flat slabs) and swaps each for a rock that's solid all the way round, the same size.
 #
@@ -143,6 +145,11 @@ float mn = min(min(l, r), min(t, b)); float mx = max(max(l, r), max(t, b));
 float edge = saturate((mx - mn) / max(mn, 1.0) * 4.0 - EdgeThreshold) * (1.0 - smoothstep(2500.0, 6000.0, d)) * (1.0 - sky);
 col = lerp(col, col * 0.35 + Ink.rgb, edge * Outline * (1.0 - isChar));
 
+// 8. gas warning: the edges of the view glow orange (low) or flash red (nearly empty).
+//    GW comes from MPC_GRToon "GasWarn", set every frame by the gas gauge (GRGasGauge).
+float2 e = (VP.xy - 0.5) * 2.0;
+float vig = smoothstep(0.55, 1.15, length(e * float2(1.0, 0.9)));
+col = lerp(col, GW.rgb, saturate(vig * GW.a * 1.6));
 return col;
 """
 
@@ -157,6 +164,21 @@ PARAMS = [  # name, kind, default
     ("Ink", "v", unreal.LinearColor(0.03, 0.03, 0.06, 1)),
 ]
 
+# ---------------- 0. the parameter collection: the gas warning colour lives here ----------------
+MPC_PATH = "/Game/GrappleRunner/Nature/MPC_GRToon"
+mpc = unreal.load_asset(MPC_PATH)
+if not mpc:
+    mpc = unreal.AssetToolsHelpers.get_asset_tools().create_asset("MPC_GRToon", "/Game/GrappleRunner/Nature", unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
+vps = list(mpc.get_editor_property("vector_parameters"))
+have = [str(v.get_editor_property("parameter_name")) for v in vps]
+for pname, val in (("SunDir", unreal.LinearColor(0.45, -0.35, 0.82, 0.0)), ("GasWarn", unreal.LinearColor(0, 0, 0, 0))):
+    if pname not in have:
+        v = unreal.CollectionVectorParameter()
+        v.set_editor_property("parameter_name", pname); v.set_editor_property("default_value", val)
+        vps.append(v)
+mpc.set_editor_property("vector_parameters", vps)
+eal.save_loaded_asset(mpc)
+
 # ---------------- 1. the material ----------------
 path = MAT_DIR + "/M_AnimeWorld"
 if eal.does_asset_exist(path):
@@ -169,7 +191,7 @@ for name in ("BL_SCENE_COLOR_AFTER_TONEMAPPING", "BL_AFTER_TONEMAPPING"):
 custom = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -350, 0)
 custom.set_editor_property("code", CODE)
 custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-names = ["Scene", "CD", "BC", "SD", "V", "T"] + [p[0] for p in PARAMS]
+names = ["Scene", "CD", "BC", "SD", "V", "T", "VP", "GW"] + [p[0] for p in PARAMS]
 ins = []
 for n in names:
     ci = unreal.CustomInput(); ci.set_editor_property("input_name", n); ins.append(ci)
@@ -183,6 +205,11 @@ cam = mel.create_material_expression(mat, unreal.MaterialExpressionCameraVectorW
 mel.connect_material_expressions(cam, "", custom, "V")
 tm = mel.create_material_expression(mat, unreal.MaterialExpressionTime, -900, y); y += 100
 mel.connect_material_expressions(tm, "", custom, "T")
+sp = mel.create_material_expression(mat, unreal.MaterialExpressionScreenPosition, -900, y); y += 100
+mel.connect_material_expressions(sp, "ViewportUV", custom, "VP")
+gw = mel.create_material_expression(mat, unreal.MaterialExpressionCollectionParameter, -900, y); y += 100
+gw.set_editor_property("collection", mpc); gw.set_editor_property("parameter_name", "GasWarn")
+mel.connect_material_expressions(gw, "", custom, "GW")
 for name, kind, value in PARAMS:
     cls = unreal.MaterialExpressionScalarParameter if kind == "s" else unreal.MaterialExpressionVectorParameter
     e = mel.create_material_expression(mat, cls, -900, y); y += 90
@@ -259,6 +286,15 @@ for lvl in LEVELS:
         continue
     lsub.load_level(lvl)
     actors = asub.get_all_level_actors()
+    # the floating weapons (old display racks from import_weapons / import_skin_weapons): Grey asked to remove them
+    gone = 0
+    for a in list(actors):
+        lab = a.get_actor_label()
+        if lab.startswith("Rack_") or lab.startswith("Display_"):
+            asub.destroy_actor(a); gone += 1
+    if gone:
+        log("removed %d floating weapon displays" % gone)
+        actors = asub.get_all_level_actors()
     # post-process + fog
     for a in actors:
         if isinstance(a, unreal.PostProcessVolume):

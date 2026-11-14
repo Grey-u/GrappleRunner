@@ -13,6 +13,8 @@
 //  "_Lambda([this]{ ... })" = worked out again every frame, so the bar can move live.
 // =====================================================================================
 #include "GRGasGauge.h"
+#include "Kismet/KismetMaterialLibrary.h"
+#include "Materials/MaterialParameterCollection.h"
 #include "GrappleRig.h"
 
 #include "Brushes/SlateRoundedBoxBrush.h"
@@ -149,6 +151,27 @@ void AGRGasGauge::Tick(float DeltaSeconds)
 	}
 	LastGas = R->GetGas();
 	Shown = FMath::FInterpTo(Shown, Real, DeltaSeconds, Real > Shown ? 6.f : 20.f);
+
+	// Screen-edge warning (Grey, 14 Nov): the edges of your view pulse ORANGE when the tank is
+	// low (25% or less) and flash RED, faster, when it's nearly or completely empty (10% or
+	// less). The anime post-process (anime_world.py) draws it; this just says what colour and
+	// how strong, through MPC_GRToon's "GasWarn" (rgb = colour, a = strength).
+	static TSoftObjectPtr<UMaterialParameterCollection> ToonParams(FSoftObjectPath(TEXT("/Game/GrappleRunner/Nature/MPC_GRToon.MPC_GRToon")));
+	if (UMaterialParameterCollection* ToonP = ToonParams.LoadSynchronous())
+	{
+		FLinearColor Warn(0.f, 0.f, 0.f, 0.f);
+		if (Real <= 0.10f)
+		{
+			const float Pulse = 0.5f + 0.5f * FMath::Sin(Clock * 14.f);
+			Warn = FLinearColor(1.f, 0.08f, 0.04f, 0.15f + 0.65f * Pulse);
+		}
+		else if (Real <= 0.25f)
+		{
+			const float Pulse = 0.5f + 0.5f * FMath::Sin(Clock * 6.f);
+			Warn = FLinearColor(1.f, 0.5f, 0.05f, 0.45f * Pulse);
+		}
+		UKismetMaterialLibrary::SetVectorParameterValue(this, ToonP, TEXT("GasWarn"), Warn);
+	}
 
 	// Where it goes. VR: on the left wrist. Desktop: low in front of your body.
 	const FVector EyeAt = Eyes->GetComponentLocation();

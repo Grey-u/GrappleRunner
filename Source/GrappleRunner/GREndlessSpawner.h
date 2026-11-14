@@ -64,6 +64,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Endless") float SideRockChance = 0.85f;  // chance of an extra rock off to one side, for choice
 	UPROPERTY(EditAnywhere, Category = "Endless") float HighRockChance = 0.4f;   // chance of a higher rock above the line
 	// Gas canisters: the fuel you slice to keep going.
+	UPROPERTY(EditAnywhere, Category = "Endless") float OrbTrailChance = 0.5f;   // chance of a trail of loot orbs in a gap
 	UPROPERTY(EditAnywhere, Category = "Endless") FIntPoint PodsPerGap = FIntPoint(2, 3);   // glowing canisters in each gap (Grey: more of them)
 	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D PodHeight = FVector2D(500.f, 1100.f);   // above the island-to-island line
 	// Floating caves and tunnels: every few gaps, a tube of rock to swing through.
@@ -99,6 +100,7 @@ private:
 	TWeakObjectPtr<AGrappleRig> Rig;
 	bool bActive = false;
 	bool bPartnerWanted = false;   // "?partner=1": spawn the AI partner
+	int32 LastMilestone = 0;        // the last distance milestone celebrated (m)
 	FVector StartTop = FVector::ZeroVector;     // top of the last hand-built island: the endless route starts after it
 	FVector LastTop = FVector::ZeroVector;      // top of the last island built
 	float StartX = 0.f;

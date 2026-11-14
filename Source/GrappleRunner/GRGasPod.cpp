@@ -13,8 +13,11 @@
 #include "GRGasPod.h"
 #include "GrappleRig.h"
 #include "GRGasGauge.h"
+#include "GRLootOrb.h"
 
 #include "Components/PointLightComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Components/StaticMeshComponent.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -128,8 +131,25 @@ void AGRGasPod::Burst(const FLinearColor& Colour)
 	BurstMat->SetScalarParameterValue(TEXT("Glow"), 25.f);   // much brighter than the canister: a flash of light
 	UStaticMesh* Ball = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 
-	// Throw out the bits: each one gets a random direction, mostly sideways and up.
 	const FVector Centre = Body->GetComponentLocation();
+
+	// A proper magic burst on top (Free Spells pack), and LOOT: a few orbs pop out and then
+	// fly to you (each a little more gas). Missing packs are simply skipped.
+	if (UNiagaraSystem* Fx = LoadObject<UNiagaraSystem>(nullptr, TEXT("/Game/Free_Spells/VFX_Niagara/NS_Free_Spells_Explosion.NS_Free_Spells_Explosion")))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), Fx, Centre, FRotator::ZeroRotator, FVector(0.8f));
+	}
+	for (int32 i = 0; i < LootDrops; ++i)
+	{
+		if (AGRLootOrb* Orb = GetWorld()->SpawnActor<AGRLootOrb>(Centre, FRotator::ZeroRotator))
+		{
+			FVector Out = FMath::VRand();
+			Out.Z = FMath::Abs(Out.Z) * 0.8f + 0.2f;
+			Orb->Launch(Out.GetSafeNormal() * FMath::FRandRange(500.f, 900.f));
+		}
+	}
+
+	// Throw out the bits: each one gets a random direction, mostly sideways and up.
 	for (int32 i = 0; i < Sparks; ++i)
 	{
 		UStaticMeshComponent* B = NewObject<UStaticMeshComponent>(this);

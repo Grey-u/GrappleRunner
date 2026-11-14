@@ -18,8 +18,10 @@
 //       material, see make_stylized_meshes.py: the wing tips are marked to move).
 //    4. BUTTERFLIES: flutter over the grass near you.
 //
-//  The meshes are our own, made from scratch by Scripts/make_stylized_meshes.py (Blender)
-//  and brought into Unreal by Scripts/import_stylized.py, which also makes their materials.
+//  Grass, flowers, bushes and stones come from the StyleHex "Stylized Forest" pack Grey added
+//  (14 Nov), sized by height so they're knee-high whatever their native size. If the pack is
+//  missing, our own meshes are used instead (Scripts/make_stylized_meshes.py, brought in by
+//  Scripts/import_stylized.py). Clouds, birds, butterflies and moss are always our own.
 //
 //  HOW IT STAYS FAST (VR needs 90 frames a second)
 //  Every kind of mesh is ONE "instanced" component: the graphics card draws thousands of
@@ -68,7 +70,6 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") int32 MaxClumps = 90000;         // safety cap on the whole level
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassCullStart = 5500.f;   // grass starts fading out here...
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassCullEnd = 8000.f;     // ...and is gone here
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") FVector2D ClumpScale = FVector2D(1.3f, 2.2f);   // lush, knee-high anime grass
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossUnderGrass = 0.2f;     // chance of a moss cushion under each clump
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossOnSides = 0.f;           // how thickly moss covers rock sides
 
@@ -97,11 +98,11 @@ protected:
 
 private:
 	// What one grass "spot" becomes.
-	enum class EKind : uint8 { Grass, Tall, FlowerPink, FlowerWhite, FlowerYellow, FlowerBlue, Bush, StoneA, StoneB, MossA, MossB, Count };
+	enum class EKind : uint8 { Grass, Tall, FlowerPink, FlowerWhite, FlowerYellow, FlowerBlue, Bush, StoneA, StoneB, MossA, MossB, Grass2, Grass3, Grass4, Grass5, Count };
 
 	UStaticMesh* MeshFor(EKind Kind) const;
 	EKind PickKind(const FVector& At);
-	FTransform ClumpTransform(const FVector& At, const FVector& Normal);
+	FTransform ClumpTransform(const FVector& At, const FVector& Normal, EKind Kind);
 	FTransform MossTransform(const FVector& At, const FVector& Normal);   // lies flat on any slope
 	UInstancedStaticMeshComponent* MakeInstancer(UStaticMesh* Mesh, USceneComponent* AttachTo, bool bHierarchical, bool bShadows, float CullStart, float CullEnd);
 	void ScatterOnLevel();
@@ -109,6 +110,7 @@ private:
 	void PlaceCloud(int32 i, const FVector& Near, bool bFar);
 
 	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMesh>> Meshes;                          // by EKind
+	TArray<float> KindScale;                                                             // by EKind: size so it's the right height
 	UPROPERTY(Transient) TArray<TObjectPtr<UInstancedStaticMeshComponent>> LevelGrass;     // by EKind
 	TArray<FVector> Spots;                                            // where grass was planted (butterflies visit)
 	int32 Planted = 0;

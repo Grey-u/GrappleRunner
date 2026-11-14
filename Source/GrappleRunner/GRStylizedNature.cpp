@@ -12,15 +12,45 @@
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/Paths.h"
 
 TWeakObjectPtr<AGRStylizedNature> AGRStylizedNature::Instance;
 
 namespace
 {
-	// Where import_stylized.py puts the meshes, in EKind order.
-	const TCHAR* KindMeshNames[] = { TEXT("SM_GR_Grass"), TEXT("SM_GR_GrassTall"), TEXT("SM_GR_Flowers_Pink"),
-		TEXT("SM_GR_Flowers_White"), TEXT("SM_GR_Flowers_Yellow"), TEXT("SM_GR_Flowers_Blue"), TEXT("SM_GR_Bush"),
-		TEXT("SM_GR_Rock_A"), TEXT("SM_GR_Rock_B"), TEXT("SM_GR_Moss_A"), TEXT("SM_GR_Moss_B") };
+	// What each kind of plant is, in EKind order: the StyleHex Stylized Forest pack first, our
+	// own mesh as the fallback, and how tall it should end up (cm; negative = keep its size).
+	struct FKindSource { const TCHAR* Pack; const TCHAR* Ours; float Height; };
+	#define GR_SH(N) TEXT("/Game/StyleHex_Studio/Free_Packs/FREE_Stylized_Forest_Sample/Meshes/") TEXT(N)
+	const FKindSource KindSources[] = {
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_1"), TEXT("SM_GR_Grass"), 60.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_GrassTall"), 100.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_1"), TEXT("SM_GR_Flowers_Pink"), 60.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_2"), TEXT("SM_GR_Flowers_White"), 60.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_3"), TEXT("SM_GR_Flowers_Yellow"), 60.f },
+		{ nullptr, TEXT("SM_GR_Flowers_Blue"), 60.f },
+		{ GR_SH("Foliage/SM_Fol_Bush_1"), TEXT("SM_GR_Bush"), 150.f },
+		{ GR_SH("Stones/SM_Stone_1"), TEXT("SM_GR_Rock_A"), 80.f },
+		{ GR_SH("Stones/SM_Stone_2"), TEXT("SM_GR_Rock_B"), 110.f },
+		{ nullptr, TEXT("SM_GR_Moss_A"), -1.f },
+		{ nullptr, TEXT("SM_GR_Moss_B"), -1.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_2"), TEXT("SM_GR_Grass"), 60.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_4"), TEXT("SM_GR_Grass"), 70.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_5"), TEXT("SM_GR_Grass"), 55.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_Grass"), 65.f },   // the tall clump, kept short
+	};
+	#undef GR_SH
+
+	UStaticMesh* LoadPackMesh(const TCHAR* Path)
+	{
+		if (!Path)
+		{
+			return nullptr;
+		}
+		const FString P(Path);
+		const FString Name = FPaths::GetBaseFilename(P);
+		return LoadObject<UStaticMesh>(nullptr, *(P + TEXT(".") + Name));
+	}
 	const TCHAR* CloudNames[] = { TEXT("SM_GR_Cloud_A"), TEXT("SM_GR_Cloud_B"), TEXT("SM_GR_Cloud_C") };
 	const TCHAR* ButterflyNames[] = { TEXT("SM_GR_Butterfly_Pink"), TEXT("SM_GR_Butterfly_Blue"), TEXT("SM_GR_Butterfly_Yellow") };
 
@@ -117,16 +147,18 @@ AGRStylizedNature::EKind AGRStylizedNature::PickKind(const FVector& At)
 	{
 		return EKind::Tall;
 	}
-	return EKind::Grass;
+	const int32 G = Rng.RandRange(0, 4);   // one of the five grass clumps
+	return G == 0 ? EKind::Grass : static_cast<EKind>(static_cast<int32>(EKind::Grass2) + G - 1);
 }
 
 // Random turn and size; tilted halfway towards the slope so clumps hug the ground.
-FTransform AGRStylizedNature::ClumpTransform(const FVector& At, const FVector& Normal)
+FTransform AGRStylizedNature::ClumpTransform(const FVector& At, const FVector& Normal, EKind Kind)
 {
 	const FVector Up = (FVector::UpVector + Normal).GetSafeNormal();
 	const FQuat Tilt = FQuat::FindBetweenNormals(FVector::UpVector, Up);
 	const FQuat Spin(FVector::UpVector, Rng.FRandRange(0.f, 2.f * PI));
-	const float S = Rng.FRandRange(ClumpScale.X, ClumpScale.Y);
+	const int32 k = static_cast<int32>(Kind);
+	const float S = (KindScale.IsValidIndex(k) ? KindScale[k] : 1.f) * Rng.FRandRange(0.75f, 1.3f);   // right height, give or take
 	return FTransform(Tilt * Spin, At - Normal * 3.f, FVector(S));   // sink 3 cm so no roots float
 }
 
@@ -145,9 +177,21 @@ void AGRStylizedNature::BeginPlay()
 	Instance = this;
 	Rng.Initialize(1234);   // same grass every time on the same level
 
-	for (const TCHAR* Name : KindMeshNames)
+	for (const FKindSource& K : KindSources)
 	{
-		Meshes.Add(LoadNatureMesh(Name));
+		UStaticMesh* M = LoadPackMesh(K.Pack);
+		if (!M)
+		{
+			M = LoadNatureMesh(K.Ours);   // the pack isn't there: use our own
+		}
+		Meshes.Add(M);
+		float Scale = 1.f;
+		if (M && K.Height > 0.f)
+		{
+			const float NativeHeight = FMath::Max(1.f, static_cast<float>(M->GetBounds().BoxExtent.Z) * 2.f);
+			Scale = K.Height / NativeHeight;
+		}
+		KindScale.Add(Scale);
 	}
 	if (!Meshes[0])
 	{
@@ -159,7 +203,7 @@ void AGRStylizedNature::BeginPlay()
 	// ---- 1. the level's grass ----
 	for (int32 k = 0; k < static_cast<int32>(EKind::Count); ++k)
 	{
-		const bool bSmall = k <= static_cast<int32>(EKind::FlowerBlue) || k >= static_cast<int32>(EKind::MossA);
+		const bool bSmall = k <= static_cast<int32>(EKind::FlowerBlue) || k >= static_cast<int32>(EKind::MossA);   // grass, flowers, moss
 		LevelGrass.Add(MakeInstancer(Meshes[k], RootComponent, true, !bSmall,
 			bSmall ? GrassCullStart : GrassCullStart * 3.f, bSmall ? GrassCullEnd : GrassCullEnd * 3.f));
 	}
@@ -315,7 +359,7 @@ void AGRStylizedNature::ScatterOnLevel()
 				const EKind K = PickKind(Hit.ImpactPoint);
 				if (LevelGrass[static_cast<int32>(K)])
 				{
-					ByKind[static_cast<int32>(K)].Add(ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal));
+					ByKind[static_cast<int32>(K)].Add(ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal, K));
 					Spots.Add(Hit.ImpactPoint);
 					++Planted;
 				}
@@ -381,7 +425,7 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 			{
 				K = EKind::Grass;   // keep the swing rocks clean of extra lumps
 			}
-			Plant(K, ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal));
+			Plant(K, ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal, K));
 			Spots.Add(Hit.ImpactPoint);
 			++Count;
 			if (Rng.FRand() < MossUnderGrass)

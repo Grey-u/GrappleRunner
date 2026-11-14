@@ -45,6 +45,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") float Refill = 40.f;      // gas added (the tank holds 100)
+	UPROPERTY(EditAnywhere, Category = "Gas Pod") int32 LootDrops = 3;   // loot orbs that pop out when it bursts
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") float Radius = 75.f;      // how close the blade must pass (cm): generous on purpose
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") float TouchRadius = 220.f; // fly this close and it counts as collected
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") int32 Sparks = 36;        // how many bits of light in the burst

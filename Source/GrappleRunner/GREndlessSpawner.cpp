@@ -5,6 +5,9 @@
 #include "GRCompanion.h"   // the AI partner (Endless + AI partner mode)
 #include "GRGasPod.h"      // gas canisters to slice
 #include "GRStylizedNature.h"   // anime grass and flowers on the new rocks and islands
+#include "GRLootOrb.h"          // loot orbs along the swing paths
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
@@ -16,6 +19,7 @@
 #include "GRVine.h"
 #include "GrappleRig.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/Paths.h"
 
 AGREndlessSpawner::AGREndlessSpawner()
 {
@@ -36,6 +40,18 @@ AGREndlessSpawner::AGREndlessSpawner()
 	for (const TCHAR* B : { TEXT("SM_GR_LeafBush_A"), TEXT("SM_GR_LeafBush_B") })
 	{
 		FernMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(TEXT("/Game/GrappleRunner/Nature/%s.%s"), B, B))));
+	}
+	// ...plus the StyleHex Stylized Forest pack Grey added (14 Nov): birch and broadleaf trees, bushes.
+	const FString SH = TEXT("/Game/StyleHex_Studio/Free_Packs/FREE_Stylized_Forest_Sample/Meshes/");
+	for (const TCHAR* T : { TEXT("Trees/SM_Tree_Birch_1"), TEXT("Trees/SM_Tree_Birch_2"), TEXT("Trees/SM_Tree_Broadleaf_1"), TEXT("Trees/SM_Tree_Broadleaf_2") })
+	{
+		const FString Name = FPaths::GetBaseFilename(T);
+		TreeMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(SH + T + TEXT(".") + Name)));
+	}
+	for (const TCHAR* B : { TEXT("Foliage/SM_Fol_Bush_1"), TEXT("Foliage/SM_Fol_Bush_2") })
+	{
+		const FString Name = FPaths::GetBaseFilename(B);
+		FernMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(SH + B + TEXT(".") + Name)));
 	}
 	for (int32 i = 1; i <= 3; ++i)
 	{
@@ -89,6 +105,7 @@ void AGREndlessSpawner::BeginPlay()
 	// Endless rules: no free refill on the ground (only canisters refill), and with the
 	// "AI partner" option a second soldier flies with you.
 	AGRGasPod::SlicedThisRun = 0;
+	AGRLootOrb::CollectedThisRun = 0;
 	const FString Partner = GM ? UGameplayStatics::ParseOption(GM->OptionsString, TEXT("partner")) : FString();
 	bPartnerWanted = Partner == TEXT("1") || (Mode.IsEmpty() && bPartnerInEditorPlay);
 
@@ -167,6 +184,8 @@ void AGREndlessSpawner::Tick(float DeltaSeconds)
 		LastTop = StartTop;
 		FurthestX = P.X;
 		Distance = 0.f;
+		LastMilestone = 0;
+		AGRLootOrb::CollectedThisRun = 0;
 		AGRGasPod::SlicedThisRun = 0;
 		CaveCentres.Reset();
 	}
@@ -193,10 +212,21 @@ void AGREndlessSpawner::Tick(float DeltaSeconds)
 		}
 	}
 
+	// Milestones (100, 250, 500 m, then every 500 m): a level-up burst of light around you.
+	const int32 Mark = Distance >= 500.f ? FMath::FloorToInt(Distance / 500.f) * 500 : (Distance >= 250.f ? 250 : (Distance >= 100.f ? 100 : 0));
+	if (Mark > LastMilestone)
+	{
+		LastMilestone = Mark;
+		if (UNiagaraSystem* Fx = LoadObject<UNiagaraSystem>(nullptr, TEXT("/Game/Free_Spells/VFX_Niagara/NS_Free_Spells_LevelUp.NS_Free_Spells_LevelUp")))
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), Fx, P, FRotator::ZeroRotator);
+		}
+	}
+
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(4205, 0.f, FColor(255, 214, 160),   // 4205: its own line (4202 is the weapon status)
-			FString::Printf(TEXT("ENDLESS   %d m      best %d m"), FMath::RoundToInt(Distance), FMath::RoundToInt(FMath::Max(Best, Distance))));
+			FString::Printf(TEXT("ENDLESS   %d m      best %d m      orbs %d"), FMath::RoundToInt(Distance), FMath::RoundToInt(FMath::Max(Best, Distance)), AGRLootOrb::CollectedThisRun));
 	}
 }
 
@@ -322,6 +352,22 @@ void AGREndlessSpawner::BuildChunk()
 	if (bCave)
 	{
 		BuildCave(FMath::Lerp(LastTop, Top, CaveFrom), FMath::Lerp(LastTop, Top, CaveTo), C);
+	}
+
+	// ---- loot: a trail of orbs along a good swing line now and then (fly through to collect)
+	if (Rng.FRand() < OrbTrailChance)
+	{
+		const float T0 = Rng.FRandRange(0.2f, 0.5f);
+		const FVector Side(0.f, Rng.FRandRange(-300.f, 300.f), 0.f);
+		for (int32 i = 0; i < 6; ++i)
+		{
+			const float T = T0 + i * 0.05f;
+			const FVector At = FMath::Lerp(LastTop, Top, T) + Side + FVector(0.f, 0.f, 600.f + 350.f * FMath::Sin(i / 5.f * PI));   // a gentle arc
+			if (AGRLootOrb* Orb = GetWorld()->SpawnActor<AGRLootOrb>(At, FRotator::ZeroRotator))
+			{
+				C.Actors.Add(Orb);
+			}
+		}
 	}
 
 	// ---- glowing gas canisters to slice, at swinging height along the gap (a cave gets one inside)
