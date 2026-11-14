@@ -1,5 +1,5 @@
 """
-Grapple Runner: paint the planets that hang in Aeloria's sky (all procedural, all ours).
+Grapple Runner: paint the planets that hang in the game's sky (all procedural, all ours).
 
 WHAT THIS MAKES (in this folder, as PNG images)
   T_Planet_Vael.png      a big banded gas giant in Arcadium orange and cream

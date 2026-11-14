@@ -1,5 +1,5 @@
 """
-Grapple Runner: atmosphere and colour. Makes Aeloria an ethereal fantasy place, not a white sky.
+Grapple Runner: atmosphere and colour. Makes the world an ethereal fantasy place, not a white sky.
 
 Run with the Floating Islands level open (not while playing), AFTER expand_world.py:
     py "C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/color_grade.py"

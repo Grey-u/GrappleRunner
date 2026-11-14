@@ -36,7 +36,7 @@ AGRPlanets::AGRPlanets()
 	SphereMesh = Sphere.Object;
 	PlaneMesh = Plane.Object;
 
-	// The four worlds of Aeloria's sky (pictures from Art/Planets/make_planets.py).
+	// The four worlds in the sky (pictures from Art/Planets/make_planets.py).
 	auto Tex = [](const TCHAR* Name)
 	{
 		return TSoftObjectPtr<UTexture2D>(FSoftObjectPath(FString::Printf(TEXT("/Game/GrappleRunner/Sky/Planets/%s.%s"), Name, Name)));

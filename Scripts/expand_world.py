@@ -1,5 +1,5 @@
 """
-Grapple Runner: make Aeloria much denser. More islands, giant islands, floating ruins, vines.
+Grapple Runner: make the floating islands much denser. More islands, giant islands, floating ruins, vines.
 
 Run with the Floating Islands level open (not while playing), AFTER the C++ rebuild
 (the vines need the GRVine class):

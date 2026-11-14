@@ -5,7 +5,7 @@ Read NOW.md first, every session.
 ## What this is
 - A VR endless runner built around Attack on Titan-style grapple swinging. Single-player first; multiplayer comes later.
 - Engine: Unreal Engine 5, C++ project started from the Virtual Reality template.
-- Setting: Aeloria, a floating city of spires and platforms.
+- Setting: floating islands, spires and ruins in the sky. (Aeloria is the world of Naomi's future VR MMO, not this game: never call this game Aeloria.)
 - Headset: [fill in, e.g. Quest 3 via Link cable]
 - PC / graphics card: [fill in]
 

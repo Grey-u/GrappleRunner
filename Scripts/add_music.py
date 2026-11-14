@@ -1,5 +1,5 @@
 """
-Grapple Runner: import the Aeloria music and play it in the level on a loop.
+Grapple Runner: import the music (asset name MUS_Aeloria_Idea) and play it in the level on a loop.
 
 Run with the Floating Islands level open (not while playing):
     py "C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/add_music.py"
