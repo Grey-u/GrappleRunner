@@ -11,8 +11,8 @@
 //                 MULTIPLAYER: 1v1, 2v2, 3v3, 5v5 squads and PvE (on L_FloatingIslands_2).
 //    3. SETTINGS: mouse sensitivity, gas difficulty, partner chatter (saved, see GRSettings.h).
 //    4. LOADING:  shown while the chosen level opens (in a packaged game Unreal's loading-
-//                 screen system keeps it up until the level is ready; in VR the headset shows
-//                 its own loading splash instead of a frozen picture).
+//                 screen system keeps it up until the level is ready). Still to do for VR:
+//                 the headset's own loading splash (its header moved in Unreal 5.8).
 //  The chosen mode is passed to the game level as options ("?mode=endless?partner=1"), so the
 //  game can read it. Multiplayer isn't built yet, so the team modes play solo for now.
 //

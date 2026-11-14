@@ -27,7 +27,6 @@
 #include "Widgets/Images/SThrobber.h"
 #include "GRSettings.h"
 #include "MoviePlayer.h"
-#include "HeadMountedDisplayFunctionLibrary.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -288,10 +287,6 @@ void AGRMenuGameMode::BeginPlay()
 	{
 		return;   // no screen (e.g. a server): nothing to draw
 	}
-	// In the headset, show the headset's own loading splash whenever a level is loading,
-	// instead of a frozen frame (frozen frames in VR are a quick way to feel sick).
-	UHeadMountedDisplayFunctionLibrary::EnableAutoLoadingSplashScreen(true);
-
 	TSharedRef<SGrappleMenu> Widget = SNew(SGrappleMenu).Owner(this).Card(CardTexture.Get());
 	Menu = Widget;
 	GEngine->GameViewport->AddViewportWidgetContent(Widget, 10);
