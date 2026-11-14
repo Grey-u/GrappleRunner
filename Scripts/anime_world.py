@@ -34,11 +34,19 @@ eal = unreal.EditorAssetLibrary
 def log(m): unreal.log("ANIME WORLD: " + str(m))
 
 CODE = r"""
-float2 uv = GetDefaultSceneTextureUV(Parameters, 14);
-float2 px = View.ViewSizeAndInvSize.zw;
+// Each scene image has its own coordinates: the 3D scene is drawn smaller (about 70%) and
+// scaled up, so depth / surface colour must NOT be read with the final picture's coordinates
+// (that was the see-through, smeared bug of 14 Nov).
+float2 uv  = GetDefaultSceneTextureUV(Parameters, 14);   // the picture so far
+float2 uvD = GetDefaultSceneTextureUV(Parameters, 1);    // depth
+float2 uvB = GetDefaultSceneTextureUV(Parameters, 5);    // surface colour
+float2 uvC = GetDefaultSceneTextureUV(Parameters, 13);   // custom depth (characters)
+float2 px  = float2(abs(ddx(uv.x)),  abs(ddy(uv.y)));    // one screen pixel, in each image's units
+float2 pxD = float2(abs(ddx(uvD.x)), abs(ddy(uvD.y)));
+float2 pxC = float2(abs(ddx(uvC.x)), abs(ddy(uvC.y)));
 float3 lw = float3(0.299, 0.587, 0.114);
 float3 scene = SceneTextureLookup(uv, 14, false).rgb + (Scene.r + CD.r + BC.r + SD.r) * 0.0;
-float d = SceneTextureLookup(uv, 1, false).r;
+float d = SceneTextureLookup(uvD, 1, false).r;
 float sky = d > 380000.0 ? 1.0 : 0.0;              // the sky dome is 4 km away
 
 // 1. painterly (Kuwahara): of 4 little squares round the pixel, take the calmest one's average
@@ -61,7 +69,7 @@ float best = 1e9;
 }
 
 // 2. toon light: light = what you see / the surface's own colour, snapped to two tones
-float3 alb = pow(max(SceneTextureLookup(uv, 5, false).rgb, 0.0001), 1.0 / 2.2);
+float3 alb = pow(max(SceneTextureLookup(uvB, 5, false).rgb, 0.0001), 1.0 / 2.2);
 float shade = dot(pick, lw) / max(dot(alb, lw), 0.04);
 float band = smoothstep(Threshold - 0.08, Threshold + 0.08, shade);
 float3 toon = alb * lerp(ShadowTint.rgb * ShadowLevel, float3(LitLevel, LitLevel, LitLevel), band);
@@ -119,19 +127,19 @@ float haze = smoothstep(15000.0, 200000.0, d) * (1.0 - sky) * HazeAmount * brigh
 col = lerp(col, HorizonColor.rgb, haze);
 
 // 6. outlines where depth jumps, near you only
-float l = SceneTextureLookup(uv + float2(-px.x, 0) * Thickness, 1, false).r;
-float r = SceneTextureLookup(uv + float2( px.x, 0) * Thickness, 1, false).r;
-float t = SceneTextureLookup(uv + float2(0, -px.y) * Thickness, 1, false).r;
-float b = SceneTextureLookup(uv + float2(0,  px.y) * Thickness, 1, false).r;
+float l = SceneTextureLookup(uvD + float2(-pxD.x, 0) * Thickness, 1, false).r;
+float r = SceneTextureLookup(uvD + float2( pxD.x, 0) * Thickness, 1, false).r;
+float t = SceneTextureLookup(uvD + float2(0, -pxD.y) * Thickness, 1, false).r;
+float b = SceneTextureLookup(uvD + float2(0,  pxD.y) * Thickness, 1, false).r;
 float mn = min(min(l, r), min(t, b)); float mx = max(max(l, r), max(t, b));
 float edge = saturate((mx - mn) / max(mn, 1.0) * 4.0 - EdgeThreshold) * (1.0 - smoothstep(2500.0, 6000.0, d)) * (1.0 - sky);
 col = lerp(col, col * 0.35 + Ink.rgb, edge * Outline);
 
 // 7. characters: warm rim light (custom depth)
-float c = SceneTextureLookup(uv, 13, false).r;
+float c = SceneTextureLookup(uvC, 13, false).r;
 float isChar = (c < 100000.0 && c <= d + 5.0) ? 1.0 : 0.0;
-float2 rp = px * 4.0;
-float farR = max(max(SceneTextureLookup(uv + float2(-rp.x, 0), 13, false).r, SceneTextureLookup(uv + float2(rp.x, 0), 13, false).r), SceneTextureLookup(uv + float2(0, -rp.y), 13, false).r);
+float2 rp = pxC * 4.0;
+float farR = max(max(SceneTextureLookup(uvC + float2(-rp.x, 0), 13, false).r, SceneTextureLookup(uvC + float2(rp.x, 0), 13, false).r), SceneTextureLookup(uvC + float2(0, -rp.y), 13, false).r);
 float rim = isChar * saturate((farR - c) / max(c, 1.0) * 4.0 - 0.3);
 col += RimColor.rgb * rim * RimStrength;
 return col;
