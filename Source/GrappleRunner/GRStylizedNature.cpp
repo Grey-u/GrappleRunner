@@ -327,7 +327,7 @@ void AGRStylizedNature::ScatterOnLevel()
 // and the grass is attached to it so it goes when the endless run clears it away.
 void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 {
-	if (!Rock || !Meshes.IsValidIndex(0) || !Meshes[0])
+	if (!Rock || !Rock->GetRootComponent() || !Meshes.IsValidIndex(0) || !Meshes[0])
 	{
 		return;
 	}
@@ -335,48 +335,45 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 	{
 		Spots.RemoveAt(0, 30000);   // forget the oldest spots (long behind you) so the list stays small
 	}
-	TArray<UStaticMeshComponent*> Comps;
-	Rock->GetComponents(Comps);
+	// Look down on the whole actor from above. Any of its parts counts as ground (Brushify's
+	// islands are built from instanced pieces, which the first version skipped: no grass).
+	FVector Origin, Extent;
+	Rock->GetActorBounds(true, Origin, Extent);
+	const FBox Box(Origin - Extent, Origin + Extent);
 	FCollisionQueryParams Params(TEXT("GRGrassRock"), true);
-	const float Gap = GrassSpacing * 1.15f;
+	const float Gap = FMath::Max(GrassSpacing * 1.15f, FMath::Sqrt(static_cast<float>(4.f * Extent.X * Extent.Y) / (MaxOnIt * 1.6f)));
+	TMap<int32, UInstancedStaticMeshComponent*> Sets;
 	int32 Count = 0;
-	for (UStaticMeshComponent* C : Comps)
+	for (float X = Box.Min.X; X < Box.Max.X && Count < MaxOnIt; X += Gap)
 	{
-		if (!C || C->IsA<UInstancedStaticMeshComponent>() || !C->IsCollisionEnabled())
+		for (float Y = Box.Min.Y; Y < Box.Max.Y && Count < MaxOnIt; Y += Gap)
 		{
-			continue;
-		}
-		const FBox Box = C->Bounds.GetBox();
-		TMap<int32, UInstancedStaticMeshComponent*> Sets;
-		for (float X = Box.Min.X; X < Box.Max.X && Count < MaxOnIt; X += Gap)
-		{
-			for (float Y = Box.Min.Y; Y < Box.Max.Y && Count < MaxOnIt; Y += Gap)
+			const FVector Top(X + Rng.FRandRange(-0.4f, 0.4f) * Gap, Y + Rng.FRandRange(-0.4f, 0.4f) * Gap, Box.Max.Z + 50.f);
+			FHitResult Hit;
+			if (!GetWorld()->LineTraceSingleByChannel(Hit, Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), ECC_Visibility, Params)
+				|| Hit.GetActor() != Rock || Hit.ImpactNormal.Z < MinFlatness)
 			{
-				const FVector Top(X + Rng.FRandRange(-0.4f, 0.4f) * Gap, Y + Rng.FRandRange(-0.4f, 0.4f) * Gap, Box.Max.Z + 50.f);
-				FHitResult Hit;
-				if (!C->LineTraceComponent(Hit, Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), Params) || Hit.ImpactNormal.Z < MinFlatness)
-				{
-					continue;
-				}
-				EKind K = PickKind(Hit.ImpactPoint);
-				if (MaxOnIt < 500 && (K == EKind::StoneA || K == EKind::StoneB || K == EKind::Bush))
-				{
-					K = EKind::Grass;   // keep the swing rocks clean of extra lumps
-				}
-				UInstancedStaticMeshComponent*& Set = Sets.FindOrAdd(static_cast<int32>(K));
-				if (!Set)
-				{
-					Set = MakeInstancer(MeshFor(K), C, true, false, GrassCullStart, GrassCullEnd);
-				}
-				if (Set)
-				{
-					Set->AddInstance(ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal), true);
-					Spots.Add(Hit.ImpactPoint);
-					++Count;
-				}
+				continue;
+			}
+			EKind K = PickKind(Hit.ImpactPoint);
+			if (MaxOnIt < 500 && (K == EKind::StoneA || K == EKind::StoneB || K == EKind::Bush))
+			{
+				K = EKind::Grass;   // keep the swing rocks clean of extra lumps
+			}
+			UInstancedStaticMeshComponent*& Set = Sets.FindOrAdd(static_cast<int32>(K));
+			if (!Set)
+			{
+				Set = MakeInstancer(MeshFor(K), Rock->GetRootComponent(), true, false, GrassCullStart, GrassCullEnd);
+			}
+			if (Set)
+			{
+				Set->AddInstance(ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal), true);
+				Spots.Add(Hit.ImpactPoint);
+				++Count;
 			}
 		}
 	}
+	UE_LOG(LogTemp, Log, TEXT("Stylized nature: dressed %s with %d clumps"), *Rock->GetName(), Count);
 }
 
 // Put cloud i somewhere around Near: anywhere in the ring, or (bFar) out at the edge, so a
