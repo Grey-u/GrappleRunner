@@ -1,4 +1,4 @@
-# NOW (updated 12 Nov 2026, afternoon)
+# NOW (updated 14 Nov 2026)
 
 ## Works
 - UE 5.8.4 project (VR / OpenXR template), level `L_FloatingIslands_2`, start menu `L_MainMenu`, Endless Runner mode, day/night match clock, 4 planets, pollen/spores (`GRAmbientLife`), haptic glove bridge (`GRHandFeel`, untested without gloves).
@@ -7,6 +7,8 @@
 - 8,709 plants swapped to Project Nature photoscans in four colour zones, 680 glowing at night.
 
 ## Half done
+- **Menu (`GRMenu`, 14 Nov):** SAO-style floating menu, dark mode with sage-green highlights. Tab/M/VR menu button. Opens and renders correctly; hover + click now use our own hit test (`FindUnder`): confirm it in Play, then in the headset with the right-hand ray. Remove the temporary read-out if any remains.
+- **Characters:** Naomi wants semi-realistic anime (realistic shading on anime proportions), original characters. Options: a MetaHuman sculpted toward anime proportions with a custom groom, or a free stylised character from Fab. Not started; needs her pick.
 - **Blades work** (built and tested 12 Nov): key 1, LMB/V slash, RMB/C cross-cut, F9 slow motion. Cutting works on plants. Still to check by hand: felling a tree (2-5 hacks on the trunk), the grip with `GripSlide` 4, and how it feels at full speed with a real mouse.
 - **Rendering is now deferred + Lumen** (instanced stereo off). Check frame rate in the headset when it arrives; if it's under 90, drop Lumen to Lite / lower scalability.
 - **Islands dressed** with free Megascans (cliffs under, rocks round, roots) plus 1,474 more photoscanned plants. Plant actors are now about 10,000: convert to instanced foliage for memory and VR frame time.
@@ -16,6 +18,7 @@
 - **Bug:** "InverseFast non-invertible matrix" logged every frame since the 10 Nov vines work.
 
 ## Decided
+- **Art direction (14 Nov):** "anime realism": stylised shapes and colours, realistic lighting and materials. Menu inspired by SAO, dark mode, sage-green accent (no yellow).
 - **Game objective (12 Nov, Claude Doc "Grapple Runner: game objective"):** keep the run alive as long as you can. Score = metres × flow multiplier (×1-×5, rises with hooks in a row without touching ground). Gas drains with reel/boost; slicing glowing gas pods refills it; trees take several hacks and felling one opens a route. One second-wind canister per run. Runs of 3-8 min, three missions at a time, a daily run with the same islands for everyone. No kill quotas.
 - Graphics are a selling point: move from forward shading to deferred + Lumen Lite + Nanite for PC VR (RTX 4070 Ti). Waiting on Naomi's go-ahead; turn instanced stereo off first (5.8 bug).
 - Free assets only for now (12 Nov). Shortlist: Claude Sheets "Grapple Runner asset shortlist".
