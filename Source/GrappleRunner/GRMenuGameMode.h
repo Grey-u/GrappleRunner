@@ -6,7 +6,7 @@
 //  The "rules" for the main-menu level (L_MainMenu). When that level starts, this game
 //  mode puts the menu on screen, one page at a time:
 //    0. STARTING: a loading screen with a filling bar while the game warms up.
-//    1. TITLE:    the EXIT SUIT portfolio cover as the title card: PLAY, SETTINGS, QUIT.
+//    1. TITLE:    the game's title on a dark screen (same look as the in-game menu): PLAY, SETTINGS, QUIT.
 //    2. MODES:    SOLO: Endless Runner, or Endless Runner with an AI partner (L_Endless).
 //                 MULTIPLAYER: 1v1, 2v2, 3v3, 5v5 squads and PvE (on L_FloatingIslands_2).
 //    3. SETTINGS: mouse sensitivity, gas difficulty, partner chatter (saved, see GRSettings.h).

@@ -14,6 +14,7 @@
 #include "GRMenuGameMode.h"
 
 #include "Brushes/SlateColorBrush.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Texture2D.h"
@@ -40,10 +41,13 @@
 
 namespace GRMenuStyle
 {
-	const FLinearColor Ink(0.012f, 0.012f, 0.012f, 1.f);      // near-black, like the portfolio type
-	const FLinearColor Paper(0.85f, 0.83f, 0.80f, 1.f);       // the cover's off-white
-	const FLinearColor Orange(1.f, 0.16f, 0.02f, 1.f);        // EXIT SUIT orange
-	const FLinearColor Grey(0.25f, 0.25f, 0.25f, 1.f);
+	// Same look as the in-game menu (Naomi, 14 Nov): dark charcoal, off-white writing, sage green.
+	const FLinearColor Back(0.004f, 0.006f, 0.005f, 1.f);      // the background: near-black with a hint of green
+	const FLinearColor ButtonBack(0.02f, 0.027f, 0.022f, 1.f); // buttons, a step lighter
+	const FLinearColor Ink(0.88f, 0.91f, 0.86f, 1.f);         // main writing: soft off-white
+	const FLinearColor Paper = Ink;                            // writing on buttons
+	const FLinearColor Orange(0.26f, 0.38f, 0.19f, 1.f);      // the accent (name kept from the old orange): sage green
+	const FLinearColor Grey(0.45f, 0.52f, 0.43f, 1.f);        // quiet writing: muted grey-green
 }
 
 // -------------------------------------------------------------------------------------
@@ -62,20 +66,12 @@ public:
 		Owner = Args._Owner;
 		using namespace GRMenuStyle;
 
-		// The background: the title card picture, or plain off-white if it isn't imported yet.
-		if (Args._Card)
-		{
-			CardBrush.SetResourceObject(Args._Card);
-			CardBrush.ImageSize = FVector2D(1920.f, 1080.f);
-		}
-		else
-		{
-			CardBrush = FSlateColorBrush(Paper);
-		}
+		// The background: plain dark (the old portfolio cover was only a placeholder).
+		CardBrush = FSlateColorBrush(Back);
 
-		// Button look: black block, orange when the mouse is over it (like the suit's orange parts).
+		// Button look: dark block, sage green when the pointer is over it.
 		ButtonStyle = FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("Button");
-		ButtonStyle.SetNormal(FSlateColorBrush(Ink));
+		ButtonStyle.SetNormal(FSlateColorBrush(ButtonBack));
 		ButtonStyle.SetHovered(FSlateColorBrush(Orange));
 		ButtonStyle.SetPressed(FSlateColorBrush(Orange * 0.8f));
 		ButtonStyle.SetNormalPadding(FMargin(22.f, 12.f));
@@ -89,6 +85,23 @@ public:
 				[
 					SNew(SOverlay)
 					+ SOverlay::Slot()[ SNew(SImage).Image(&CardBrush) ]
+					// A big, faint sage "moon" on the right and a thin line on the left: quiet decoration.
+					+ SOverlay::Slot()
+					[
+						SNew(SCanvas)
+						+ SCanvas::Slot().Position(FVector2D(1060.f, 120.f)).Size(FVector2D(840.f, 840.f))
+						[
+							SNew(SImage).Image(&Moon).ColorAndOpacity(FLinearColor(Orange.R, Orange.G, Orange.B, 0.10f))
+						]
+						+ SCanvas::Slot().Position(FVector2D(1240.f, 300.f)).Size(FVector2D(480.f, 480.f))
+						[
+							SNew(SImage).Image(&Moon).ColorAndOpacity(FLinearColor(Orange.R, Orange.G, Orange.B, 0.08f))
+						]
+						+ SCanvas::Slot().Position(FVector2D(120.f, 140.f)).Size(FVector2D(4.f, 800.f))
+						[
+							SNew(SImage).Image(&LineBrush).ColorAndOpacity(Orange)
+						]
+					]
 					+ SOverlay::Slot()
 					[
 						// Five pages, one shown at a time:
@@ -120,15 +133,21 @@ private:
 	FButtonStyle ButtonStyle;
 	FSlateColorBrush BarBack = FSlateColorBrush(GRMenuStyle::Grey * 0.6f);   // the loading bar's empty track
 	FSlateColorBrush BarFill = FSlateColorBrush(GRMenuStyle::Orange);        // ...and its fill
+	FSlateRoundedBoxBrush Moon = FSlateRoundedBoxBrush(FLinearColor::White, 420.f);   // a circle (corners rounded all the way)
+	FSlateColorBrush LineBrush = FSlateColorBrush(FLinearColor::White);
 	int32 Page = 1;   // the title, once the starting screen is done
 
-	// Every page sits in the empty space in the middle of the cover (right of "EXIT SUIT").
+	// Every page: the game's title at the top, then the page's own content under it.
 	TSharedRef<SWidget> Panel(TSharedRef<SWidget> Content)
 	{
+		using namespace GRMenuStyle;
 		return SNew(SCanvas)
-			+ SCanvas::Slot().Position(FVector2D(640.f, 110.f)).Size(FVector2D(500.f, 880.f))
+			+ SCanvas::Slot().Position(FVector2D(160.f, 130.f)).Size(FVector2D(760.f, 900.f))
 			[
-				Content
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[ Label(TEXT("A VR GAME FOR THE EXIT SUIT"), 13, Grey) ]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f, 0.f, 34.f)[ Label(TEXT("GRAPPLE RUNNER"), 64, Ink) ]
+				+ SVerticalBox::Slot().AutoHeight()[ SNew(SBox).WidthOverride(520.f)[ Content ] ]
 			];
 	}
 
@@ -158,10 +177,6 @@ private:
 	{
 		using namespace GRMenuStyle;
 		return SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight()[ Label(TEXT("PROJECT 02  -  GAME"), 11, Grey, "Regular") ]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f, 0.f, 0.f)[ Label(TEXT("GRAPPLE RUNNER"), 34, Ink) ]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f, 0.f, 26.f)
-			  [ Label(TEXT("A VR grapple game built for the EXIT SUIT"), 12, Ink, "Regular") ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("PLAY"), TEXT("choose a mode"), [this]() { Page = 2; }) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("SETTINGS"), TEXT("controls and comfort"), [this]() { Page = 3; }) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("QUIT"), TEXT(""), [this]() { if (Owner.IsValid()) { Owner->Quit(); } }) ];
@@ -190,8 +205,7 @@ private:
 	{
 		using namespace GRMenuStyle;
 		return SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight()[ Label(TEXT("GRAPPLE RUNNER"), 34, Ink) ]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f, 0.f, 8.f)[ Label(TEXT("LOADING"), 14, Grey) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f)[ Label(TEXT("LOADING"), 14, Grey) ]
 			+ SVerticalBox::Slot().AutoHeight()
 			[
 				SNew(SBox).WidthOverride(420.f).HeightOverride(10.f)
@@ -206,8 +220,7 @@ private:
 						]
 					]
 				]
-			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f)[ Label(TEXT("Waking the islands of Aeloria..."), 12, Ink, "Regular") ];
+			];
 	}
 
 	// Settings: each row is a name, its value, and buttons to change it. Saved straight away.
@@ -251,7 +264,7 @@ private:
 	{
 		using namespace GRMenuStyle;
 		return SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight()[ Label(TEXT("LOADING AELORIA"), 30, Ink) ]
+			+ SVerticalBox::Slot().AutoHeight()[ Label(TEXT("LOADING"), 30, Ink) ]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f)
 			[
 				SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Bold", 16)).ColorAndOpacity(FSlateColor(Orange))
@@ -339,13 +352,17 @@ void AGRMenuGameMode::OpenGameLevel()
 		FLoadingScreenAttributes Screen;
 		Screen.bAutoCompleteWhenLoadingCompletes = true;
 		Screen.MinimumLoadingScreenDisplayTime = 1.f;
-		Screen.WidgetLoadingScreen = SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(Ink)
+		Screen.WidgetLoadingScreen = SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(Back)
 			.HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 				[
-					SNew(STextBlock).Text(FText::FromString(TEXT("LOADING AELORIA"))).Font(FCoreStyle::GetDefaultFontStyle("Bold", 30)).ColorAndOpacity(FSlateColor(Paper))
+					SNew(STextBlock).Text(FText::FromString(TEXT("GRAPPLE RUNNER"))).Font(FCoreStyle::GetDefaultFontStyle("Bold", 48)).ColorAndOpacity(FSlateColor(Ink))
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 10.f, 0.f, 0.f)
+				[
+					SNew(STextBlock).Text(FText::FromString(TEXT("LOADING"))).Font(FCoreStyle::GetDefaultFontStyle("Bold", 16)).ColorAndOpacity(FSlateColor(Grey))
 				]
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 16.f)[ SNew(SThrobber) ]
 			];

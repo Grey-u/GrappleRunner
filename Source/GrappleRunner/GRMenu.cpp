@@ -450,7 +450,7 @@ TSharedRef<SWidget> AGRMenu::BuildInfo()
 			.Text_Lambda([this]
 			{
 				return Entries.IsValidIndex(HoverEntry) ? Entries[HoverEntry].Info
-					: LOCTEXT("QuestBody", "Keep the run alive.\n\nSwing, slice and dash as far through Aeloria as you can before you fall.\n\nScore = metres travelled x your flow multiplier. Chain hooks without touching the ground to raise it.\n\nSlice glowing gas pods to refill your tanks.");
+					: LOCTEXT("QuestBody", "Keep the run alive.\n\nSwing, slice and dash as far through the floating islands as you can before you fall.\n\nScore = metres travelled x your flow multiplier. Chain hooks without touching the ground to raise it.\n\nSlice glowing gas pods to refill your tanks.");
 			})
 		]
 	];
@@ -501,7 +501,7 @@ void AGRMenu::SelectCategory(int32 Index)
 		Add(LOCTEXT("SkCross", "Cross-cut"), LOCTEXT("SkCrossInfo", "Blades out: right mouse or C. Both blades at once, in an X. Counts as one and a half hacks."));
 		break;
 	case 4:   // Map
-		Add(LOCTEXT("MapHere", "Aeloria: the floating islands"), LOCTEXT("MapHereInfo", "A city of spires and islands in the sky. The islands go on forever ahead of you in Endless Runner mode."));
+		Add(LOCTEXT("MapHere", "The floating islands"), LOCTEXT("MapHereInfo", "A city of spires and islands in the sky. The islands go on forever ahead of you in Endless Runner mode."));
 		Add(LOCTEXT("MapRespawn", "Back to the start"), LOCTEXT("MapRespawnInfo", "Close the menu and press R to respawn on the first island."));
 		break;
 	case 5:   // Settings
