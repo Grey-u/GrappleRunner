@@ -58,6 +58,7 @@ namespace
 	const FLinearColor IconGrey(0.62f, 0.68f, 0.60f, 1.f);      // icons that aren't picked
 	const FLinearColor SlotEmpty(0.012f, 0.016f, 0.013f, 0.95f);  // gear slots with nothing in them
 	const FLinearColor Disabled(0.04f, 0.04f, 0.04f, 0.5f);     // greyed-out buttons (Party, for now)
+	const FLinearColor OnAccent(0.008f, 0.012f, 0.009f, 1.f);   // writing/icons sitting on a sage-green highlight
 	const FLinearColor Divider(0.22f, 0.27f, 0.21f, 1.f);       // thin lines between sections
 	const FLinearColor HoverTint(0.06f, 0.095f, 0.045f, 0.98f);   // deep sage glow under the pointer
 
@@ -347,7 +348,7 @@ TSharedRef<SWidget> AGRMenu::BuildIconColumn()
 					[
 						SNew(SImage).Image(IconBrushes[i].Get()).ColorAndOpacity_Lambda([this, i]
 						{
-							return FSlateColor(Category == i ? FLinearColor::White : IconGrey);
+							return FSlateColor(Category == i ? OnAccent : IconGrey);
 						})
 					]
 				]
@@ -369,7 +370,7 @@ TSharedRef<SWidget> AGRMenu::BuildList()
 		[
 			SNew(SBorder).BorderImage(&PillBrush).BorderBackgroundColor(Accent).Padding(FMargin(26.f, 8.f))
 			[
-				SNew(STextBlock).Font(Font(26, TEXT("Regular"))).ColorAndOpacity(FLinearColor::White)
+				SNew(STextBlock).Font(Font(26, TEXT("Regular"))).ColorAndOpacity(OnAccent)
 				.Text_Lambda([this] { return FText::FromString(CategoryNames[Category]); })
 			]
 		]
@@ -406,7 +407,7 @@ void AGRMenu::RefreshList()
 						.ColorAndOpacity_Lambda([this, i]
 						{
 							const bool bOn = Entries.IsValidIndex(i) && Entries[i].IsOn && Entries[i].IsOn();
-							return FSlateColor(bOn ? FLinearColor::White : TextMain);
+							return FSlateColor(bOn ? OnAccent : TextMain);
 						})
 					]
 				]
