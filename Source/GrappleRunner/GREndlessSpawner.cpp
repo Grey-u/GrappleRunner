@@ -68,6 +68,7 @@ void AGREndlessSpawner::BeginPlay()
 	// The floating islands are the multiplayer map now, so they stay as built.
 	const bool bEndlessMap = GetWorld()->GetMapName().Contains(TEXT("Endless"));
 	bActive = Mode.Equals(TEXT("endless"), ESearchCase::IgnoreCase) || (Mode.IsEmpty() && bRunInEditorPlay && bEndlessMap);
+	UE_LOG(LogTemp, Log, TEXT("Endless spawner: map %s, mode '%s', active %d"), *GetWorld()->GetMapName(), *Mode, bActive ? 1 : 0);
 	if (!bActive)
 	{
 		SetActorTickEnabled(false);   // a team mode: leave the hand-built level alone

@@ -41,9 +41,9 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	// Where it floats on desktop, measured from your eyes (turning with your body):
-	UPROPERTY(EditAnywhere, Category = "Gauge") float Ahead = 55.f;      // in front of you
-	UPROPERTY(EditAnywhere, Category = "Gauge") float Side = -22.f;      // to the left (minus = left)
-	UPROPERTY(EditAnywhere, Category = "Gauge") float Down = 34.f;       // below eye level
+	UPROPERTY(EditAnywhere, Category = "Gauge") float Ahead = 60.f;      // in front of you
+	UPROPERTY(EditAnywhere, Category = "Gauge") float Side = 0.f;        // centred, between your hands (minus = left)
+	UPROPERTY(EditAnywhere, Category = "Gauge") float Down = 22.f;       // below eye level (low enough to stay out of the way, high enough to stay in view)
 	UPROPERTY(EditAnywhere, Category = "Gauge") float WidthCm = 16.f;    // how wide it is in the world
 
 	// The gauge colour for a tank this full (0 = empty, 1 = full). Used for the burst too.
