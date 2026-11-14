@@ -283,7 +283,7 @@ void AGREndlessSpawner::BuildChunk()
 	C.Actors.Add(Island);
 	if (AGRStylizedNature* Nature = AGRStylizedNature::Get())
 	{
-		Nature->DressRock(Island, 2500);   // a meadow on top of the island
+		Nature->DressRock(Island, 5000);   // a dense meadow on top, moss down the sides
 	}
 	const FVector Top(X, Y, Z);
 
@@ -406,7 +406,7 @@ void AGREndlessSpawner::AddAnchorRock(UStaticMesh* Mesh, const FVector& At, floa
 	}
 	if (AGRStylizedNature* Nature = AGRStylizedNature::Get())
 	{
-		Nature->DressRock(Rock);   // a tuft of anime grass and flowers on top
+		Nature->DressRock(Rock);   // a dense carpet of grass and flowers on top, moss on the sides
 	}
 }
 

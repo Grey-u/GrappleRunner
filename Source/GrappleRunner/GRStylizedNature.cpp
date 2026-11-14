@@ -20,7 +20,7 @@ namespace
 	// Where import_stylized.py puts the meshes, in EKind order.
 	const TCHAR* KindMeshNames[] = { TEXT("SM_GR_Grass"), TEXT("SM_GR_GrassTall"), TEXT("SM_GR_Flowers_Pink"),
 		TEXT("SM_GR_Flowers_White"), TEXT("SM_GR_Flowers_Yellow"), TEXT("SM_GR_Flowers_Blue"), TEXT("SM_GR_Bush"),
-		TEXT("SM_GR_Rock_A"), TEXT("SM_GR_Rock_B") };
+		TEXT("SM_GR_Rock_A"), TEXT("SM_GR_Rock_B"), TEXT("SM_GR_Moss_A"), TEXT("SM_GR_Moss_B") };
 	const TCHAR* CloudNames[] = { TEXT("SM_GR_Cloud_A"), TEXT("SM_GR_Cloud_B"), TEXT("SM_GR_Cloud_C") };
 	const TCHAR* ButterflyNames[] = { TEXT("SM_GR_Butterfly_Pink"), TEXT("SM_GR_Butterfly_Blue"), TEXT("SM_GR_Butterfly_Yellow") };
 
@@ -130,6 +130,15 @@ FTransform AGRStylizedNature::ClumpTransform(const FVector& At, const FVector& N
 	return FTransform(Tilt * Spin, At - Normal * 3.f, FVector(S));   // sink 3 cm so no roots float
 }
 
+// Moss lies fully along the surface (tops, slopes and sides), unlike grass which grows up.
+FTransform AGRStylizedNature::MossTransform(const FVector& At, const FVector& Normal)
+{
+	const FQuat Lie = FQuat::FindBetweenNormals(FVector::UpVector, Normal);
+	const FQuat Spin(FVector::UpVector, Rng.FRandRange(0.f, 2.f * PI));
+	const float S = Rng.FRandRange(1.0f, 2.2f);
+	return FTransform(Lie * Spin, At - Normal * 2.f, FVector(S));
+}
+
 void AGRStylizedNature::BeginPlay()
 {
 	Super::BeginPlay();
@@ -150,7 +159,7 @@ void AGRStylizedNature::BeginPlay()
 	// ---- 1. the level's grass ----
 	for (int32 k = 0; k < static_cast<int32>(EKind::Count); ++k)
 	{
-		const bool bSmall = k <= static_cast<int32>(EKind::FlowerBlue);
+		const bool bSmall = k <= static_cast<int32>(EKind::FlowerBlue) || k >= static_cast<int32>(EKind::MossA);
 		LevelGrass.Add(MakeInstancer(Meshes[k], RootComponent, true, !bSmall,
 			bSmall ? GrassCullStart : GrassCullStart * 3.f, bSmall ? GrassCullEnd : GrassCullEnd * 3.f));
 	}
@@ -341,8 +350,20 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 	Rock->GetActorBounds(true, Origin, Extent);
 	const FBox Box(Origin - Extent, Origin + Extent);
 	FCollisionQueryParams Params(TEXT("GRGrassRock"), true);
-	const float Gap = FMath::Max(GrassSpacing * 1.15f, FMath::Sqrt(static_cast<float>(4.f * Extent.X * Extent.Y) / (MaxOnIt * 1.6f)));
+	const float Gap = FMath::Max(GrassSpacing * 0.85f, FMath::Sqrt(static_cast<float>(4.f * Extent.X * Extent.Y) / (MaxOnIt * 1.6f)));
 	TMap<int32, UInstancedStaticMeshComponent*> Sets;
+	auto Plant = [&](EKind K, const FTransform& Xf)
+	{
+		UInstancedStaticMeshComponent*& Set = Sets.FindOrAdd(static_cast<int32>(K));
+		if (!Set)
+		{
+			Set = MakeInstancer(MeshFor(K), Rock->GetRootComponent(), true, false, GrassCullStart, GrassCullEnd);
+		}
+		if (Set)
+		{
+			Set->AddInstance(Xf, true);
+		}
+	};
 	int32 Count = 0;
 	for (float X = Box.Min.X; X < Box.Max.X && Count < MaxOnIt; X += Gap)
 	{
@@ -356,24 +377,47 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 				continue;
 			}
 			EKind K = PickKind(Hit.ImpactPoint);
-			if (MaxOnIt < 500 && (K == EKind::StoneA || K == EKind::StoneB || K == EKind::Bush))
+			if (MaxOnIt < 1000 && (K == EKind::StoneA || K == EKind::StoneB || K == EKind::Bush))
 			{
 				K = EKind::Grass;   // keep the swing rocks clean of extra lumps
 			}
-			UInstancedStaticMeshComponent*& Set = Sets.FindOrAdd(static_cast<int32>(K));
-			if (!Set)
+			Plant(K, ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal));
+			Spots.Add(Hit.ImpactPoint);
+			++Count;
+			if (Rng.FRand() < MossUnderGrass)
 			{
-				Set = MakeInstancer(MeshFor(K), Rock->GetRootComponent(), true, false, GrassCullStart, GrassCullEnd);
-			}
-			if (Set)
-			{
-				Set->AddInstance(ClumpTransform(Hit.ImpactPoint, Hit.ImpactNormal), true);
-				Spots.Add(Hit.ImpactPoint);
-				++Count;
+				Plant(Rng.FRand() < 0.5f ? EKind::MossA : EKind::MossB, MossTransform(Hit.ImpactPoint, Hit.ImpactNormal));
 			}
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("Stylized nature: dressed %s with %d clumps"), *Rock->GetName(), Count);
+
+	// Moss down the sides: look at the rock from four sides and cushion every wall and slope
+	// that isn't facing the ground (undersides stay bare rock).
+	int32 Moss = 0;
+	const FVector Sides[4] = { FVector(1, 0, 0), FVector(-1, 0, 0), FVector(0, 1, 0), FVector(0, -1, 0) };
+	const float MossGap = Gap * 1.1f;
+	for (const FVector& Dir : Sides)
+	{
+		const FVector Across(-Dir.Y, Dir.X, 0.f);
+		const float Wide = static_cast<float>(FMath::Abs(Across.X) * Extent.X + FMath::Abs(Across.Y) * Extent.Y);
+		const float Reach = static_cast<float>(FMath::Abs(Dir.X) * Extent.X + FMath::Abs(Dir.Y) * Extent.Y) + 50.f;
+		for (float U = -Wide; U < Wide && Moss < MaxOnIt; U += MossGap)
+		{
+			for (float Z = -static_cast<float>(Extent.Z); Z < Extent.Z && Moss < MaxOnIt; Z += MossGap)
+			{
+				const FVector Start = Origin - Dir * Reach + Across * (U + Rng.FRandRange(-0.4f, 0.4f) * MossGap) + FVector(0.f, 0.f, Z + Rng.FRandRange(-0.4f, 0.4f) * MossGap);
+				FHitResult Hit;
+				if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, Start + Dir * (Reach * 2.f), ECC_Visibility, Params)
+					|| Hit.GetActor() != Rock || Hit.ImpactNormal.Z < -0.25f || Rng.FRand() > MossOnSides)
+				{
+					continue;
+				}
+				Plant(Rng.FRand() < 0.5f ? EKind::MossA : EKind::MossB, MossTransform(Hit.ImpactPoint, Hit.ImpactNormal));
+				++Moss;
+			}
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("Stylized nature: dressed %s with %d clumps and %d moss"), *Rock->GetName(), Count, Moss);
 }
 
 // Put cloud i somewhere around Near: anywhere in the ring, or (bFar) out at the edge, so a

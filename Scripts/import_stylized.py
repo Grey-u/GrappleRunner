@@ -14,7 +14,8 @@
 #  The game code (GRStylizedNature) then plants and flies them when a level starts.
 #
 #  TWEAKING: open a material in Content/GrappleRunner/Nature and change the numbers in its
-#  "Custom" node (e.g. 9.0 = how far grass sways, in cm). Safe to run again.
+#  "Custom" node (e.g. 9.0 = how far grass sways, in cm). Safe to run again: it re-imports the
+#  meshes (new ones like the moss get added) and keeps the materials that already exist.
 # =====================================================================================
 import unreal, os, glob
 
@@ -37,7 +38,7 @@ FLAP_FLY = "return float3(0, 0, A * 5.0 * sin(T * 24.0 + R * 6.283));"
 def make_material(name, two_sided, glow, wpo_code=None, wpo_inputs=()):
     path = DEST + "/" + name
     if eal.does_asset_exist(path):
-        eal.delete_asset(path)                       # remake so changes to this script apply
+        return unreal.load_asset(path)               # already made (deleting it while meshes use it would ask questions)
     mat = tools.create_asset(name, DEST, unreal.Material, unreal.MaterialFactoryNew())
     mat.set_editor_property("two_sided", two_sided)
     mat.set_editor_property("used_with_instanced_static_meshes", True)

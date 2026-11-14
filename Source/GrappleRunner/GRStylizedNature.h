@@ -7,7 +7,7 @@
 //  The Genshin-inspired look for the world itself (M_GenshinToon, from genshin_look.py,
 //  does the characters).
 //  When a level starts it:
-//    1. GRASS: looks at every solid thing in the level from above (a downward "line trace"
+//    1. GRASS AND MOSS: looks at every solid thing in the level from above (a downward "line trace"
 //       every ~1.1 m) and wherever it finds a fairly flat top (an island, a rock, a ledge),
 //       it plants a clump: mostly short grass, with patches of tall grass, flower meadows
 //       (pink, white, yellow, blue), little bushes and mossy stones. The rocks the endless
@@ -56,19 +56,21 @@ public:
 	// Plant grass and flowers on top of one rock or island (used for things spawned while
 	// playing). The grass is attached to it, so it disappears when it does.
 	// MaxOnIt = most clumps on this one actor (rocks ~220, islands more).
-	void DressRock(AActor* Rock, int32 MaxOnIt = 220);
+	void DressRock(AActor* Rock, int32 MaxOnIt = 700);
 
 	// ---- grass ----
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassSpacing = 110.f;      // gap between clumps (smaller = denser)
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassSpacing = 80.f;       // gap between clumps (smaller = denser)
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MinFlatness = 0.72f;       // 1 = only perfectly flat ground, 0 = walls too
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float FlowerChance = 0.14f;      // in flower meadows: chance a clump is flowers
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float TallGrassChance = 0.16f;
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float BushChance = 0.025f;
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float StoneChance = 0.02f;
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") int32 MaxClumps = 60000;         // safety cap on the whole level
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") int32 MaxClumps = 90000;         // safety cap on the whole level
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassCullStart = 5500.f;   // grass starts fading out here...
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassCullEnd = 8000.f;     // ...and is gone here
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") FVector2D ClumpScale = FVector2D(0.8f, 1.5f);
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossUnderGrass = 0.45f;    // chance of a moss cushion under each clump
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossOnSides = 0.8f;        // how thickly moss covers rock sides
 
 	// ---- clouds ----
 	UPROPERTY(EditAnywhere, Category = "Nature|Clouds") int32 CloudCount = 60;
@@ -95,11 +97,12 @@ protected:
 
 private:
 	// What one grass "spot" becomes.
-	enum class EKind : uint8 { Grass, Tall, FlowerPink, FlowerWhite, FlowerYellow, FlowerBlue, Bush, StoneA, StoneB, Count };
+	enum class EKind : uint8 { Grass, Tall, FlowerPink, FlowerWhite, FlowerYellow, FlowerBlue, Bush, StoneA, StoneB, MossA, MossB, Count };
 
 	UStaticMesh* MeshFor(EKind Kind) const;
 	EKind PickKind(const FVector& At);
 	FTransform ClumpTransform(const FVector& At, const FVector& Normal);
+	FTransform MossTransform(const FVector& At, const FVector& Normal);   // lies flat on any slope
 	UInstancedStaticMeshComponent* MakeInstancer(UStaticMesh* Mesh, USceneComponent* AttachTo, bool bHierarchical, bool bShadows, float CullStart, float CullEnd);
 	void ScatterOnLevel();
 	FVector Viewer() const;

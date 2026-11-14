@@ -130,6 +130,19 @@ for k, s in enumerate(["A", "B"]):
     B = Builder(); lumpy(B, Vector((0, 0, 0.35)), 0.6, (0.45, 0.72, 0.38), (0.52, 0.55, 0.66), subdiv=2, bumps=0.45, flat_bottom=-0.45, seed=10 + k)
     B.export("SM_GR_Rock_" + s)
 
+# ---- 3b. moss: a soft lumpy cushion (flattened), deep green with bright tops; drapes on rock
+#      tops and sides. Alpha 0 = it doesn't sway.
+for k, s_ in enumerate(["A", "B"]):
+    B = Builder()
+    for i in range(5 + k * 2):
+        c = Vector((R.uniform(-.25, .25), R.uniform(-.25, .25), 0.0))
+        bm_r = R.uniform(0.16, 0.26)
+        lumpy(B, c, bm_r, (0.50, 0.78, 0.30), (0.12, 0.36, 0.18), subdiv=2, bumps=0.35, flat_bottom=-0.1, seed=40 + i + k * 7)
+    # squash it flat so it hugs the surface
+    for j, p in enumerate(B.v):
+        B.v[j] = Vector((p.x, p.y, max(-0.01, p.z * 0.32)))
+    B.export("SM_GR_Moss_" + s_)
+
 # ---- 4. clouds: puffy white tops, cool blue undersides (like Genshin's) ----
 for k, s in enumerate(["A", "B", "C"]):
     B = Builder(); n = 6 + k * 2

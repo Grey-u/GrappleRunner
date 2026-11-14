@@ -14,7 +14,8 @@
 #       - SKY: an anime sky in place of the dull one: deep blue overhead fading to pale cyan,
 #         soft painted clouds that drift, a pale sea of cloud below the horizon; it still
 #         darkens with the day/night clock
-#       - HAZE: far islands fade into the sky colour (anime "aerial perspective")
+#       - HAZE: slight soft-blue atmospheric fog that thickens with distance (HazeAmount,
+#         HazeDistance = metres x100 for it to reach ~63%)
 #       - OUTLINES: thin coloured lines where depth jumps, near you only
 #       - CHARACTERS: a warm rim light round anyone with custom depth (you, the partner)
 #  2. Puts it on both levels in place of M_GenshinToon / M_AnimeOutline, and thins the fog.
@@ -122,9 +123,10 @@ float bright = saturate(dot(scene, lw) * 1.8);     // follows the day/night cloc
 skyCol = lerp(scene, skyCol * lerp(0.35, 1.0, bright), lerp(0.4, 1.0, bright) * SkyAmount);
 col = lerp(col, skyCol, sky);
 
-// 5. haze: far islands fade into the horizon colour
-float haze = smoothstep(15000.0, 200000.0, d) * (1.0 - sky) * HazeAmount * bright;
-col = lerp(col, HorizonColor.rgb, haze);
+// 5. atmospheric haze: a slight soft-blue air that thickens with distance (starts gently
+//    a few metres out), so far islands fade into the sky like in Genshin
+float haze = (1.0 - exp(-max(d - 1500.0, 0.0) / HazeDistance)) * (1.0 - sky) * HazeAmount * lerp(0.3, 1.0, bright);
+col = lerp(col, lerp(HorizonColor.rgb, float3(0.72, 0.84, 0.97), 0.5), haze);
 
 // 6. outlines where depth jumps, near you only
 float l = SceneTextureLookup(uvD + float2(-pxD.x, 0) * Thickness, 1, false).r;
@@ -148,7 +150,7 @@ return col;
 PARAMS = [  # name, kind, default
     ("Brush", "s", 1.0), ("Threshold", "s", 0.55), ("ShadowLevel", "s", 0.62), ("LitLevel", "s", 1.06),
     ("ToonAmount", "s", 0.7), ("FadeStart", "s", 8000.0), ("FadeEnd", "s", 40000.0), ("Saturation", "s", 1.3),
-    ("SkyAmount", "s", 1.0), ("CloudAmount", "s", 0.9), ("HazeAmount", "s", 0.5),
+    ("SkyAmount", "s", 1.0), ("CloudAmount", "s", 0.9), ("HazeAmount", "s", 0.55), ("HazeDistance", "s", 45000.0),
     ("Thickness", "s", 1.0), ("EdgeThreshold", "s", 0.6), ("Outline", "s", 0.55), ("RimStrength", "s", 0.35),
     ("ShadowTint", "v", unreal.LinearColor(0.72, 0.80, 0.98, 1)),
     ("ZenithColor", "v", unreal.LinearColor(0.12, 0.40, 0.86, 1)),
