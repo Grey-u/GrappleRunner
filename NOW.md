@@ -7,6 +7,7 @@
 - 8,709 plants swapped to Project Nature photoscans in four colour zones, 680 glowing at night.
 
 ## Half done
+- **Anime world (14 Nov night), NOT built or run yet:** close Unreal, double-click `Tools/Rebuild.bat`, then paste `exec(open("C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/import_stylized.py").read())` and press Play. Check: log line "Stylized nature: N grass clumps..."; grass sways; birds face the way they fly (else set BirdYawOffset 90); frame rate OK (else raise GrassSpacing). Old photoscan plants may now clash with the anime grass: Grey to decide whether to remove them.
 - **Genshin-style look, ready to run:** after the rebuild, paste in Unreal's Python box: `exec(open("C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/genshin_look.py").read())` then press Play. Not tested yet.
 - **Map rotation (5 maps, random, no repeats):** coded, needs the rebuild; only Floating Islands exists.
 - **Keyboard fixes (14 Nov, late), synced to the PC but NOT compiled yet:** the rope always pulls you to the hook (half strength on an empty tank), reel gas cost halved, aim assist 13 degrees, fly within 2.2 m of a canister to collect it. To build: close Unreal, open GrappleRunner.uproject, click Yes to rebuild.

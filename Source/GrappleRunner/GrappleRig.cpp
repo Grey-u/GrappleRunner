@@ -41,6 +41,7 @@
 #include "GRPlanets.h"                             // planets in the sky
 #include "GRHandFeel.h"                            // haptic gloves: feel what your fingers touch
 #include "GRAmbientLife.h"                         // drifting pollen by day, glowing spores at night
+#include "GRStylizedNature.h"                      // anime grass, clouds, birds and butterflies
 #include "GRCutter.h"                              // the blades slice plants, props and trees
 #include "GRMenu.h"                                // the floating menu (Tab / M)
 
@@ -209,6 +210,11 @@ void AGrappleRig::BeginPlay()
 	if (!TActorIterator<AGRMenu>(GetWorld()))
 	{
 		GetWorld()->SpawnActor<AGRMenu>();
+	}
+	// The anime-style world: grass and flower meadows, a sea of clouds, birds, butterflies.
+	if (!TActorIterator<AGRStylizedNature>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRStylizedNature>();
 	}
 	// The living air: pollen and dust by day, glowing spores at night.
 	if (!TActorIterator<AGRAmbientLife>(GetWorld()))

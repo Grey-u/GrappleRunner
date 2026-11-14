@@ -4,6 +4,7 @@
 #include "GREndlessSpawner.h"
 #include "GRCompanion.h"   // the AI partner (Endless + AI partner mode)
 #include "GRGasPod.h"      // gas canisters to slice
+#include "GRStylizedNature.h"   // anime grass and flowers on the new rocks and islands
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
@@ -271,6 +272,10 @@ void AGREndlessSpawner::BuildChunk()
 	Island->AddActorWorldOffset(FVector(0.f, 0.f, Z - static_cast<float>(O.Z + E.Z)));
 	Island->Tags.Add(FName(TEXT("LandingIsland")));
 	C.Actors.Add(Island);
+	if (AGRStylizedNature* Nature = AGRStylizedNature::Get())
+	{
+		Nature->DressRock(Island, 2500);   // a meadow on top of the island
+	}
 	const FVector Top(X, Y, Z);
 
 	// ---- grapple rocks along the gap, 11-21 m above the line between the islands
@@ -389,6 +394,10 @@ void AGREndlessSpawner::AddAnchorRock(UStaticMesh* Mesh, const FVector& At, floa
 	if (Rig.IsValid())
 	{
 		Rig->AddAnchor(Rock);
+	}
+	if (AGRStylizedNature* Nature = AGRStylizedNature::Get())
+	{
+		Nature->DressRock(Rock);   // a tuft of anime grass and flowers on top
 	}
 }
 

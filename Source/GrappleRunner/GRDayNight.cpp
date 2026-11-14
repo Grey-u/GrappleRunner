@@ -33,7 +33,7 @@ AGRDayNight::AGRDayNight()
 		return K;
 	};
 	Dawn = Key(FLinearColor(1.00f, 0.88f, 0.74f), 6.f, FLinearColor(0.50f, 0.52f, 0.58f), FLinearColor(1.0f, 0.78f, 0.55f), 0.8f);
-	Noon = Key(FLinearColor(1.00f, 0.97f, 0.92f), 10.f, FLinearColor(0.42f, 0.58f, 0.68f), FLinearColor(1.0f, 0.95f, 0.85f), 1.1f);
+	Noon = Key(FLinearColor(1.00f, 0.97f, 0.92f), 10.f, FLinearColor(0.36f, 0.62f, 0.92f), FLinearColor(1.0f, 0.95f, 0.85f), 1.25f);   // anime sky blue haze
 	Dusk = Key(FLinearColor(1.00f, 0.60f, 0.40f), 6.f, FLinearColor(0.48f, 0.40f, 0.52f), FLinearColor(1.0f, 0.58f, 0.40f), 0.7f);
 	Night = Key(FLinearColor(0.55f, 0.72f, 1.00f), 1.0f, FLinearColor(0.02f, 0.06f, 0.10f), FLinearColor(0.30f, 0.55f, 0.85f), 0.25f);   // deep blue-teal: the glow takes over
 }
