@@ -7,6 +7,8 @@
 - 8,709 plants swapped to Project Nature photoscans in four colour zones, 680 glowing at night.
 
 ## Half done
+- **Genshin-style look, ready to run:** after the rebuild, paste in Unreal's Python box: `exec(open("C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/genshin_look.py").read())` then press Play. Not tested yet.
+- **Map rotation (5 maps, random, no repeats):** coded, needs the rebuild; only Floating Islands exists.
 - **Keyboard fixes (14 Nov, late), synced to the PC but NOT compiled yet:** the rope always pulls you to the hook (half strength on an empty tank), reel gas cost halved, aim assist 13 degrees, fly within 2.2 m of a canister to collect it. To build: close Unreal, open GrappleRunner.uproject, click Yes to rebuild.
 - **Endless run (14 Nov pm), built, needs a full play-test:** gas runs out, canisters to slice, gauge, closer rocks, caves, vault onto lower points, AI partner with CSV lines, start-up/menu flow, L_Endless. Check: the spawner says "active 1" in the log on L_Endless; canisters burst; vault feels right; partner keeps up; gauge readable.
 - **VR loading splash** still to add (its header moved in 5.8).

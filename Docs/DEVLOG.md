@@ -258,3 +258,9 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - **Anime realism:** `M_AnimeOutline` post-process on both levels: ink outline and soft banded shading on anything with custom depth (player body, partner); the world stays realistic.
 - **Portfolio doc** (Claude Doc "Grapple Runner: where the game is now"): mostly diagrams for a non-games reader, including six sword moves from kendo, iaido, Filipino sinawali and Chinese double broadsword.
 - **Disk:** the asset registry showed which packs nothing uses; with Naomi's OK, deleting ParagonGrux, InfinityBladeAdversaries, PN_tropicalGroundPlants, SampleMap, Realistic_Starter_VFX_Pack_Vol2 and the old builds (about 5.3 GB). ParagonProps stays (KiteDemo rocks use it).
+
+## 14 Nov 2026 (evening): map rotation, Genshin-style shading script, portfolio doc
+- **Multiplayer map rotation** (`GRMenuGameMode`): five map slots; each team match draws one at random (like Valorant), skipping maps not built yet and never repeating the last map. Floating Islands is map 1; slots 2-5 are placeholders. The loading screen shows the drawn map.
+- **"Aeloria" removed from the game** (menus, loading screen, quest text, comments, CLAUDE.md): Aeloria is the world of Grey's future VR MMO, not this game.
+- **Genshin-style look** (`Scripts/genshin_look.py`, not run yet): a new post-process material, M_GenshinToon, replaces M_AnimeOutline on both levels. On characters: two-tone shading with a soft edge, purple-tinted shadows, a warm rim light, coloured (not black) outlines and richer colour; the whole picture gets a little more saturation. The world keeps realistic lighting.
+- **Portfolio doc** for a friend (writer, not from games): visual timeline from the EXIT SUIT onwards, what changed, screenshots, 22 sword moves from six martial arts, 8 kicks for the EXIT SUIT, exported as a PDF.
