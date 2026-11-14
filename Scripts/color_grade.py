@@ -4,8 +4,13 @@ Grapple Runner: atmosphere and colour. Makes Aeloria an ethereal fantasy place, 
 Run with the Floating Islands level open (not while playing), AFTER expand_world.py:
     py "C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/color_grade.py"
 
-FIVE MOODS. Change MOOD below and re-run to switch (it updates the same lights every time):
-  "pandora" - (CURRENT ART DIRECTION, 11 Nov, Naomi: "alive and real but fantastical - think
+SIX MOODS. Change MOOD below and re-run to switch (it updates the same lights every time):
+  "anime"  - (CURRENT ART DIRECTION, 14 Nov, Naomi: "in anime most things are stylised but a lot
+             is actually drawn in realism", and Final Fantasy VII Remake for characters): real,
+             physically lit materials, graded like an anime background painting: warm golden
+             sun, bright airy shadows (anime shadows are never muddy), clear saturated greens and
+             sky blues, soft bloom and pale blue haze in the distance.
+  "pandora" - (art direction 11-13 Nov, Naomi: "alive and real but fantastical - think
              Avatar"): true daylight so plants are properly GREEN, humid blue-green air in the
              distance, natural contrast, and bioluminescent orbs that glow brighter at night.
   "haze"   - sepia haze: one warm family of peach, amber and
@@ -36,9 +41,13 @@ import math
 import random
 import unreal
 
-MOOD = "pandora"
+MOOD = "anime"
 
 MOODS = {
+    "anime": dict(sun=(255, 238, 208), lux=11.0, pitch=-32, sky=(180, 208, 255), skyi=1.35, fog=(0.60, 0.74, 0.90), glow=(1.0, 0.90, 0.72), dens=0.018,
+                  shadows=(0.94, 1.0, 1.10), highs=(1.06, 1.03, 0.94), orbs=[(0.55, 0.85, 1.0), (1.0, 0.85, 0.45), (0.75, 1.0, 0.65)],
+                  saturation=1.16, sat_rgb=(1.0, 1.12, 1.04), contrast=1.0, bloom=1.25, midsat=1.08, falloff=0.0018, start=1500.0, extinction=0.8,
+                  grain=0.0, gamma=(1.0, 1.0, 1.0), gain=(1.02, 1.02, 0.99), orb_light=500.0, ruin_light=800.0, retint_lights=True, biolum=True),
     "pandora": dict(sun=(255, 247, 235), lux=10.0, pitch=-38, sky=(190, 215, 255), skyi=1.1, fog=(0.42, 0.58, 0.68), glow=(1.0, 0.95, 0.85), dens=0.03,
                   shadows=(0.96, 1.0, 1.06), highs=(1.03, 1.02, 0.97), orbs=[(0.15, 0.85, 1.0), (0.3, 1.0, 0.7), (0.55, 0.35, 1.0)],
                   saturation=1.08, sat_rgb=(0.68, 1.15, 1.03), contrast=1.06, bloom=0.8, midsat=1.05, falloff=0.002, start=800.0, extinction=1.2,

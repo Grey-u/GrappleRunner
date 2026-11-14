@@ -23,6 +23,7 @@
 #include "GrappleRig.h"
 #include "GRVine.h"
 #include "GRCutter.h"
+#include "GRMenu.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/PointLightComponent.h"
@@ -517,7 +518,7 @@ void AGRArsenal::ReadInput(float Dt)
 	AGrappleRig* R = Rig.Get();
 	APlayerController* P = R ? R->GetPlayerController() : nullptr;
 	bWantAim = false;
-	if (!P || R->IsUsingVR())
+	if (!P || R->IsUsingVR() || AGRMenu::IsOpen(this))   // the menu has the mouse while it's open
 	{
 		return;
 	}

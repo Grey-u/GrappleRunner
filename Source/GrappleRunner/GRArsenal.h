@@ -143,6 +143,10 @@ class GRAPPLERUNNER_API AGRArsenal : public AActor
 	GENERATED_BODY()
 
 public:
+	// For the menu (GRMenu): pick a weapon slot, and which slot is in your hands (-1 = none).
+	void Equip(int32 Slot) { StartSwitch(Slot); }
+	int32 HeldSlot() const { return (!bHolstered && Weapons.IsValidIndex(Current)) ? Current : -1; }
+
 	AGRArsenal();
 	void ApplyTuning(bool bArms, const FVector& Location, const FRotator& Turn);   // gr.Arms / gr.Gun console commands
 	virtual void Tick(float DeltaSeconds) override;

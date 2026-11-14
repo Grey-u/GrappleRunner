@@ -40,8 +40,9 @@
 #include "GRArsenal.h"                             // the weapons: switch, aim, fire, slash
 #include "GRPlanets.h"                             // planets in the sky
 #include "GRHandFeel.h"                            // haptic gloves: feel what your fingers touch
-#include "GRAmbientLife.h"
-#include "GRCutter.h"                         // drifting pollen by day, glowing spores at night
+#include "GRAmbientLife.h"                         // drifting pollen by day, glowing spores at night
+#include "GRCutter.h"                              // the blades slice plants, props and trees
+#include "GRMenu.h"                                // the floating menu (Tab / M)
 
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
@@ -196,6 +197,11 @@ void AGrappleRig::BeginPlay()
 	if (!TActorIterator<AGRCutter>(GetWorld()))
 	{
 		GetWorld()->SpawnActor<AGRCutter>();
+	}
+	// The floating menu (Tab / M, or the left controller's menu button in VR).
+	if (!TActorIterator<AGRMenu>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRMenu>();
 	}
 	// The living air: pollen and dust by day, glowing spores at night.
 	if (!TActorIterator<AGRAmbientLife>(GetWorld()))
@@ -409,8 +415,9 @@ void AGrappleRig::ReadInput(float DeltaSeconds)
 		// ---- Mouse and keyboard (testing without a headset) ----
 		// Q / E always fire the hooks. The mouse buttons do too, but only with empty hands:
 		// with a weapon out they fire and aim it instead (see GRArsenal.cpp).
-		bHookDown[0] = P->IsInputKeyDown(EKeys::Q) || (bMouseHooks && P->IsInputKeyDown(EKeys::LeftMouseButton));
-		bHookDown[1] = P->IsInputKeyDown(EKeys::E) || (bMouseHooks && P->IsInputKeyDown(EKeys::RightMouseButton));
+		const bool bMouseFree = bMouseHooks && !AGRMenu::IsOpen(this);   // the menu has the mouse while it's open
+		bHookDown[0] = P->IsInputKeyDown(EKeys::Q) || (bMouseFree && P->IsInputKeyDown(EKeys::LeftMouseButton));
+		bHookDown[1] = P->IsInputKeyDown(EKeys::E) || (bMouseFree && P->IsInputKeyDown(EKeys::RightMouseButton));
 		const bool bShift = P->IsInputKeyDown(EKeys::LeftShift);
 		// Auto-pull on: hooks reel you in by themselves, Shift = stop pulling and swing.
 		// Auto-pull off: Shift = reel in.

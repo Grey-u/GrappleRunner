@@ -268,6 +268,7 @@ public:
 	USceneComponent* GetHand(int32 Index) const;
 	APlayerController* GetPlayerController() const;
 	bool IsUsingVR() const { return bVR; }
+	float GetGas() const { return Gas; }               // gas left in the tank (the menu's gas bar)
 	bool IsGrounded() const { return bGrounded; }
 	FVector GetBodyVelocity() const { return Velocity; }
 	const TArray<TWeakObjectPtr<class AGRVine>>& GetVines() const { return Vines; }
