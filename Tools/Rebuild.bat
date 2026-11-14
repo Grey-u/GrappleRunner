@@ -18,4 +18,4 @@ if errorlevel 1 (
   exit /b 1
 )
 echo Built. Opening Unreal...
-start "" "%CD%\GrappleRunner.uproject"
+start "" "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "%CD%\GrappleRunner.uproject"
