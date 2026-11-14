@@ -64,7 +64,10 @@ void AGREndlessSpawner::BeginPlay()
 	// Which mode did the menu pick? ("?mode=endless" travels with the level.)
 	const AGameModeBase* GM = GetWorld()->GetAuthGameMode();
 	const FString Mode = GM ? UGameplayStatics::ParseOption(GM->OptionsString, TEXT("mode")) : FString();
-	bActive = Mode.Equals(TEXT("endless"), ESearchCase::IgnoreCase) || (Mode.IsEmpty() && bRunInEditorPlay);
+	// Pressing Play in the editor (no menu, so no mode): run only in the endless level itself.
+	// The floating islands are the multiplayer map now, so they stay as built.
+	const bool bEndlessMap = GetWorld()->GetMapName().Contains(TEXT("Endless"));
+	bActive = Mode.Equals(TEXT("endless"), ESearchCase::IgnoreCase) || (Mode.IsEmpty() && bRunInEditorPlay && bEndlessMap);
 	if (!bActive)
 	{
 		SetActorTickEnabled(false);   // a team mode: leave the hand-built level alone
