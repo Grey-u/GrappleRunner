@@ -68,6 +68,7 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> CapBottom;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Beam;   // thin light beam above it
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> Light;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UNiagaraComponent> Orb;   // the glowing orb you see (MayuOrbs effect)
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Bits;          // the burst's bits of light
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> GlowMat;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> BurstMat;

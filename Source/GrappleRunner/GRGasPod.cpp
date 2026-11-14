@@ -16,6 +16,7 @@
 #include "GRLootOrb.h"
 
 #include "Components/PointLightComponent.h"
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Components/StaticMeshComponent.h"
@@ -57,10 +58,17 @@ AGRGasPod::AGRGasPod()
 	CapBottom = MakePart(this, Body, TEXT("CapBottom"), Cyl, FVector(1.15f, 1.15f, 0.12f), FVector(0.f, 0.f, -52.f));
 	Beam = MakePart(this, Pivot, TEXT("Beam"), Cyl, FVector(0.025f, 0.025f, 7.f), FVector(0.f, 0.f, 390.f));   // 7 m of light straight up
 
+	// What you actually see (14 Nov, Grey: "just make it a floating orb"): a big glowing orb
+	// from the MayuOrbs pack, riding on the canister's spot. The cylinder is kept only as the
+	// invisible "where am I" point (and as the fallback look if the pack is missing).
+	Orb = CreateDefaultSubobject<UNiagaraComponent>(TEXT("Orb"));
+	Orb->SetupAttachment(Body);
+	Orb->SetAutoActivate(false);
+
 	Light = CreateDefaultSubobject<UPointLightComponent>(TEXT("Light"));
 	Light->SetupAttachment(Pivot);
 	Light->SetIntensity(9000.f);
-	Light->SetAttenuationRadius(700.f);
+	Light->SetAttenuationRadius(900.f);
 	Light->SetCastShadows(false);
 }
 
@@ -90,6 +98,19 @@ void AGRGasPod::BeginPlay()
 	CapMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.03f, 0.035f, 0.04f));   // dark metal caps
 	CapTop->SetMaterial(0, CapMat);
 	CapBottom->SetMaterial(0, CapMat);
+
+	// The orb look: if the MayuOrbs effect is there, show it big and hide the cylinder parts.
+	if (UNiagaraSystem* OrbFx = LoadObject<UNiagaraSystem>(nullptr, TEXT("/Game/MayuOrbs/02_Orbs/Orb_1/NiagaraSystem/NS_Orb_1.NS_Orb_1")))
+	{
+		Orb->SetAsset(OrbFx);
+		Orb->SetRelativeScale3D(FVector(2.5f) / Body->GetRelativeScale3D());   // undo the cylinder's squash, then make it big
+		Orb->Activate(true);
+		Body->SetVisibility(false, false);   // hide the cylinder itself...
+		CapTop->SetVisibility(false);         // ...its caps
+		CapBottom->SetVisibility(false);
+		Beam->SetVisibility(false);           // and the grey beam
+	}
+	Light->SetLightColor(Glow);
 	Light->SetLightColor(Glow);
 }
 
@@ -118,8 +139,9 @@ void AGRGasPod::Burst(const FLinearColor& Colour)
 {
 	bBurst = true;
 	Age = 0.f;
-	Body->SetVisibility(false, true);   // hide the canister and its caps
+	Body->SetVisibility(false, true);   // hide the canister and its caps (and the orb on it)
 	Beam->SetVisibility(false);
+	Orb->Deactivate();
 
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/GrappleRunner/Materials/M_GasGlow.M_GasGlow"));
 	if (!Base)

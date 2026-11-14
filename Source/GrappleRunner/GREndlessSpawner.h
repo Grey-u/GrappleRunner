@@ -66,7 +66,7 @@ public:
 	// Gas canisters: the fuel you slice to keep going.
 	UPROPERTY(EditAnywhere, Category = "Endless") float OrbTrailChance = 0.5f;   // chance of a trail of loot orbs in a gap
 	UPROPERTY(EditAnywhere, Category = "Endless") FIntPoint PodsPerGap = FIntPoint(2, 3);   // glowing canisters in each gap (Grey: more of them)
-	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D PodHeight = FVector2D(500.f, 1100.f);   // above the island-to-island line
+	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D PodHeight = FVector2D(150.f, 550.f);    // above the island-to-island line: right on your swing path
 	// Floating caves and tunnels: every few gaps, a tube of rock to swing through.
 	UPROPERTY(EditAnywhere, Category = "Endless") int32 CaveEvery = 3;          // one every 3 gaps
 	UPROPERTY(EditAnywhere, Category = "Endless|Assets") TArray<TSoftObjectPtr<UStaticMesh>> CaveMeshes;

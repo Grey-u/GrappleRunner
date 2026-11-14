@@ -135,6 +135,12 @@ void AGREndlessSpawner::BeginPlay()
 	{
 		Rig->UseEndlessRules();
 	}
+	// Three gas orbs straight ahead of where you start, so you see what they are at once.
+	for (int32 i = 0; i < 3; ++i)
+	{
+		const FVector At = StartTop + FVector(900.f + i * 1100.f, Rng.FRandRange(-300.f, 300.f), 250.f + i * 100.f);
+		GetWorld()->SpawnActor<AGRGasPod>(At, FRotator::ZeroRotator);
+	}
 	if (bPartnerWanted)
 	{
 		GetWorld()->SpawnActor<AGRCompanion>();
