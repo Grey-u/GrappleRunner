@@ -180,7 +180,7 @@ void AGREndlessSpawner::Tick(float DeltaSeconds)
 
 	if (GEngine)
 	{
-		GEngine->AddOnScreenDebugMessage(4202, 0.f, FColor(255, 214, 160),
+		GEngine->AddOnScreenDebugMessage(4205, 0.f, FColor(255, 214, 160),   // 4205: its own line (4202 is the weapon status)
 			FString::Printf(TEXT("ENDLESS   %d m      best %d m"), FMath::RoundToInt(Distance), FMath::RoundToInt(FMath::Max(Best, Distance))));
 	}
 }
