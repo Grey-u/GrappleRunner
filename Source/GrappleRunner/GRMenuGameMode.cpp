@@ -28,6 +28,7 @@
 #include "Widgets/Images/SThrobber.h"
 #include "GRSettings.h"
 #include "MoviePlayer.h"
+#include "Misc/PackageName.h"   // to check which maps exist
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -268,7 +269,12 @@ private:
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f)
 			[
 				SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Bold", 16)).ColorAndOpacity(FSlateColor(Orange))
-				.Text_Lambda([this]() { return FText::FromString(Owner.IsValid() ? Owner->GetPendingMode().ToUpper() : FString()); })
+				.Text_Lambda([this]()
+				{
+					if (!Owner.IsValid()) { return FText(); }
+					const FString Map = Owner->GetPendingMapName();
+					return FText::FromString(Owner->GetPendingMode().ToUpper() + (Map.IsEmpty() ? FString() : TEXT("   ON   ") + Map));
+				})
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f)[ SNew(SBox).HAlign(HAlign_Left)[ SNew(SThrobber) ] ]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f)
@@ -331,15 +337,47 @@ void AGRMenuGameMode::StartMode(const FString& Mode)
 		return;   // already loading: ignore double clicks
 	}
 	PendingMode = Mode;   // this switches the menu to its loading page
+	// Team modes: draw this match's map from the rotation now, so the loading page can show it.
+	PendingMapName.Reset();
+	if (!PendingMode.StartsWith(TEXT("endless")) && MultiplayerMaps.Num() > 0)
+	{
+		const int32 Pick = DrawMap();
+		PendingMap = MultiplayerMaps[Pick];
+		PendingMapName = MultiplayerMapNames.IsValidIndex(Pick) ? MultiplayerMapNames[Pick] : PendingMap.ToString();
+		// Remember it, so the next match doesn't draw the same map straight away.
+		GConfig->SetString(TEXT("GrappleRunner"), TEXT("LastMap"), *PendingMap.ToString(), GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
 	// Wait a moment so the loading screen is actually drawn, then open the level.
 	GetWorldTimerManager().SetTimer(LoadTimer, this, &AGRMenuGameMode::OpenGameLevel, FMath::Max(0.05f, LoadingScreenSeconds), false);
+}
+
+// The map draw: every map in the rotation that exists on disk is a candidate; the one played
+// last time is left out (if there's another to pick); then one is picked at random.
+int32 AGRMenuGameMode::DrawMap() const
+{
+	FString Last;
+	GConfig->GetString(TEXT("GrappleRunner"), TEXT("LastMap"), Last, GGameUserSettingsIni);
+	TArray<int32> Ready;
+	for (int32 i = 0; i < MultiplayerMaps.Num(); ++i)
+	{
+		if (FPackageName::DoesPackageExist(FString::Printf(TEXT("/Game/GrappleRunner/Maps/%s"), *MultiplayerMaps[i].ToString())))
+		{
+			Ready.Add(i);
+		}
+	}
+	if (Ready.Num() > 1)
+	{
+		Ready.RemoveAll([this, &Last](int32 i) { return MultiplayerMaps[i].ToString() == Last; });
+	}
+	return Ready.Num() > 0 ? Ready[FMath::RandRange(0, Ready.Num() - 1)] : 0;
 }
 
 void AGRMenuGameMode::OpenGameLevel()
 {
 	// Solo modes go to the endless level; the team modes to the floating islands.
 	const bool bEndless = PendingMode.StartsWith(TEXT("endless"));
-	const FName Level = bEndless ? EndlessLevel : GameLevel;
+	const FName Level = bEndless ? EndlessLevel : PendingMap;
 	const FString Options = bEndless
 		? FString::Printf(TEXT("mode=endless?partner=%d"), PendingMode == TEXT("endless_partner") ? 1 : 0)
 		: FString::Printf(TEXT("mode=%s"), *PendingMode);

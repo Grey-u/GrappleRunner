@@ -50,7 +50,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Menu") TSoftObjectPtr<UTexture2D> TitleCard =
 		TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Game/GrappleRunner/UI/T_TitleCard.T_TitleCard")));
 	// The level each mode opens (every mode uses the floating islands for now).
-	UPROPERTY(EditAnywhere, Category = "Menu") FName GameLevel = TEXT("L_FloatingIslands_2");   // the multiplayer modes' map
+	// MULTIPLAYER MAP ROTATION (Grey, 14 Nov): five maps, and each match draws one at random,
+	// like Valorant. A map that isn't built yet is skipped, and the map you just played isn't
+	// drawn twice in a row (when there's more than one to choose from).
+	// Only the Floating Islands exists so far: the other four names are placeholders. To add a
+	// map, save it in Content/GrappleRunner/Maps under one of these names (or change the names here).
+	UPROPERTY(EditAnywhere, Category = "Menu|Multiplayer") TArray<FName> MultiplayerMaps =
+		{ TEXT("L_FloatingIslands_2"), TEXT("L_MP_Map2"), TEXT("L_MP_Map3"), TEXT("L_MP_Map4"), TEXT("L_MP_Map5") };
+	// The names shown on the loading screen, in the same order as the maps above.
+	UPROPERTY(EditAnywhere, Category = "Menu|Multiplayer") TArray<FString> MultiplayerMapNames =
+		{ TEXT("FLOATING ISLANDS"), TEXT("MAP 2"), TEXT("MAP 3"), TEXT("MAP 4"), TEXT("MAP 5") };
 	// The solo endless run's level: a start island in open sky; the run is built ahead of you.
 	UPROPERTY(EditAnywhere, Category = "Menu") FName EndlessLevel = TEXT("L_Endless");
 	// How long the "starting" loading screen shows when the game opens (seconds).
@@ -64,6 +73,7 @@ public:
 	float GetBootProgress() const { return FMath::Clamp(BootClock / FMath::Max(0.1f, BootSeconds), 0.f, 1.f); }
 	virtual void Tick(float DeltaSeconds) override;
 	const FString& GetPendingMode() const { return PendingMode; }
+	const FString& GetPendingMapName() const { return PendingMapName; }   // the map drawn for this match ("" for solo)
 
 protected:
 	virtual void BeginPlay() override;     // put the menu on screen
@@ -73,6 +83,9 @@ private:
 	UPROPERTY() TObjectPtr<UTexture2D> CardTexture;   // keeps the picture loaded while the menu shows
 	TSharedPtr<SWidget> Menu;                          // the menu itself (built in the .cpp)
 	FString PendingMode;                               // the mode being loaded ("" = none yet)
+	FName PendingMap;                                  // the multiplayer map drawn for this match
+	FString PendingMapName;
+	int32 DrawMap() const;                             // picks the map: index into MultiplayerMaps
 	FTimerHandle LoadTimer;
 	float BootClock = 0.f;
 	void OpenGameLevel();
