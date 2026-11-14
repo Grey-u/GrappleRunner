@@ -103,7 +103,7 @@ public:
 
 	// ---- Hooks ----
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float MaxFireRange = 6000.f;     // furthest a hook can reach (60 m)
-	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float AimAssistDegrees = 9.f;    // if you miss, snap to a grapple rock within this angle
+	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float AimAssistDegrees = 13.f;   // was 9: easier to hit rocks with a mouse    // if you miss, snap to a grapple rock within this angle
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float MinRopeLength = 250.f;     // reeling stops at 2.5 m so you don't crash into the rock
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float ReelSpeed = 900.f;         // how fast the rope shortens when reeling (9 m/s)
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float ReelPullAccel = 1400.f;    // extra tug toward the hook while reeling
@@ -160,7 +160,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float BoostAccel = 1600.f;          // how hard the boost pushes
 	// Endless rules (14 Nov): the rope's reel and every hook burn gas too, so the tank runs out
 	// and you have to slice gas canisters to keep going. Empty tank = the rope can't pull you.
-	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float GasReelPerSecond = 5.f;       // while a rope is pulling you in
+	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float GasReelPerSecond = 2.5f;      // while a rope is pulling you in (halved 14 Nov: too hard on keyboard)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float EmptyPullStrength = 0.5f;     // with an empty tank the rope still pulls you in, at this fraction of full strength
 	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float GasPerHook = 2.f;             // each hook fired
 	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") bool bRefillOnGround = true;        // Endless turns this off: only canisters refill
 	// Vault: a hook fired at a point more than this far below you pulls you on top instead of under.

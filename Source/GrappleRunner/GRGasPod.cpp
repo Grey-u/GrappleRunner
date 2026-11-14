@@ -156,6 +156,22 @@ void AGRGasPod::Tick(float DeltaSeconds)
 	Clock += DeltaSeconds;
 	if (!bBurst)
 	{
+		// Fly through it (or close past, within TouchRadius) and it counts too: on a keyboard
+		// you're busy aiming hooks, so slicing alone was too hard (Naomi, 14 Nov).
+		if (!Rig.IsValid())
+		{
+			TActorIterator<AGrappleRig> It(GetWorld());
+			Rig = It ? *It : nullptr;
+		}
+		if (AGrappleRig* R = Rig.Get())
+		{
+			const FVector Body = R->GetBodyPosition() + FVector(0.f, 0.f, 85.f);
+			if (FVector::Dist(Body, GetActorLocation()) < TouchRadius)
+			{
+				TrySlice(GetActorLocation(), GetActorLocation(), R);   // a zero-length "blade" right through the middle
+				return;
+			}
+		}
 		// Bob up and down 25 cm and turn slowly: it reads as "pick me up" from far away.
 		SetActorLocation(Home + FVector(0.f, 0.f, FMath::Sin(Clock * 1.8f) * 25.f));
 		Body->SetRelativeRotation(FRotator(18.f, Clock * 70.f, 0.f));

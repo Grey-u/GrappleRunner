@@ -8,6 +8,8 @@
 //  blade and it bursts into a spray of light in the colour your gas gauge shows right now
 //  (green, orange or red), and your tank refills by Refill.
 //
+//  FLYING THROUGH IT counts too (within TouchRadius), so it's playable on a keyboard.
+//
 //  HOW THE SLICE IS DETECTED
 //  Each frame of a sword swing, the arsenal (GRArsenal) asks every canister "did this blade
 //  pass through you?" (TrySlice). The answer is a distance check: how close does the line
@@ -44,6 +46,7 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") float Refill = 40.f;      // gas added (the tank holds 100)
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") float Radius = 75.f;      // how close the blade must pass (cm): generous on purpose
+	UPROPERTY(EditAnywhere, Category = "Gas Pod") float TouchRadius = 220.f; // fly this close and it counts as collected
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") int32 Sparks = 36;        // how many bits of light in the burst
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") FLinearColor Glow = FLinearColor(0.35f, 0.95f, 0.35f);   // the canister's own colour
 
@@ -68,6 +71,7 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> GlowMat;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> BurstMat;
 	TArray<FVector> BitSpeed;
+	TWeakObjectPtr<AGrappleRig> Rig;
 	FVector Home;
 	float Clock = 0.f;
 	float Age = -1.f;         // seconds since the burst (-1 = not burst yet)
