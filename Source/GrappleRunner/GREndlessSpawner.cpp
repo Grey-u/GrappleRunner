@@ -318,7 +318,7 @@ void AGREndlessSpawner::BuildChunk()
 	C.Actors.Add(Island);
 	if (AGRStylizedNature* Nature = AGRStylizedNature::Get())
 	{
-		Nature->DressRock(Island, 5000);   // a dense meadow on top, moss down the sides
+		Nature->DressRock(Island, 15000);   // a dense meadow on top, moss down the sides
 	}
 	const FVector Top(X, Y, Z);
 

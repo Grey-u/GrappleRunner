@@ -21,26 +21,69 @@ namespace
 {
 	// What each kind of plant is, in EKind order: the StyleHex Stylized Forest pack first, our
 	// own mesh as the fallback, and how tall it should end up (cm; negative = keep its size).
+	// Grey: grass is FOOT height and very dense, not knee-high.
 	struct FKindSource { const TCHAR* Pack; const TCHAR* Ours; float Height; };
 	#define GR_SH(N) TEXT("/Game/StyleHex_Studio/Free_Packs/FREE_Stylized_Forest_Sample/Meshes/") TEXT(N)
 	const FKindSource KindSources[] = {
-		{ GR_SH("Foliage/SM_Fol_Grass_Clump_1"), TEXT("SM_GR_Grass"), 60.f },
-		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_GrassTall"), 100.f },
-		{ GR_SH("Foliage/SM_Fol_Flower_Clump_1"), TEXT("SM_GR_Flowers_Pink"), 60.f },
-		{ GR_SH("Foliage/SM_Fol_Flower_Clump_2"), TEXT("SM_GR_Flowers_White"), 60.f },
-		{ GR_SH("Foliage/SM_Fol_Flower_Clump_3"), TEXT("SM_GR_Flowers_Yellow"), 60.f },
-		{ nullptr, TEXT("SM_GR_Flowers_Blue"), 60.f },
-		{ GR_SH("Foliage/SM_Fol_Bush_1"), TEXT("SM_GR_Bush"), 150.f },
-		{ GR_SH("Stones/SM_Stone_1"), TEXT("SM_GR_Rock_A"), 80.f },
-		{ GR_SH("Stones/SM_Stone_2"), TEXT("SM_GR_Rock_B"), 110.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_1"), TEXT("SM_GR_Grass"), 25.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_GrassTall"), 38.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_1"), TEXT("SM_GR_Flowers_Pink"), 30.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_2"), TEXT("SM_GR_Flowers_White"), 30.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_3"), TEXT("SM_GR_Flowers_Yellow"), 30.f },
+		{ nullptr, TEXT("SM_GR_Flowers_Blue"), 30.f },
+		{ GR_SH("Foliage/SM_Fol_Bush_1"), TEXT("SM_GR_Bush"), 55.f },
+		{ GR_SH("Stones/SM_Stone_1"), TEXT("SM_GR_Rock_A"), 35.f },
+		{ GR_SH("Stones/SM_Stone_2"), TEXT("SM_GR_Rock_B"), 45.f },
 		{ nullptr, TEXT("SM_GR_Moss_A"), -1.f },
 		{ nullptr, TEXT("SM_GR_Moss_B"), -1.f },
-		{ GR_SH("Foliage/SM_Fol_Grass_Clump_2"), TEXT("SM_GR_Grass"), 60.f },
-		{ GR_SH("Foliage/SM_Fol_Grass_Clump_4"), TEXT("SM_GR_Grass"), 70.f },
-		{ GR_SH("Foliage/SM_Fol_Grass_Clump_5"), TEXT("SM_GR_Grass"), 55.f },
-		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_Grass"), 65.f },   // the tall clump, kept short
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_2"), TEXT("SM_GR_Grass"), 25.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_4"), TEXT("SM_GR_Grass"), 28.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_5"), TEXT("SM_GR_Grass"), 22.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_Grass"), 26.f },   // the tall clump, kept short
 	};
 	#undef GR_SH
+
+	// Is this actor a plant (tree, fern, bush, vine...)? Plants are never ground: the grass
+	// trace looks straight through them (it used to plant grass on top of the trees).
+	bool IsPlant(const AActor* A)
+	{
+		static const TCHAR* Words[] = { TEXT("Tree"), TEXT("Fern"), TEXT("Plant"), TEXT("Foliage"), TEXT("Beech"), TEXT("Bush"),
+			TEXT("Grass"), TEXT("Vine"), TEXT("Root"), TEXT("Leaf"), TEXT("Leaves"), TEXT("Ivy"), TEXT("Flower"), TEXT("Banana"),
+			TEXT("Pandanus"), TEXT("Palm"), TEXT("Fol_"), TEXT("PN_"), TEXT("Moss") };
+		auto Has = [](const FString& S)
+		{
+			for (const TCHAR* W : Words)
+			{
+				if (S.Contains(W))
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+		if (Has(A->GetClass()->GetName()))
+		{
+			return true;
+		}
+#if WITH_EDITOR
+		if (Has(A->GetActorLabel(false)))   // the name shown in the editor's Outliner
+		{
+			return true;
+		}
+#endif
+		TArray<UStaticMeshComponent*> Comps;
+		A->GetComponents(Comps);
+		int32 Plants = 0, All = 0;
+		for (const UStaticMeshComponent* C : Comps)
+		{
+			if (C && C->GetStaticMesh())
+			{
+				++All;
+				Plants += Has(C->GetStaticMesh()->GetPathName()) ? 1 : 0;
+			}
+		}
+		return All > 0 && Plants * 2 >= All;   // mostly plant meshes = a plant
+	}
 
 	UStaticMesh* LoadPackMesh(const TCHAR* Path)
 	{
@@ -378,11 +421,21 @@ void AGRStylizedNature::ScatterOnLevel()
 	// instanced pieces, which the first version skipped), rocks, ruins, ledges.
 	struct FTarget { AActor* Actor; FBox Box; double Dist; };
 	TArray<FTarget> Targets;
+	FCollisionQueryParams Params(TEXT("GRGrass"), true);   // true = trace the real shape, not a rough box
+	Params.AddIgnoredActor(this);
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		AActor* A = *It;
-		if (A == this || A->IsHidden() || A->ActorHasTag(FName(TEXT("NoGrass"))) || A->IsA<APawn>() || !A->GetRootComponent()
-			|| A->GetRootComponent()->Mobility == EComponentMobility::Movable || A->GetClass()->GetName().Contains(TEXT("Foliage")))
+		if (A == this || A->IsHidden() || A->IsA<APawn>() || !A->GetRootComponent())
+		{
+			continue;
+		}
+		if (IsPlant(A))
+		{
+			Params.AddIgnoredActor(A);   // see through trees and plants down to the ground
+			continue;
+		}
+		if (A->ActorHasTag(FName(TEXT("NoGrass"))) || A->GetRootComponent()->Mobility == EComponentMobility::Movable)
 		{
 			continue;
 		}
@@ -412,9 +465,8 @@ void AGRStylizedNature::ScatterOnLevel()
 	Targets.Sort([](const FTarget& L, const FTarget& R) { return L.Dist < R.Dist; });
 
 	int32 Traces = 0;
-	const int32 MaxTraces = 500000;
-	const int32 MaxPerActor = 9000;       // traces any one actor may use (big ones get wider spacing)
-	FCollisionQueryParams Params(TEXT("GRGrass"), true);   // true = trace the real shape, not a rough box
+	const int32 MaxTraces = 2500000;      // baked in the editor, so it can take its time
+	const int32 MaxPerActor = 60000;      // traces any one actor may use (huge ones get wider spacing)
 	for (const FTarget& T : Targets)
 	{
 		if (Planted >= MaxClumps || Traces >= MaxTraces)
@@ -484,6 +536,7 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 	Rock->GetActorBounds(true, Origin, Extent);
 	const FBox Box(Origin - Extent, Origin + Extent);
 	FCollisionQueryParams Params(TEXT("GRGrassRock"), true);
+	// (The spawner adds an island's trees AFTER this, so nothing blocks the ground here.)
 	const float Gap = FMath::Max(GrassSpacing * 0.85f, FMath::Sqrt(static_cast<float>(4.f * Extent.X * Extent.Y) / (MaxOnIt * 1.6f)));
 	TMap<int32, UInstancedStaticMeshComponent*> Sets;
 	auto Plant = [&](EKind K, const FTransform& Xf)
