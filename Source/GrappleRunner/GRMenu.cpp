@@ -14,7 +14,7 @@
 //  Slate describes UI as nested boxes. "SNew(SVerticalBox) + SVerticalBox::Slot() [ ... ]"
 //  means "a column; in its first row put ...". [ ] holds a box's content. Anything written
 //  "_Lambda([this]{ ... })" is worked out again every frame, so it can change live (a bar
-//  that shrinks, a button that turns amber).
+//  that shrinks, a button that turns green).
 // =====================================================================================
 #include "GRMenu.h"
 #include "GrappleRig.h"
@@ -48,12 +48,12 @@ namespace
 	const FVector2D PanelPixels(1600.f, 900.f);
 
 	// Colours (Red, Green, Blue, see-through-ness 0..1)
-	const FLinearColor PanelTint(0.94f, 0.94f, 0.95f, 0.93f); // soft white panels
+	const FLinearColor PanelTint(0.94f, 0.94f, 0.95f, 0.96f); // soft white panels
 	const FLinearColor Button(0.97f, 0.97f, 0.98f, 0.97f);    // round buttons and pills
-	const FLinearColor TextDark(0.30f, 0.31f, 0.34f, 1.f);    // grey writing
-	const FLinearColor IconGrey(0.55f, 0.56f, 0.60f, 1.f);
+	const FLinearColor TextDark(0.12f, 0.13f, 0.15f, 1.f);    // dark grey writing (the panel is brightened by the scene's lighting)
+	const FLinearColor IconGrey(0.32f, 0.33f, 0.37f, 1.f);
 	const FLinearColor SlotEmpty(0.80f, 0.80f, 0.83f, 0.9f);
-	const FLinearColor HoverTint(1.f, 0.90f, 0.70f, 1.f);     // pale amber under the pointer
+	const FLinearColor HoverTint(FColor(214, 228, 204));        // pale sage under the pointer
 
 	// Buttons with no look of their own (we paint the shapes ourselves, inside them).
 	const FButtonStyle& PlainButton()
@@ -109,6 +109,9 @@ AGRMenu::AGRMenu()
 	Panel->SetCollisionProfileName(TEXT("UI"));               // the pointer's ray can hit it
 	Panel->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // ...but only while it's open
 	Panel->SetVisibility(false);
+	// The scene's bright lighting and colour grade wash a world-space panel out; dim it a
+	// little so white reads as soft white and the writing stays sharp.
+	Panel->SetTintColorAndOpacity(FLinearColor(0.62f, 0.62f, 0.64f, 1.f));
 
 	// The pointer: we tell it exactly what it's pointing at each frame ("Custom").
 	Pointer = CreateDefaultSubobject<UWidgetInteractionComponent>(TEXT("Pointer"));
@@ -157,7 +160,7 @@ void AGRMenu::BeginPlay()
 // =====================================================================================
 void AGRMenu::BuildBrushes()
 {
-	// Rounded boxes: white, so each use can tint them (white, amber, grey).
+	// Rounded boxes: white, so each use can tint them (white, sage green, grey).
 	CircleBrush = FSlateRoundedBoxBrush(FLinearColor::White, 52.f);
 	PillBrush = FSlateRoundedBoxBrush(FLinearColor::White, 29.f, FLinearColor(0.f, 0.f, 0.f, 0.08f), 1.f);
 	PanelBrush = FSlateRoundedBoxBrush(FLinearColor::White, 18.f, FLinearColor(1.f, 1.f, 1.f, 0.6f), 2.f);
@@ -227,7 +230,7 @@ TSharedRef<SWidget> AGRMenu::BuildStatusAndGear()
 					AGRArsenal* A = FindArsenal();
 					const int32 H = A ? A->HeldSlot() : -1;
 					const bool bHeld = S.Blade >= 0 && H >= 0 && A->Weapons[H].Kind == EGRWeaponKind::Swords;   // blades in your hands
-					if (bHeld) { return FSlateColor(Amber); }
+					if (bHeld) { return FSlateColor(Accent); }
 					if (HoverSlot == i) { return FSlateColor(HoverTint); }
 					return FSlateColor(S.bFilled ? Button : SlotEmpty);
 				})
@@ -328,7 +331,7 @@ TSharedRef<SWidget> AGRMenu::BuildIconColumn()
 					[
 						SNew(SImage).Image(&CircleBrush).ColorAndOpacity_Lambda([this, i, bEnabled]
 						{
-							if (Category == i) { return FSlateColor(Amber); }
+							if (Category == i) { return FSlateColor(Accent); }
 							if (HoverIcon == i) { return FSlateColor(HoverTint); }
 							return FSlateColor(bEnabled ? Button : FLinearColor(0.85f, 0.85f, 0.87f, 0.6f));
 						})
@@ -353,10 +356,10 @@ TSharedRef<SWidget> AGRMenu::BuildList()
 	return SNew(SBox).WidthOverride(420.f)
 	[
 		SNew(SVerticalBox)
-		// The category name, in an amber pill (like SAO's highlighted tab)
+		// The category name, in a sage-green pill (like SAO's highlighted tab)
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 16.f)
 		[
-			SNew(SBorder).BorderImage(&PillBrush).BorderBackgroundColor(Amber).Padding(FMargin(26.f, 8.f))
+			SNew(SBorder).BorderImage(&PillBrush).BorderBackgroundColor(Accent).Padding(FMargin(26.f, 8.f))
 			[
 				SNew(STextBlock).Font(Font(26, TEXT("Regular"))).ColorAndOpacity(FLinearColor::White)
 				.Text_Lambda([this] { return FText::FromString(CategoryNames[Category]); })
@@ -394,7 +397,7 @@ void AGRMenu::RefreshList()
 				.BorderBackgroundColor_Lambda([this, i]
 				{
 					const bool bOn = Entries.IsValidIndex(i) && Entries[i].IsOn && Entries[i].IsOn();
-					return FSlateColor(bOn ? Amber : (HoverEntry == i ? HoverTint : Button));
+					return FSlateColor(bOn ? Accent : (HoverEntry == i ? HoverTint : Button));
 				})
 				[
 					SNew(SBox).HeightOverride(58.f).VAlign(VAlign_Center)
@@ -467,7 +470,7 @@ void AGRMenu::SelectCategory(int32 Index)
 	{
 	case 0:   // Player
 		Add(LOCTEXT("Status", "Status"), LOCTEXT("StatusInfo", "Level 1.\nYour gas is the bar under your name: it drains when you boost and refills on the ground."));
-		Add(LOCTEXT("Gear", "Equipment"), LOCTEXT("GearInfo", "Your gear is on the body outline to the left. Point at a slot to see what's in it. Slots turn amber when that item is in your hands."));
+		Add(LOCTEXT("Gear", "Equipment"), LOCTEXT("GearInfo", "Your gear is on the body outline to the left. Point at a slot to see what's in it. Slots turn green when that item is in your hands."));
 		break;
 	case 1:   // Party (comes with multiplayer)
 		Add(LOCTEXT("Invite", "Invite a friend"), LOCTEXT("InviteInfo", "Multiplayer comes in a later version."));
@@ -500,11 +503,11 @@ void AGRMenu::SelectCategory(int32 Index)
 		break;
 	case 5:   // Settings
 	{
-		const float Sens = bOpen ? SavedSensitivity : (R ? R->MouseSensitivity : 0.6f);
+		const float Sens = R ? R->MouseSensitivity : 0.6f;
 		Add(FText::Format(LOCTEXT("SensUp", "Mouse sensitivity  {0}   +"), FText::AsNumber(Sens)), LOCTEXT("SensUpInfo", "Look around faster with the mouse."),
-			[this] { SavedSensitivity = FMath::Clamp(SavedSensitivity + 0.1f, 0.1f, 3.f); SelectCategory(5); });
+			[this] { if (AGrappleRig* Rr = Rig.Get()) { Rr->MouseSensitivity = FMath::Clamp(Rr->MouseSensitivity + 0.1f, 0.1f, 3.f); } SelectCategory(5); });
 		Add(LOCTEXT("SensDown", "Mouse sensitivity   -"), LOCTEXT("SensDownInfo", "Look around slower with the mouse."),
-			[this] { SavedSensitivity = FMath::Clamp(SavedSensitivity - 0.1f, 0.1f, 3.f); SelectCategory(5); });
+			[this] { if (AGrappleRig* Rr = Rig.Get()) { Rr->MouseSensitivity = FMath::Clamp(Rr->MouseSensitivity - 0.1f, 0.1f, 3.f); } SelectCategory(5); });
 		break;
 	}
 	case 6:   // Log Out
@@ -531,13 +534,12 @@ void AGRMenu::Place()
 		return;
 	}
 	const FVector EyeAt = Eyes->GetComponentLocation();
-	FVector Ahead = Eyes->GetForwardVector();
-	Ahead.Z = 0.f;                                   // level with the horizon, whatever angle you look at
-	Ahead = Ahead.GetSafeNormal();
-	if (Ahead.IsNearlyZero())
-	{
-		Ahead = FVector::ForwardVector;
-	}
+	// Where you're looking, but never more than 25 degrees up or down (so it never ends up on
+	// the floor or overhead).
+	FRotator Look = Eyes->GetComponentRotation();
+	Look.Pitch = FMath::Clamp(Look.Pitch, -25.f, 25.f);
+	Look.Roll = 0.f;
+	const FVector Ahead = Look.Vector();
 	const FVector At = EyeAt + Ahead * Distance - FVector(0.f, 0.f, Drop);
 	// The panel's front faces along its X axis, so turn X toward your eyes.
 	Panel->SetWorldLocationAndRotation(At, (EyeAt - At).Rotation());
@@ -554,19 +556,6 @@ void AGRMenu::Open()
 	Place();
 	Panel->SetVisibility(true);
 	Panel->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	SavedSensitivity = R->MouseSensitivity;
-	if (!R->IsUsingVR())
-	{
-		R->MouseSensitivity = 0.f;                   // the view holds still while you use the menu
-		if (APlayerController* PC = R->GetPlayerController())
-		{
-			PC->bShowMouseCursor = true;
-			FInputModeGameAndUI Mode;
-			Mode.SetHideCursorDuringCapture(false);
-			Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
-			PC->SetInputMode(Mode);
-		}
-	}
 	SelectCategory(Category);
 }
 
@@ -583,15 +572,7 @@ void AGRMenu::Close()
 	{
 		Pointer->ReleasePointerKey(EKeys::LeftMouseButton);
 	}
-	if (R && !R->IsUsingVR())
-	{
-		R->MouseSensitivity = SavedSensitivity;
-		if (APlayerController* PC = R->GetPlayerController())
-		{
-			PC->bShowMouseCursor = false;
-			PC->SetInputMode(FInputModeGameOnly());
-		}
-	}
+	(void)R;
 }
 
 // =====================================================================================
@@ -626,18 +607,17 @@ void AGRMenu::ReadInput()
 		return;
 	}
 
-	// What are you pointing at? Desktop: under the mouse cursor. VR: a ray from your right hand.
+	// What are you pointing at? Desktop: the centre of your view (look at a button, click).
+	// VR: a ray from your right hand.
 	FHitResult Hit;
 	bool bHit = false;
-	if (!R->IsUsingVR())
+	const USceneComponent* Ray = R->IsUsingVR() ? R->GetHand(1) : static_cast<const USceneComponent*>(R->GetEyes());
+	if (Ray)
 	{
-		bHit = PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit) && Hit.GetComponent() == Panel;
-	}
-	else if (USceneComponent* Hand = R->GetHand(1))
-	{
-		const FVector From = Hand->GetComponentLocation();
-		const FVector To = From + Hand->GetForwardVector() * Pointer->InteractionDistance;
+		const FVector From = Ray->GetComponentLocation();
+		const FVector To = From + Ray->GetForwardVector() * Pointer->InteractionDistance;
 		FCollisionQueryParams Params(TEXT("GRMenuPointer"), false, this);
+		Params.AddIgnoredActor(R);
 		bHit = GetWorld()->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params) && Hit.GetComponent() == Panel;
 	}
 	Pointer->SetCustomHitResult(bHit ? Hit : FHitResult());

@@ -12,15 +12,14 @@
 //       Under it, the GEAR PANEL: a body outline with round slots round it (blades, ODM
 //       gear, gas tanks...). Point at a slot to see what's in it.
 //    2. The ICON COLUMN: round white buttons (Player, Party, Items, Skills, Map, Settings,
-//       Log Out). The one you pick turns amber.
+//       Log Out). The one you pick turns sage green.
 //    3. The LIST: the picked category's entries as pill-shaped buttons. Items: your weapons
 //       (pick one to equip it). Settings: mouse sensitivity. Log Out: back to the main menu.
 //    4. The INFO PANEL: what the pointed-at entry is; otherwise your current quest.
 //
 //  HOW YOU POINT AND CLICK
-//  A "widget interaction" pointer: on desktop it follows the mouse cursor (the cursor shows
-//  while the menu is open, and looking around pauses); in VR it is a laser from your right
-//  hand and the trigger clicks.
+//  A "widget interaction" pointer: on desktop it's the centre of your view (look at a button,
+//  left-click); in VR it's a ray from your right hand and the trigger clicks.
 //
 //  HOW IT'S BUILT
 //  The menu is drawn with Slate, Unreal's own UI code (the same thing the editor is made of),
@@ -65,7 +64,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Menu") float WidthCm = 120.f;           // how wide it is in the world (cm)
 	UPROPERTY(EditAnywhere, Category = "Menu") float OpenSeconds = 0.22f;       // the pop-in animation
 	UPROPERTY(EditAnywhere, Category = "Menu") FString PlayerName = TEXT("NAOMI");
-	UPROPERTY(EditAnywhere, Category = "Menu") FLinearColor Amber = FLinearColor(1.f, 0.66f, 0.08f);   // the "picked" colour
+	UPROPERTY(EditAnywhere, Category = "Menu") FLinearColor Accent = FLinearColor(FColor(140, 166, 120));   // the "picked" colour: sage green (Naomi, 14 Nov)
 	UPROPERTY(EditAnywhere, Category = "Menu") FName MainMenuLevel = TEXT("L_MainMenu");
 
 protected:
@@ -93,7 +92,7 @@ private:
 		FText Label;
 		FText Info;                        // shown in the info panel when pointed at
 		TFunction<void()> Action;          // what clicking it does (may be empty)
-		TFunction<bool()> IsOn;            // shows it amber when true (e.g. the weapon you hold)
+		TFunction<bool()> IsOn;            // shows it green when true (e.g. the weapon you hold)
 	};
 	TArray<FEntry> Entries;               // the current category's rows
 
