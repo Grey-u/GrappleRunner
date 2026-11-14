@@ -8,9 +8,9 @@
 #     depth: you, the AI partner) get a thin ink outline and softly banded, cel-like
 #     shading; the world stays realistic. This is the FF7 Remake / anime-film idea:
 #     anime characters drawn into a realistically lit world.
-#  3. L_Endless: the solo endless level. A COPY of L_FloatingIslands_2 (the original is not
-#     touched) with everything removed except the start island area, the sky, lights and
-#     game helpers. The endless spawner builds the rest of the run ahead of you.
+#  3. L_Endless: the solo endless level. Made from L_FloatingIslands_2 (opened, stripped,
+#     then saved under the new name, so the original is not touched): only the start island
+#     area, the sky, lights and game helpers remain. The spawner builds the rest ahead of you.
 #  4. In L_FloatingIslands_2 (now the multiplayer map), the endless spawner no longer runs
 #     when you press Play, and both levels get the anime outline.
 #
@@ -136,9 +136,10 @@ def add_outline_to_level():
 
 
 # ---- 3. the endless level -----------------------------------------------------------------
-if not eal.does_asset_exist(ENDLESS):
-    eal.duplicate_asset(ISLANDS, ENDLESS)
-    level_sub.load_level(ENDLESS)
+# Open the islands level, strip it down to the start island + sky, then "Save As" L_Endless.
+# (Duplicating the map asset and opening the copy crashes the editor in 5.8, so we don't.)
+# The islands level on disk is never saved here, so it stays exactly as it was.
+def strip_to_start():
     actors = actor_sub.get_all_level_actors()
     start = None
     for a in actors:
@@ -148,9 +149,8 @@ if not eal.does_asset_exist(ENDLESS):
     if start is None:
         start = unreal.Vector(0, 0, 0)
     keep_types = (unreal.Light, unreal.SkyLight, unreal.ExponentialHeightFog, unreal.PostProcessVolume,
-                  unreal.PlayerStart, unreal.WorldSettings, unreal.SkyAtmosphere, unreal.VolumetricCloud,
-                  unreal.AtmosphericFog if hasattr(unreal, "AtmosphericFog") else unreal.SkyAtmosphere)
-    keep_names = ("GrappleRig", "GREndlessSpawner", "GRDayNight", "GRPlanets", "GRAmbientLife", "BP_Sky", "Sky")
+                  unreal.PlayerStart, unreal.WorldSettings, unreal.SkyAtmosphere, unreal.VolumetricCloud)
+    keep_names = ("GrappleRig", "GREndlessSpawner", "GRDayNight", "GRPlanets", "GRAmbientLife", "Sky")
     doomed = []
     for a in actors:
         if isinstance(a, keep_types) or any(k in a.get_class().get_name() for k in keep_names):
@@ -158,13 +158,21 @@ if not eal.does_asset_exist(ENDLESS):
         loc = a.get_actor_location()
         if (loc.x - start.x) ** 2 + (loc.y - start.y) ** 2 < KEEP_RADIUS ** 2:
             continue   # the start island and what grows on it
-        if a.get_class().get_name() in ("SkySphere_C", "BP_Sky_Sphere_C"):
-            continue
         doomed.append(a)
-    print("L_Endless: removing", len(doomed), "of", len(actors), "actors (only in the copy)")
+    print("L_Endless: removing", len(doomed), "of", len(actors), "actors")
     actor_sub.destroy_actors(doomed)
+    for a in actor_sub.get_all_level_actors():
+        if a.get_class().get_name() == "GREndlessSpawner":
+            a.set_editor_property("run_in_editor_play", True)
+
+
+if not eal.does_asset_exist(ENDLESS):
+    level_sub.load_level(ISLANDS)
+    strip_to_start()
     add_outline_to_level()
-    level_sub.save_current_level()
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    unreal.EditorLoadingAndSavingUtils.save_map(world, ENDLESS)
+    print("L_Endless saved")
 else:
     print("L_Endless already there")
 
