@@ -272,3 +272,9 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - **`GRStylizedNature`** (new class, spawned by the rig): traces down on every solid non-moving mesh in the level and plants clumps on flat tops (meadows of one flower colour, patches of tall grass, bare spots, using smooth noise), up to 60,000 clumps, all instanced, culled past 80 m, no grass shadows. Endless mode: every new rock and island is dressed as it spawns (`DressRock`). Sea of clouds below you that drifts and wraps ahead, 4 flocks of birds circling in loose V's, 30 butterflies fluttering over grass near you.
 - Noon fog is a brighter anime sky blue.
 - `Tools/Rebuild.bat`: double-click after closing Unreal to compile and reopen (log in `Saved/rebuild_log.txt`).
+
+## 14 Nov 2026 (late night): whole-world anime look, anime sky, solid rocks only
+- Grey's play-test: "looks exactly the same, dull sky, no clouds, rocks look like paper". Causes: the Genshin shading only touched characters; the grass planter used its whole budget on the first huge mesh it found, so the islands got almost none; the clouds were far away in thick fog; the Megascans "cliff" scans dressing the islands are open shells (no back).
+- **`Scripts/anime_world.py`** makes **M_AnimeWorld**, a post-process for the whole picture: painterly Kuwahara filter, two-tone toon light with lilac shadows, richer colour, an anime sky (blue gradient, painted drifting clouds, pale sea of cloud below, follows day/night), haze into the horizon colour, thin coloured outlines near you, rim light on characters. Fog thinned. Open-shell rocks and flat slabs are swapped for solid rocks of the same size.
+- **Grass planter fixed:** skips hidden meshes, starts with the meshes nearest you, gives each mesh a fair share of traces. Clouds now 50-280 m away and more of them.
+- **Caves** no longer use the open-backed cliff scans (rule: only rocks that are solid all the way round).

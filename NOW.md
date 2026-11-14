@@ -1,13 +1,15 @@
 # NOW (updated 14 Nov 2026, afternoon)
 
 ## Works
+- Rule (Grey): only rocks that are solid all the way round, never open-backed scans or flat slabs.
 - UE 5.8.4 project (VR / OpenXR template), level `L_FloatingIslands_2`, start menu `L_MainMenu`, Endless Runner mode, day/night match clock, 4 planets, pollen/spores (`GRAmbientLife`), haptic glove bridge (`GRHandFeel`, untested without gloves).
 - `GrappleRig`: twin hooks, soft rope, swing, Kwang body with ODM gear, vines snap.
 - Weapons (`GRArsenal`): 1 twin ODM blades (new, see below), 2 rifle with the animated arms pack (draw/fire/reload montages), 3 bolt-action sniper. Desktop hands reload; VR manual reload written for the headset.
 - 8,709 plants swapped to Project Nature photoscans in four colour zones, 680 glowing at night.
 
 ## Half done
-- **Anime world (14 Nov night), NOT built or run yet:** close Unreal, double-click `Tools/Rebuild.bat`, then paste `exec(open("C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/import_stylized.py").read())` and press Play. Check: log line "Stylized nature: N grass clumps..."; grass sways; birds face the way they fly (else set BirdYawOffset 90); frame rate OK (else raise GrassSpacing). Old photoscan plants may now clash with the anime grass: Grey to decide whether to remove them.
+- **Anime world v2 (14 Nov late):** rebuild (`Tools/Rebuild.bat`), then run `Scripts/anime_world.py`, Play. Check the sky, the toon look, that grass is on the islands near you, and that no paper rocks are left (the log lists each PAPER mesh).
+- **Anime world v1 (14 Nov night):** close Unreal, double-click `Tools/Rebuild.bat`, then paste `exec(open("C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/import_stylized.py").read())` and press Play. Check: log line "Stylized nature: N grass clumps..."; grass sways; birds face the way they fly (else set BirdYawOffset 90); frame rate OK (else raise GrassSpacing). Old photoscan plants may now clash with the anime grass: Grey to decide whether to remove them.
 - **Genshin-style look, ready to run:** after the rebuild, paste in Unreal's Python box: `exec(open("C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/genshin_look.py").read())` then press Play. Not tested yet.
 - **Map rotation (5 maps, random, no repeats):** coded, needs the rebuild; only Floating Islands exists.
 - **Keyboard fixes (14 Nov, late), synced to the PC but NOT compiled yet:** the rope always pulls you to the hook (half strength on an empty tank), reel gas cost halved, aim assist 13 degrees, fly within 2.2 m of a canister to collect it. To build: close Unreal, open GrappleRunner.uproject, click Yes to rebuild.
