@@ -130,13 +130,13 @@ for k, s in enumerate(["A", "B"]):
     B = Builder(); lumpy(B, Vector((0, 0, 0.35)), 0.6, (0.45, 0.72, 0.38), (0.52, 0.55, 0.66), subdiv=2, bumps=0.45, flat_bottom=-0.45, seed=10 + k)
     B.export("SM_GR_Rock_" + s)
 
-# ---- 4. clouds: puffy white tops, soft lilac-blue undersides ----
+# ---- 4. clouds: puffy white tops, cool blue undersides (like Genshin's) ----
 for k, s in enumerate(["A", "B", "C"]):
     B = Builder(); n = 6 + k * 2
     for i in range(n):
         x = (i / (n - 1) - 0.5) * (14 + k * 6) + R.uniform(-2, 2)
         r = R.uniform(3.5, 6.5) * (1.2 - abs(i / (n - 1) - 0.5))
-        lumpy(B, Vector((x, R.uniform(-3, 3), r * 0.35)), r, (1.0, 1.0, 1.0), (0.70, 0.74, 0.92), subdiv=2, bumps=0.12, flat_bottom=-0.25, seed=20 + i + k * 9)
+        lumpy(B, Vector((x, R.uniform(-3, 3), r * 0.35)), r, (1.0, 1.0, 1.0), (0.62, 0.76, 0.93), subdiv=2, bumps=0.12, flat_bottom=-0.25, seed=20 + i + k * 9)
     B.export("SM_GR_Cloud_" + s, smooth=True)
 
 # ---- 5. bird: a simple gull shape facing +X, wings flap (alpha = wing weight) ----

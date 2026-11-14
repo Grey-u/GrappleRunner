@@ -77,8 +77,8 @@ col = lerp(float3(g, g, g), col, Saturation);
 float3 dir = -normalize(V);
 float up = dir.z;
 float3 skyCol = lerp(HorizonColor.rgb, ZenithColor.rgb, pow(saturate(up * 1.3), 0.55));
-skyCol = lerp(skyCol, float3(0.86, 0.89, 0.98), saturate(-up * 2.5));    // a pale sea of cloud below
-float2 q = dir.xy / max(up + 0.18, 0.05) * 1.6 + float2(T * 0.004, T * 0.002);
+skyCol = lerp(skyCol, float3(0.90, 0.95, 1.0), saturate(-up * 2.5));    // a pale sea of cloud below
+float2 q = dir.xy / max(up + 0.18, 0.05) * 0.9 + float2(T * 0.004, T * 0.002);
 float n = 0.0; float amp = 0.5;
 [unroll] for (int oc = 0; oc < 5; oc++)
 {
@@ -90,8 +90,8 @@ float n = 0.0; float amp = 0.5;
     n += amp * lerp(lerp(h00, h10, fp.x), lerp(h01, h11, fp.x), fp.y);
     q = q * 2.03 + 11.7; amp *= 0.5;
 }
-float cloud = smoothstep(0.50, 0.70, n) * saturate(up * 4.0 + 0.1) * CloudAmount;
-float3 cloudCol = lerp(float3(0.80, 0.83, 0.96), float3(1.0, 1.0, 1.0), saturate((n - 0.5) * 3.0));
+float cloud = smoothstep(0.53, 0.58, n) * saturate(up * 4.0 + 0.1) * CloudAmount;   // crisp edges, like Genshin
+float3 cloudCol = lerp(float3(0.62, 0.76, 0.93), float3(1.0, 1.0, 1.0), smoothstep(0.56, 0.68, n));   // cool blue shading, white tops
 skyCol = lerp(skyCol, cloudCol, cloud);
 float bright = saturate(dot(scene, lw) * 1.8);     // follows the day/night clock
 skyCol = lerp(scene, skyCol * lerp(0.35, 1.0, bright), lerp(0.4, 1.0, bright) * SkyAmount);
@@ -125,9 +125,9 @@ PARAMS = [  # name, kind, default
     ("ToonAmount", "s", 0.7), ("FadeStart", "s", 8000.0), ("FadeEnd", "s", 40000.0), ("Saturation", "s", 1.3),
     ("SkyAmount", "s", 1.0), ("CloudAmount", "s", 0.9), ("HazeAmount", "s", 0.5),
     ("Thickness", "s", 1.0), ("EdgeThreshold", "s", 0.6), ("Outline", "s", 0.55), ("RimStrength", "s", 0.35),
-    ("ShadowTint", "v", unreal.LinearColor(0.80, 0.74, 0.95, 1)),
-    ("ZenithColor", "v", unreal.LinearColor(0.16, 0.42, 0.88, 1)),
-    ("HorizonColor", "v", unreal.LinearColor(0.66, 0.86, 0.98, 1)),
+    ("ShadowTint", "v", unreal.LinearColor(0.72, 0.80, 0.98, 1)),
+    ("ZenithColor", "v", unreal.LinearColor(0.12, 0.40, 0.86, 1)),
+    ("HorizonColor", "v", unreal.LinearColor(0.80, 0.92, 0.99, 1)),
     ("Ink", "v", unreal.LinearColor(0.03, 0.03, 0.06, 1)),
     ("RimColor", "v", unreal.LinearColor(1.0, 0.94, 0.84, 1)),
 ]
