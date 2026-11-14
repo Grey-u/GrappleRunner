@@ -12,6 +12,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerStart.h"
+#include "Engine/Brush.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/Paths.h"
 
@@ -85,21 +86,63 @@ namespace
 		return SM && SM->GetStaticMesh() && HasPlantWord(SM->GetStaticMesh()->GetPathName());
 	}
 
-	// Trace down to the GROUND: if the first thing hit is a plant piece, look through it and
-	// keep going (up to 8 layers of leaves).
+	// Is this piece something grass can't grow on, so the trace should look through it?
+	// Plants, invisible things (blocking volumes, trigger boxes), anything that moves, and the
+	// sky dome / fog / mist / clouds / water. Returns the reason, or nullptr if it's ground.
+	const TCHAR* NotGround(const UPrimitiveComponent* C)
+	{
+		if (!C)
+		{
+			return TEXT("nothing");
+		}
+		if (IsPlantPiece(C))
+		{
+			return TEXT("plant");
+		}
+		if (!C->IsVisible() || C->bHiddenInGame)
+		{
+			return TEXT("invisible");
+		}
+		const AActor* A = C->GetOwner();
+		if (!A || A->IsA<ABrush>() || A->IsA<APawn>() || C->Mobility == EComponentMobility::Movable)
+		{
+			return TEXT("volume or moving");
+		}
+		const FString Name = A->GetClass()->GetName() + TEXT(" ") + A->GetName()
+			+ (Cast<UStaticMeshComponent>(C) && Cast<UStaticMeshComponent>(C)->GetStaticMesh() ? Cast<UStaticMeshComponent>(C)->GetStaticMesh()->GetName() : FString());
+		for (const TCHAR* W : { TEXT("Sky"), TEXT("Fog"), TEXT("Mist"), TEXT("Cloud"), TEXT("Water"), TEXT("Waterfall"), TEXT("Planet") })
+		{
+			if (Name.Contains(W))
+			{
+				return TEXT("sky/fog/water");
+			}
+		}
+		return nullptr;
+	}
+
+	// What the trace looked through, and why (written to the log after baking).
+	TMap<FString, int32> GSkipped;
+
+	// Trace down to the GROUND: anything that isn't ground (see NotGround) is looked through,
+	// layer after layer, until real ground is hit.
 	bool GroundTrace(UWorld* World, const FVector& From, const FVector& To, FCollisionQueryParams& Params, FHitResult& Hit)
 	{
-		for (int32 Layer = 0; Layer < 8; ++Layer)
+		for (int32 Layer = 0; Layer < 12; ++Layer)
 		{
 			if (!World->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params))
 			{
 				return false;
 			}
-			if (!IsPlantPiece(Hit.GetComponent()))
+			const TCHAR* Why = NotGround(Hit.GetComponent());
+			if (!Why)
 			{
 				return true;
 			}
-			Params.AddIgnoredComponent(Hit.GetComponent());   // see through this plant from now on
+			if (GSkipped.Num() < 200)
+			{
+				GSkipped.FindOrAdd(FString(Why) + TEXT(": ") + (Hit.GetActor() ? Hit.GetActor()->GetName() : FString(TEXT("?"))))++;
+			}
+			Params.AddIgnoredComponent(Hit.GetComponent());   // look through it from now on
 		}
 		return false;
 	}
@@ -488,6 +531,8 @@ void AGRStylizedNature::ScatterOnLevel()
 		Ground.Add(T.Actor);
 	}
 	TSet<FIntPoint> Done;                  // one clump per 40 cm square, even where islands overlap
+	int32 NoGround = 0, TooSteep = 0;      // for the log: why traces didn't plant
+	GSkipped.Reset();
 
 	int32 Traces = 0;
 	const int32 MaxTraces = 2500000;      // baked in the editor, so it can take its time
@@ -509,10 +554,15 @@ void AGRStylizedNature::ScatterOnLevel()
 				FHitResult Hit;
 				++Traces;
 				// The first thing hit from above must be part of THIS actor, and flat enough.
-				// Any ground actor counts (an island can be made of several pieces), not just this one.
-				if (!GroundTrace(GetWorld(), Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), Params, Hit)
-					|| !Ground.Contains(Hit.GetActor()) || Hit.ImpactNormal.Z < MinFlatness)
+				// Grass grows on the first real ground below (whatever actor it belongs to).
+				if (!GroundTrace(GetWorld(), Top, FVector(Top.X, Top.Y, Box.Min.Z - 50.f), Params, Hit))
 				{
+					++NoGround;
+					continue;
+				}
+				if (Hit.ImpactNormal.Z < MinFlatness)
+				{
+					++TooSteep;
 					continue;
 				}
 				const FIntPoint Cell(FMath::FloorToInt(Hit.ImpactPoint.X / GrassSpacing), FMath::FloorToInt(Hit.ImpactPoint.Y / GrassSpacing));
@@ -547,7 +597,18 @@ void AGRStylizedNature::ScatterOnLevel()
 			LevelGrass[k]->AddInstances(ByKind[k], false, true);   // (transforms, don't need the numbers back, world space)
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("Stylized nature: %d actors looked at, %d traces, %d clumps"), Targets.Num(), Traces, Planted);
+	UE_LOG(LogTemp, Log, TEXT("Stylized nature: %d actors looked at, %d traces, %d clumps (no ground below: %d, too steep: %d)"),
+		Targets.Num(), Traces, Planted, NoGround, TooSteep);
+	GSkipped.ValueSort([](int32 L, int32 R) { return L > R; });
+	int32 Shown = 0;
+	for (const TPair<FString, int32>& P : GSkipped)
+	{
+		if (++Shown > 12)
+		{
+			break;
+		}
+		UE_LOG(LogTemp, Log, TEXT("Stylized nature:   looked through %s  x%d"), *P.Key, P.Value);
+	}
 }
 
 // Rocks and islands spawned while playing (endless mode): same idea, but only that actor,
