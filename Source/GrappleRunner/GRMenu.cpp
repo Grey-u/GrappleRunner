@@ -625,11 +625,6 @@ void AGRMenu::ReadInput()
 		bHit = GetWorld()->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params) && Hit.GetComponent() == Panel;
 	}
 	Pointer->SetCustomHitResult(bHit ? Hit : FHitResult());
-	if (GEngine && !R->IsUsingVR())
-	{
-		GEngine->AddOnScreenDebugMessage(4310, 0.f, FColor(160, 200, 140), bHit ? FString::Printf(TEXT("Menu: pointing at %.0f, %.0f"),
-			Hit.Location.X, Hit.Location.Y) : FString(TEXT("Menu: look at a button, left-click to pick it")));
-	}
 
 	// Click: left mouse on desktop, the right trigger in VR.
 	bool bDown = PC->IsInputKeyDown(EKeys::LeftMouseButton);
@@ -647,6 +642,16 @@ void AGRMenu::ReadInput()
 		Pointer->ReleasePointerKey(EKeys::LeftMouseButton);
 	}
 	bPointerDown = bDown;
+
+	// Temporary test read-out (top-left on desktop): where on the panel you're pointing, in pixels.
+	if (GEngine && !R->IsUsingVR())
+	{
+		const FVector2D Px = Pointer->Get2DHitLocation();
+		GEngine->AddOnScreenDebugMessage(4310, 0.f, FColor(160, 200, 140), bHit
+			? FString::Printf(TEXT("Menu: panel pixel %.0f, %.0f  over button %d  entry %d icon %d  click %d"),
+				Px.X, Px.Y, Pointer->IsOverInteractableWidget() ? 1 : 0, HoverEntry, HoverIcon, bDown ? 1 : 0)
+			: FString(TEXT("Menu: look at a button, left-click to pick it")));
+	}
 }
 
 void AGRMenu::Tick(float DeltaSeconds)
