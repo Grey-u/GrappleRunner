@@ -61,10 +61,10 @@ UInstancedStaticMeshComponent* AGRStylizedNature::MakeInstancer(UStaticMesh* Mes
 	{
 		return nullptr;
 	}
-	AActor* Owner = AttachTo->GetOwner();
+	AActor* Holder = AttachTo->GetOwner();
 	UInstancedStaticMeshComponent* C = bHierarchical
-		? NewObject<UHierarchicalInstancedStaticMeshComponent>(Owner)
-		: NewObject<UInstancedStaticMeshComponent>(Owner);
+		? NewObject<UHierarchicalInstancedStaticMeshComponent>(Holder)
+		: NewObject<UInstancedStaticMeshComponent>(Holder);
 	C->SetStaticMesh(Mesh);
 	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // you swing through grass and clouds
 	C->SetCastShadow(bShadows);
@@ -78,7 +78,7 @@ UInstancedStaticMeshComponent* AGRStylizedNature::MakeInstancer(UStaticMesh* Mes
 	}
 	C->RegisterComponent();
 	C->AttachToComponent(AttachTo, FAttachmentTransformRules::KeepWorldTransform);
-	Owner->AddInstanceComponent(C);
+	Holder->AddInstanceComponent(C);
 	return C;
 }
 

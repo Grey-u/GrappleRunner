@@ -28,7 +28,7 @@
 
 namespace
 {
-	const FVector2D PanelPixels(320.f, 92.f);   // the card's size in pixels (it's scaled to WidthCm)
+	const FVector2D GaugePixels(320.f, 92.f);   // the card's size in pixels (it's scaled to WidthCm)
 	// Brushes must outlive the widget, so they live here for the whole game.
 	FSlateRoundedBoxBrush& BackBrush() { static FSlateRoundedBoxBrush B(FLinearColor::White, 18.f, FLinearColor(0.55f, 0.65f, 0.47f, 0.5f), 2.f); return B; }
 	FSlateRoundedBoxBrush& BarBrush() { static FSlateRoundedBoxBrush B(FLinearColor::White, 9.f); return B; }
@@ -55,7 +55,7 @@ AGRGasGauge::AGRGasGauge()
 	Panel = CreateDefaultSubobject<UWidgetComponent>(TEXT("Panel"));
 	RootComponent = Panel;
 	Panel->SetWidgetSpace(EWidgetSpace::World);
-	Panel->SetDrawSize(PanelPixels);
+	Panel->SetDrawSize(GaugePixels);
 	Panel->SetPivot(FVector2D(0.5f, 0.5f));
 	Panel->SetTwoSided(true);
 	Panel->SetBlendMode(EWidgetBlendMode::Masked);                // solid card, cut-out corners
@@ -70,7 +70,7 @@ void AGRGasGauge::BeginPlay()
 	Rig = It ? *It : nullptr;
 	Root = Build();
 	Panel->SetSlateWidget(Root);
-	Panel->SetWorldScale3D(FVector(WidthCm / PanelPixels.X));
+	Panel->SetWorldScale3D(FVector(WidthCm / GaugePixels.X));
 }
 
 TSharedRef<SWidget> AGRGasGauge::Build()
@@ -106,7 +106,7 @@ TSharedRef<SWidget> AGRGasGauge::Build()
 				]
 				+ SOverlay::Slot().HAlign(HAlign_Left)
 				[
-					SNew(SBox).WidthOverride_Lambda([this] { return FOptionalSize(FMath::Max(0.f, Shown) * (PanelPixels.X - 36.f)); })
+					SNew(SBox).WidthOverride_Lambda([this] { return FOptionalSize(FMath::Max(0.f, Shown) * (GaugePixels.X - 36.f)); })
 					[
 						SNew(SBorder).BorderImage(&BarBrush())
 						.BorderBackgroundColor_Lambda([this]

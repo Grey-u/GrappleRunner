@@ -90,9 +90,9 @@ void AGRGasPod::BeginPlay()
 	Light->SetLightColor(Glow);
 }
 
-bool AGRGasPod::TrySlice(const FVector& Base, const FVector& Tip, AGrappleRig* Rig)
+bool AGRGasPod::TrySlice(const FVector& Base, const FVector& Tip, AGrappleRig* Slicer)
 {
-	if (bBurst || !Rig)
+	if (bBurst || !Slicer)
 	{
 		return false;
 	}
@@ -104,8 +104,8 @@ bool AGRGasPod::TrySlice(const FVector& Base, const FVector& Tip, AGrappleRig* R
 		return false;
 	}
 	// The burst takes the gauge's colour right NOW (before the refill), as Naomi asked.
-	const FLinearColor Colour = AGRGasGauge::ColourFor(Rig->GetGas() / FMath::Max(1.f, Rig->GetGasMax()));
-	Rig->AddGas(Refill);
+	const FLinearColor Colour = AGRGasGauge::ColourFor(Slicer->GetGas() / FMath::Max(1.f, Slicer->GetGasMax()));
+	Slicer->AddGas(Refill);
 	++SlicedThisRun;
 	Burst(Colour);
 	return true;
@@ -165,8 +165,8 @@ void AGRGasPod::Tick(float DeltaSeconds)
 		}
 		if (AGrappleRig* R = Rig.Get())
 		{
-			const FVector Body = R->GetBodyPosition() + FVector(0.f, 0.f, 85.f);
-			if (FVector::Dist(Body, GetActorLocation()) < TouchRadius)
+			const FVector Chest = R->GetBodyPosition() + FVector(0.f, 0.f, 85.f);
+			if (FVector::Dist(Chest, GetActorLocation()) < TouchRadius)
 			{
 				TrySlice(GetActorLocation(), GetActorLocation(), R);   // a zero-length "blade" right through the middle
 				return;

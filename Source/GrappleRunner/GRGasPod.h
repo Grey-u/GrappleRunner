@@ -51,7 +51,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Gas Pod") FLinearColor Glow = FLinearColor(0.35f, 0.95f, 0.35f);   // the canister's own colour
 
 	// Did the blade (a line from Base to Tip) pass through? If so: burst and refill. Returns true on a hit.
-	bool TrySlice(const FVector& Base, const FVector& Tip, AGrappleRig* Rig);
+	bool TrySlice(const FVector& Base, const FVector& Tip, AGrappleRig* Slicer);
 	bool IsSpent() const { return bBurst; }
 
 	// Number of canisters sliced this run (for the partner's chatter and the score screen).
