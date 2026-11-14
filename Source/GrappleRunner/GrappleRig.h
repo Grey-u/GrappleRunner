@@ -76,6 +76,10 @@ struct FGrappleHook
 	bool bWasDown = false;                    // was the fire button held last frame? (to spot press / release)
 	FVector Anchor = FVector::ZeroVector;     // the exact point in the world the hook is stuck to
 	float Length = 0.f;                       // current rope length in cm (gets shorter when you reel in)
+	// VAULT: the hook bit something LOWER than you. Instead of hanging under it, the rope
+	// pulls you up and over so you land on its top (VaultTarget = a point just above the top).
+	bool bVault = false;
+	FVector VaultTarget = FVector::ZeroVector;
 };
 
 // UCLASS() tells Unreal "this is a type of object you should know about" - so it shows up
@@ -120,15 +124,15 @@ public:
 	// How strongly the rope pulls back for each cm it is stretched. Higher = stiffer, snappier.
 	// (The square root of this is how fast the rope "springs": sqrt(64) = 8, so the jolt is
 	// spread over roughly 1/8 of a second.)
-	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeStiffness = 64.f;
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeStiffness = 85.f;   // was 64: Naomi found the rope a little too lax (14 Nov)
 	// Stops the rope bouncing like a bungee. 0 = bouncy forever, 1 = no bounce at all.
-	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeDampingRatio = 0.6f;
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeDampingRatio = 0.65f;
 	// Progressive spring (fix for F6): the rope gets stiffer the more it stretches, so a hard
 	// catch on a short rope never reaches the safety limit. At this many cm of stretch it is
 	// twice as stiff; at double this, five times. 0 = off (plain spring).
 	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeProgressiveStretch = 100.f;
 	// Safety limit: the rope can never stretch more than this (cm), however hard you fall.
-	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float MaxRopeStretch = 150.f;
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float MaxRopeStretch = 115.f;   // was 150 (a little tighter)
 	// While reeling in with the soft rope, the reel "stalls" (waits for you to catch up) once
 	// the rope is stretched this much (cm). Without this the reel winds faster than you move,
 	// the rope stretches like a catapult and flings you (found in the offline model, Tools/rope_model.py).
@@ -154,6 +158,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float GasUsePerSecond = 30.f;       // a full tank lasts about 3 seconds of boosting
 	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float GasRegenPerSecond = 35.f;     // refills while standing on the ground
 	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float BoostAccel = 1600.f;          // how hard the boost pushes
+	// Endless rules (14 Nov): the rope's reel and every hook burn gas too, so the tank runs out
+	// and you have to slice gas canisters to keep going. Empty tank = the rope can't pull you.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float GasReelPerSecond = 5.f;       // while a rope is pulling you in
+	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") float GasPerHook = 2.f;             // each hook fired
+	UPROPERTY(EditAnywhere, Category = "Grapple|Gas") bool bRefillOnGround = true;        // Endless turns this off: only canisters refill
+	// Vault: a hook fired at a point more than this far below you pulls you on top instead of under.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float VaultBelow = 150.f;
 
 	// ---- The player's body ----
 	// The body is treated as a CAPSULE (a pill shape) for bumping into things.
@@ -175,7 +186,7 @@ public:
 	// so it sags when slack, whips when you swing, and snaps straight when pulled tight.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Look") int32 RopeLinks = 24;
 	// How quickly the rope's wobble dies away (0 = wobbles forever, 0.1 = settles fast).
-	UPROPERTY(EditAnywhere, Category = "Grapple|Look") float RopeWobbleDamping = 0.02f;
+	UPROPERTY(EditAnywhere, Category = "Grapple|Look") float RopeWobbleDamping = 0.035f;   // was 0.02: the drawn rope settles a bit quicker
 
 	// ---- Body ----
 	// Your mass in kg. Used to turn the rope's pull into a real force (newtons), which sets
@@ -269,6 +280,10 @@ public:
 	APlayerController* GetPlayerController() const;
 	bool IsUsingVR() const { return bVR; }
 	float GetGas() const { return Gas; }               // gas left in the tank (the menu's gas bar)
+	float GetGasMax() const { return GasMax; }
+	void AddGas(float Amount) { Gas = FMath::Clamp(Gas + Amount, 0.f, GasMax); }   // a canister, or the partner sharing
+	FVector GetVelocity() const { return Velocity; }
+	void UseEndlessRules() { bRefillOnGround = false; }   // called by the endless spawner
 	bool IsGrounded() const { return bGrounded; }
 	FVector GetBodyVelocity() const { return Velocity; }
 	const TArray<TWeakObjectPtr<class AGRVine>>& GetVines() const { return Vines; }

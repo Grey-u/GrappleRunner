@@ -20,6 +20,7 @@
 //    touches is hit, and vines in the way are cut.
 // =====================================================================================
 #include "GRArsenal.h"
+#include "GRGasPod.h"   // gas canisters the blades can slice
 #include "GrappleRig.h"
 #include "GRVine.h"
 #include "GRCutter.h"
@@ -1783,6 +1784,21 @@ void AGRArsenal::CutWithBlades(float Dt)
 			const float P = MeleeTime / (bHeavy ? StabSeconds : SlashSeconds);
 			const bool bThisBlade = bHeavy || (Side == 0) == bLeftBlade || W->Kind == EGRWeaponKind::Knife;
 			bActive = bThisBlade && P > 0.12f && P < 0.8f;   // the strike, not the wind-up or recovery
+		}
+		if (bActive)
+		{
+			// Gas canisters: did this blade pass through one? (It refills your tank and bursts.)
+			for (TActorIterator<AGRGasPod> Pod(GetWorld()); Pod; ++Pod)
+			{
+				if (Pod->TrySlice(A, B, R))
+				{
+					HapticLeft[Side] = 0.15f;
+					if (PC && bVR)
+					{
+						PC->SetHapticsByValue(1.f, 0.9f, Side == 0 ? EControllerHand::Left : EControllerHand::Right);   // a strong pop in that hand
+					}
+				}
+			}
 		}
 		if (bActive && bBladePrevValid[Side])
 		{

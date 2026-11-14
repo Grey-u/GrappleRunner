@@ -24,7 +24,12 @@
 #include "Styling/CoreStyle.h"
 #include "TimerManager.h"
 #include "Widgets/Images/SImage.h"
+#include "Widgets/Images/SThrobber.h"
+#include "GRSettings.h"
+#include "MoviePlayer.h"
+#include "HeadMountedDisplayFunctionLibrary.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScaleBox.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
@@ -87,11 +92,19 @@ public:
 					+ SOverlay::Slot()[ SNew(SImage).Image(&CardBrush) ]
 					+ SOverlay::Slot()
 					[
-						// Three pages, one shown at a time: 0 = title, 1 = choose a mode, 2 = loading.
+						// Five pages, one shown at a time:
+						// 0 = starting (loading bar), 1 = title, 2 = modes, 3 = settings, 4 = loading a level.
 						SNew(SWidgetSwitcher)
-						.WidgetIndex_Lambda([this]() { return (Owner.IsValid() && Owner->IsLoading()) ? 2 : Page; })
+						.WidgetIndex_Lambda([this]()
+						{
+							if (!Owner.IsValid()) { return Page; }
+							if (Owner->IsLoading()) { return 4; }
+							return Owner->GetBootProgress() < 1.f ? 0 : Page;
+						})
+						+ SWidgetSwitcher::Slot()[ Panel(BootPage()) ]
 						+ SWidgetSwitcher::Slot()[ Panel(TitlePage()) ]
 						+ SWidgetSwitcher::Slot()[ Panel(ModePage()) ]
+						+ SWidgetSwitcher::Slot()[ Panel(SettingsPage()) ]
 						+ SWidgetSwitcher::Slot()[ Panel(LoadingPage()) ]
 					]
 				]
@@ -106,13 +119,15 @@ private:
 	TWeakObjectPtr<AGRMenuGameMode> Owner;
 	FSlateBrush CardBrush;
 	FButtonStyle ButtonStyle;
-	int32 Page = 0;
+	FSlateColorBrush BarBack = FSlateColorBrush(GRMenuStyle::Grey * 0.6f);   // the loading bar's empty track
+	FSlateColorBrush BarFill = FSlateColorBrush(GRMenuStyle::Orange);        // ...and its fill
+	int32 Page = 1;   // the title, once the starting screen is done
 
 	// Every page sits in the empty space in the middle of the cover (right of "EXIT SUIT").
 	TSharedRef<SWidget> Panel(TSharedRef<SWidget> Content)
 	{
 		return SNew(SCanvas)
-			+ SCanvas::Slot().Position(FVector2D(640.f, 150.f)).Size(FVector2D(470.f, 520.f))
+			+ SCanvas::Slot().Position(FVector2D(640.f, 110.f)).Size(FVector2D(500.f, 880.f))
 			[
 				Content
 			];
@@ -148,7 +163,8 @@ private:
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f, 0.f, 0.f)[ Label(TEXT("GRAPPLE RUNNER"), 34, Ink) ]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f, 0.f, 26.f)
 			  [ Label(TEXT("A VR grapple game built for the EXIT SUIT"), 12, Ink, "Regular") ]
-			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("PLAY"), TEXT("choose a mode"), [this]() { Page = 1; }) ]
+			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("PLAY"), TEXT("choose a mode"), [this]() { Page = 2; }) ]
+			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("SETTINGS"), TEXT("controls and comfort"), [this]() { Page = 3; }) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("QUIT"), TEXT(""), [this]() { if (Owner.IsValid()) { Owner->Quit(); } }) ];
 	}
 
@@ -157,14 +173,79 @@ private:
 		using namespace GRMenuStyle;
 		auto Start = [this](const TCHAR* Mode) { return [this, Mode]() { if (Owner.IsValid()) { Owner->StartMode(Mode); } }; };
 		return SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 14.f)[ Label(TEXT("CHOOSE A MODE"), 24, Ink) ]
-			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("ENDLESS RUNNER"), TEXT("solo, swing forever"), Start(TEXT("endless"))) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)[ Label(TEXT("CHOOSE A MODE"), 24, Ink) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f, 0.f, 6.f)[ Label(TEXT("SOLO  -  ENDLESS RUN"), 11, Grey) ]
+			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("ENDLESS RUNNER"), TEXT("swing as far as your gas lets you"), Start(TEXT("endless"))) ]
+			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("ENDLESS + AI PARTNER"), TEXT("a partner who helps and talks"), Start(TEXT("endless_partner"))) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f, 0.f, 6.f)[ Label(TEXT("MULTIPLAYER  -  FLOATING ISLANDS (solo practice for now)"), 11, Grey) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("1 v 1"), TEXT("duel"), Start(TEXT("1v1"))) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("2 v 2"), TEXT("pairs"), Start(TEXT("2v2"))) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("3 v 3"), TEXT("trios"), Start(TEXT("3v3"))) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("5 v 5"), TEXT("full squads"), Start(TEXT("5v5"))) ]
 			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("PvE"), TEXT("monsters"), Start(TEXT("pve"))) ]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f, 0.f, 0.f)[ Button(TEXT("BACK"), TEXT(""), [this]() { Page = 0; }) ];
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f, 0.f, 0.f)[ Button(TEXT("BACK"), TEXT(""), [this]() { Page = 1; }) ];
+	}
+
+	// The starting screen: title, a bar that fills, and what's happening.
+	TSharedRef<SWidget> BootPage()
+	{
+		using namespace GRMenuStyle;
+		return SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()[ Label(TEXT("GRAPPLE RUNNER"), 34, Ink) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f, 0.f, 8.f)[ Label(TEXT("LOADING"), 14, Grey) ]
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(SBox).WidthOverride(420.f).HeightOverride(10.f)
+				[
+					SNew(SOverlay)
+					+ SOverlay::Slot()[ SNew(SImage).Image(&BarBack) ]
+					+ SOverlay::Slot().HAlign(HAlign_Left)
+					[
+						SNew(SBox).WidthOverride_Lambda([this]() { return FOptionalSize(420.f * (Owner.IsValid() ? Owner->GetBootProgress() : 0.f)); })
+						[
+							SNew(SImage).Image(&BarFill)
+						]
+					]
+				]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f)[ Label(TEXT("Waking the islands of Aeloria..."), 12, Ink, "Regular") ];
+	}
+
+	// Settings: each row is a name, its value, and buttons to change it. Saved straight away.
+	TSharedRef<SWidget> SettingRow(const FString& Name, TFunction<FString()> Value, TFunction<void()> Less, TFunction<void()> More)
+	{
+		using namespace GRMenuStyle;
+		return SNew(SBox).Padding(FMargin(0.f, 0.f, 0.f, 10.f))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[ Label(Name, 14, Ink) ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f, 0.f)
+			[
+				SNew(SBox).WidthOverride(110.f).HAlign(HAlign_Center)
+				[
+					SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Bold", 14)).ColorAndOpacity(FSlateColor(Orange))
+					.Text_Lambda([Value]() { return FText::FromString(Value()); })
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth()[ SNew(SBox).WidthOverride(56.f)[ Button(TEXT("-"), TEXT(""), Less) ] ]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(6.f, 0.f, 0.f, 0.f)[ SNew(SBox).WidthOverride(56.f)[ Button(TEXT("+"), TEXT(""), More) ] ]
+		];
+	}
+
+	TSharedRef<SWidget> SettingsPage()
+	{
+		using namespace GRMenuStyle;
+		auto Sens = [](float Step) { return [Step]() { GRSettings::SetFloat(TEXT("MouseSensitivity"), FMath::Clamp(GRSettings::MouseSensitivity() + Step, 0.1f, 3.f)); }; };
+		auto Gas = [](int32 Step) { return [Step]() { GRSettings::SetFloat(TEXT("GasDifficulty"), static_cast<float>(FMath::Clamp(GRSettings::GasDifficulty() + Step, 0, 2))); }; };
+		auto Chat = [](bool bOn) { return [bOn]() { GRSettings::SetFloat(TEXT("PartnerChatter"), bOn ? 1.f : 0.f); }; };
+		return SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 18.f)[ Label(TEXT("SETTINGS"), 24, Ink) ]
+			+ SVerticalBox::Slot().AutoHeight()[ SettingRow(TEXT("MOUSE SENSITIVITY"), []() { return FString::Printf(TEXT("%.1f"), GRSettings::MouseSensitivity()); }, Sens(-0.1f), Sens(0.1f)) ]
+			+ SVerticalBox::Slot().AutoHeight()[ SettingRow(TEXT("GAS DIFFICULTY"), []() { return GRSettings::GasDifficultyName(); }, Gas(-1), Gas(1)) ]
+			+ SVerticalBox::Slot().AutoHeight()[ SettingRow(TEXT("PARTNER CHATTER"), []() { return FString(GRSettings::PartnerChatter() ? TEXT("ON") : TEXT("OFF")); }, Chat(false), Chat(true)) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f, 0.f, 14.f)
+			  [ Label(TEXT("Relaxed gas burns 40% slower; hard burns 40% faster."), 11, Grey, "Regular") ]
+			+ SVerticalBox::Slot().AutoHeight()[ Button(TEXT("BACK"), TEXT(""), [this]() { Page = 1; }) ];
 	}
 
 	TSharedRef<SWidget> LoadingPage()
@@ -177,8 +258,9 @@ private:
 				SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Bold", 16)).ColorAndOpacity(FSlateColor(Orange))
 				.Text_Lambda([this]() { return FText::FromString(Owner.IsValid() ? Owner->GetPendingMode().ToUpper() : FString()); })
 			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f)[ SNew(SBox).HAlign(HAlign_Left)[ SNew(SThrobber) ] ]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f)
-			  [ Label(TEXT("Multiplayer isn't built yet: every mode plays solo for now."), 11, Grey, "Regular") ];
+			  [ Label(TEXT("Team modes play solo until multiplayer is built."), 11, Grey, "Regular") ];
 	}
 };
 
@@ -188,6 +270,13 @@ private:
 AGRMenuGameMode::AGRMenuGameMode()
 {
 	DefaultPawnClass = nullptr;   // the menu has no body to walk around in
+	PrimaryActorTick.bCanEverTick = true;   // to fill the starting screen's bar
+}
+
+void AGRMenuGameMode::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	BootClock += DeltaSeconds;
 }
 
 void AGRMenuGameMode::BeginPlay()
@@ -199,6 +288,10 @@ void AGRMenuGameMode::BeginPlay()
 	{
 		return;   // no screen (e.g. a server): nothing to draw
 	}
+	// In the headset, show the headset's own loading splash whenever a level is loading,
+	// instead of a frozen frame (frozen frames in VR are a quick way to feel sick).
+	UHeadMountedDisplayFunctionLibrary::EnableAutoLoadingSplashScreen(true);
+
 	TSharedRef<SGrappleMenu> Widget = SNew(SGrappleMenu).Owner(this).Card(CardTexture.Get());
 	Menu = Widget;
 	GEngine->GameViewport->AddViewportWidgetContent(Widget, 10);
@@ -236,8 +329,34 @@ void AGRMenuGameMode::StartMode(const FString& Mode)
 
 void AGRMenuGameMode::OpenGameLevel()
 {
-	// "?mode=2v2" travels with the level, so the game can read which mode was picked.
-	UGameplayStatics::OpenLevel(this, GameLevel, true, FString::Printf(TEXT("mode=%s"), *PendingMode));
+	// Solo modes go to the endless level; the team modes to the floating islands.
+	const bool bEndless = PendingMode.StartsWith(TEXT("endless"));
+	const FName Level = bEndless ? EndlessLevel : GameLevel;
+	const FString Options = bEndless
+		? FString::Printf(TEXT("mode=endless?partner=%d"), PendingMode == TEXT("endless_partner") ? 1 : 0)
+		: FString::Printf(TEXT("mode=%s"), *PendingMode);
+
+	// A real loading screen for the time the level takes to open (packaged game only:
+	// in the editor the level opens inside the editor, which has its own progress).
+	if (!GIsEditor && IsMoviePlayerEnabled())
+	{
+		using namespace GRMenuStyle;
+		FLoadingScreenAttributes Screen;
+		Screen.bAutoCompleteWhenLoadingCompletes = true;
+		Screen.MinimumLoadingScreenDisplayTime = 1.f;
+		Screen.WidgetLoadingScreen = SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(Ink)
+			.HAlign(HAlign_Center).VAlign(VAlign_Center)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				[
+					SNew(STextBlock).Text(FText::FromString(TEXT("LOADING AELORIA"))).Font(FCoreStyle::GetDefaultFontStyle("Bold", 30)).ColorAndOpacity(FSlateColor(Paper))
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 16.f)[ SNew(SThrobber) ]
+			];
+		GetMoviePlayer()->SetupLoadingScreen(Screen);
+	}
+	UGameplayStatics::OpenLevel(this, Level, true, Options);
 }
 
 void AGRMenuGameMode::Quit()

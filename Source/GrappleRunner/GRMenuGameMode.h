@@ -4,12 +4,17 @@
 //
 //  WHAT THIS IS
 //  The "rules" for the main-menu level (L_MainMenu). When that level starts, this game
-//  mode puts the menu on screen:
-//    1. TITLE:   the EXIT SUIT portfolio cover as the title card, with PLAY and QUIT.
-//    2. MODES:   Endless Runner (solo), 1v1, 2v2, 3v3, 5v5 squads and PvE.
-//    3. LOADING: the cover again with "Loading..." while the game level opens.
-//  The chosen mode is passed to the game level as an option ("?mode=2v2"), so the game
-//  can read it later. Multiplayer isn't built yet, so every mode currently plays solo.
+//  mode puts the menu on screen, one page at a time:
+//    0. STARTING: a loading screen with a filling bar while the game warms up.
+//    1. TITLE:    the EXIT SUIT portfolio cover as the title card: PLAY, SETTINGS, QUIT.
+//    2. MODES:    SOLO: Endless Runner, or Endless Runner with an AI partner (L_Endless).
+//                 MULTIPLAYER: 1v1, 2v2, 3v3, 5v5 squads and PvE (on L_FloatingIslands_2).
+//    3. SETTINGS: mouse sensitivity, gas difficulty, partner chatter (saved, see GRSettings.h).
+//    4. LOADING:  shown while the chosen level opens (in a packaged game Unreal's loading-
+//                 screen system keeps it up until the level is ready; in VR the headset shows
+//                 its own loading splash instead of a frozen picture).
+//  The chosen mode is passed to the game level as options ("?mode=endless?partner=1"), so the
+//  game can read it. Multiplayer isn't built yet, so the team modes play solo for now.
 //
 //  WHY C++ AND NOT A BLUEPRINT WIDGET
 //  Project rule: gameplay and UI logic live in C++ you can read. The menu is drawn with
@@ -45,13 +50,19 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Menu") TSoftObjectPtr<UTexture2D> TitleCard =
 		TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Game/GrappleRunner/UI/T_TitleCard.T_TitleCard")));
 	// The level each mode opens (every mode uses the floating islands for now).
-	UPROPERTY(EditAnywhere, Category = "Menu") FName GameLevel = TEXT("L_FloatingIslands_2");
+	UPROPERTY(EditAnywhere, Category = "Menu") FName GameLevel = TEXT("L_FloatingIslands_2");   // the multiplayer modes' map
+	// The solo endless run's level: a start island in open sky; the run is built ahead of you.
+	UPROPERTY(EditAnywhere, Category = "Menu") FName EndlessLevel = TEXT("L_Endless");
+	// How long the "starting" loading screen shows when the game opens (seconds).
+	UPROPERTY(EditAnywhere, Category = "Menu") float BootSeconds = 2.5f;
 	// How long the loading screen shows before the level opens (seconds), so you can see it.
 	UPROPERTY(EditAnywhere, Category = "Menu") float LoadingScreenSeconds = 1.0f;
 
 	void StartMode(const FString& Mode);   // a mode button was clicked: show "loading", then open the level
 	void Quit();                           // the QUIT button
 	bool IsLoading() const { return !PendingMode.IsEmpty(); }
+	float GetBootProgress() const { return FMath::Clamp(BootClock / FMath::Max(0.1f, BootSeconds), 0.f, 1.f); }
+	virtual void Tick(float DeltaSeconds) override;
 	const FString& GetPendingMode() const { return PendingMode; }
 
 protected:
@@ -63,5 +74,6 @@ private:
 	TSharedPtr<SWidget> Menu;                          // the menu itself (built in the .cpp)
 	FString PendingMode;                               // the mode being loaded ("" = none yet)
 	FTimerHandle LoadTimer;
+	float BootClock = 0.f;
 	void OpenGameLevel();
 };

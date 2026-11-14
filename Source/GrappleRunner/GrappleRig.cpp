@@ -47,7 +47,9 @@
 // The real definitions of everything we use (the .h only promised they exist):
 #include "Camera/CameraComponent.h"            // the player's eyes
 #include "Components/AudioComponent.h"         // plays a sound (the wind)
-#include "Components/SkeletalMeshComponent.h"  // a character body with bones and animation
+#include "Components/SkeletalMeshComponent.h"
+#include "GRGasGauge.h"                     // the gas gauge you see while swinging
+#include "GRSettings.h"                     // saved player settings (mouse sensitivity, gas difficulty)  // a character body with bones and animation
 #include "Animation/AnimSequence.h"
 #include "Engine/SkeletalMesh.h"
 #include "Sound/SoundBase.h"
@@ -198,6 +200,11 @@ void AGrappleRig::BeginPlay()
 	{
 		GetWorld()->SpawnActor<AGRCutter>();
 	}
+	// The gas gauge, floating low in front of you (on your wrist in VR).
+	if (!TActorIterator<AGRGasGauge>(GetWorld()))
+	{
+		GetWorld()->SpawnActor<AGRGasGauge>();
+	}
 	// The floating menu (Tab / M, or the left controller's menu button in VR).
 	if (!TActorIterator<AGRMenu>(GetWorld()))
 	{
@@ -284,6 +291,7 @@ void AGrappleRig::BeginPlay()
 	}
 
 	Gas = GasMax;   // start with a full tank
+	MouseSensitivity = GRSettings::MouseSensitivity();   // the player's saved setting
 
 	// Write a note in the Output Log so we can check the rig found everything.
 	UE_LOG(LogTemp, Log, TEXT("GrappleRig: %d anchors, kill Z %.0f"), Anchors.Num(), KillZ);
@@ -590,12 +598,41 @@ void AGrappleRig::FireHook(int32 Index)
 		Pulse(Index, 0.15f);   // nothing in range: tiny buzz so you feel the miss
 		return;
 	}
+	// Each hook costs a little gas. With an empty tank the launcher can't fire.
+	const float HookCost = GasPerHook * GRSettings::GasDrainScale();
+	if (Gas < HookCost)
+	{
+		Pulse(Index, 0.1f);   // a weak click: no gas
+		return;
+	}
+	Gas -= HookCost;
+
 	FGrappleHook& H = Hooks[Index];
 	H.bAttached = true;
 	H.Anchor = Point;
 	// The rope starts exactly as long as the distance to the anchor (no sudden yank),
 	// but never shorter than the minimum.
 	H.Length = FMath::Max(MinRopeLength, static_cast<float>(FVector::Dist(BodyCenter(), Point)));
+
+	// VAULT CHECK: is the hook point well below you? Then find the top of what it bit, by
+	// looking straight down onto it from 15 m above. If there's a flat-enough top, the rope
+	// will carry you up and over onto it (see Simulate) instead of you hanging underneath.
+	H.bVault = false;
+	if (Point.Z < BodyCenter().Z - VaultBelow)
+	{
+		FHitResult TopHit;
+		FCollisionQueryParams Q(TEXT("GRVault"), true, this);
+		if (Pawn.IsValid())
+		{
+			Q.AddIgnoredActor(Pawn.Get());
+		}
+		if (GetWorld()->LineTraceSingleByChannel(TopHit, Point + FVector(0.f, 0.f, 1500.f), Point - FVector(0.f, 0.f, 60.f), ECC_Visibility, Q)
+			&& TopHit.ImpactNormal.Z > 0.6f && TopHit.ImpactPoint.Z > Point.Z - 20.f)
+		{
+			H.bVault = true;
+			H.VaultTarget = TopHit.ImpactPoint + FVector(0.f, 0.f, BodyHalfHeight + 40.f);   // body centre, just above the top
+		}
+	}
 	Pulse(Index, 0.7f);   // strong buzz: the hook has bitten
 }
 
@@ -603,6 +640,7 @@ void AGrappleRig::FireHook(int32 Index)
 void AGrappleRig::ReleaseHook(int32 Index)
 {
 	Hooks[Index].bAttached = false;
+	Hooks[Index].bVault = false;
 }
 
 // =====================================================================================
@@ -798,7 +836,10 @@ void AGrappleRig::Simulate(float Dt)
 		Velocity.X = FMath::FInterpTo(static_cast<float>(Velocity.X), static_cast<float>(Wish.X), Dt, 10.f);
 		Velocity.Y = FMath::FInterpTo(static_cast<float>(Velocity.Y), static_cast<float>(Wish.Y), Dt, 10.f);
 		Velocity.Z = FMath::Max(Velocity.Z, 0.0);                       // don't sink into the floor
-		Gas = FMath::Min(GasMax, Gas + GasRegenPerSecond * Dt);         // refill gas while standing
+		if (bRefillOnGround)
+		{
+			Gas = FMath::Min(GasMax, Gas + GasRegenPerSecond * Dt);     // refill gas while standing (not in Endless)
+		}
 	}
 	else
 	{
@@ -833,14 +874,40 @@ void AGrappleRig::Simulate(float Dt)
 	{
 		const FVector Dir = Camera.IsValid() ? Camera->GetForwardVector() : Pawn->GetActorForwardVector();
 		Velocity += Dir * BoostAccel * Dt;
-		Gas = FMath::Max(0.f, Gas - GasUsePerSecond * Dt);
+		Gas = FMath::Max(0.f, Gas - GasUsePerSecond * GRSettings::GasDrainScale() * Dt);
 	}
 
-	// Reeling in: shorten the rope, and tug the player toward the anchor.
+	// Reeling in: shorten the rope, and tug the player toward the anchor. The reel runs on
+	// gas: with an empty tank it stops, and you just swing (and drop) on the rope you have.
+	bool bVaultDone[2] = {false, false};
+	const bool bAnyReel = (Hooks[0].bAttached && bReel[0]) || (Hooks[1].bAttached && bReel[1]);
+	if (bAnyReel && Gas > 0.f)
+	{
+		Gas = FMath::Max(0.f, Gas - GasReelPerSecond * GRSettings::GasDrainScale() * Dt);
+	}
 	for (int32 i = 0; i < 2; ++i)
 	{
 		FGrappleHook& H = Hooks[i];
-		if (H.bAttached && bReel[i])
+		if (H.bAttached && bReel[i] && H.bVault && Gas > 0.f)
+		{
+			// VAULT: fly to just above the top of what you hooked, then let go and land on it.
+			const FVector ToTop = H.VaultTarget - C;
+			const float D = ToTop.Size();
+			// Keep the rope long enough that it never drags you below the top.
+			H.Length = FMath::Max(H.Length, static_cast<float>(FVector::Dist(H.VaultTarget, H.Anchor)));
+			// Steer toward the top: faster when far, easing off as you arrive. A little lift
+			// while you're still below it makes the path arc up and over the edge.
+			const FVector Want = ToTop.GetSafeNormal() * FMath::Clamp(D * 2.2f, 500.f, 1800.f) + FVector(0.f, 0.f, ToTop.Z > 0.f ? 250.f : 0.f);
+			Velocity = FMath::VInterpTo(Velocity, Want, Dt, 4.5f);
+			Velocity.Z += Gravity * Dt;   // cancel this frame's gravity while the rope carries you
+			StepTension[i] += PlayerMass * ReelPullAccel / 100.f;
+			if (D < 110.f)
+			{
+				bVaultDone[i] = true;     // arrived: let go below so you drop the last bit onto the top
+			}
+			continue;
+		}
+		if (H.bAttached && bReel[i] && Gas > 0.f)
 		{
 			H.Length = FMath::Max(MinRopeLength, H.Length - ReelSpeed * Dt);
 			if (bSoftRope)
@@ -923,6 +990,16 @@ void AGrappleRig::Simulate(float Dt)
 				// The rope stopped that outward speed within one step: force = mass x (speed / time).
 				StepTension[i] += PlayerMass * (Outward / Dt) / 100.f;
 			}
+		}
+	}
+
+	// Finished vaults: let go of that rope and keep only a little speed, so you land on top.
+	for (int32 i = 0; i < 2; ++i)
+	{
+		if (bVaultDone[i])
+		{
+			ReleaseHook(i);
+			Velocity *= 0.25f;
 		}
 	}
 
@@ -1310,6 +1387,7 @@ void AGrappleRig::SetUpBody()
 	}
 	Body = NewObject<USkeletalMeshComponent>(this);
 	Body->SetSkeletalMeshAsset(Mesh);
+	Body->SetRenderCustomDepth(true);   // the anime ink outline (M_AnimeOutline) draws round anything with custom depth
 	Body->SetUsingAbsoluteScale(true);
 	Body->SetWorldScale3D(FVector(BodyScale));                    // resize so the shoulders sit below your eyes
 	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // the body never blocks anything (physics uses the capsule)

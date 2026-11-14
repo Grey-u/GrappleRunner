@@ -2,6 +2,8 @@
 //  GREndlessSpawner.cpp  -  what the endless spawner DOES (see the .h for the overview)
 // =====================================================================================
 #include "GREndlessSpawner.h"
+#include "GRCompanion.h"   // the AI partner (Endless + AI partner mode)
+#include "GRGasPod.h"      // gas canisters to slice
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
@@ -41,6 +43,15 @@ AGREndlessSpawner::AGREndlessSpawner()
 		RuinMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(
 			TEXT("/Game/InfinityBladeGrassLands/Environments/Plains/Env_Plains_Ruins/StaticMesh/%s.%s"), R, R))));
 	}
+	// Caves are built from the free Megascans cliffs and rock formation (big, craggy, mossy).
+	const TCHAR* CaveParts[] = {
+		TEXT("/Game/Fab/Megascans/3D/Granite_Cliff_rivav/High/rivav_tier_1/StaticMeshes/rivav_tier_1.rivav_tier_1"),
+		TEXT("/Game/Fab/Megascans/3D/Huge_Nordic_Coastal_Cliff_venrdcgga/High/venrdcgga_tier_1/StaticMeshes/venrdcgga_tier_1.venrdcgga_tier_1"),
+		TEXT("/Game/Fab/Megascans/3D/Mossy_Rock_Formation_plFhY/High/plFhY_tier_1/StaticMeshes/plFhY_tier_1.plFhY_tier_1") };
+	for (const TCHAR* Path : CaveParts)
+	{
+		CaveMeshes.Add(TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(Path)));
+	}
 	// RockMeshes is filled in BeginPlay from the grapple rocks already in the level, so the new
 	// ones look the same.
 }
@@ -59,6 +70,12 @@ void AGREndlessSpawner::BeginPlay()
 		SetActorTickEnabled(false);   // a team mode: leave the hand-built level alone
 		return;
 	}
+
+	// Endless rules: no free refill on the ground (only canisters refill), and with the
+	// "AI partner" option a second soldier flies with you.
+	AGRGasPod::SlicedThisRun = 0;
+	const FString Partner = GM ? UGameplayStatics::ParseOption(GM->OptionsString, TEXT("partner")) : FString();
+	bPartnerWanted = Partner == TEXT("1") || (Mode.IsEmpty() && bPartnerInEditorPlay);
 
 	for (TActorIterator<AGrappleRig> It(GetWorld()); It; ++It)
 	{
@@ -82,6 +99,14 @@ void AGREndlessSpawner::BeginPlay()
 		}
 	}
 	LastTop = StartTop;
+	if (Rig.IsValid())
+	{
+		Rig->UseEndlessRules();
+	}
+	if (bPartnerWanted)
+	{
+		GetWorld()->SpawnActor<AGRCompanion>();
+	}
 
 	// Use the same rock as the existing grapple rocks.
 	if (RockMeshes.Num() == 0)
@@ -123,6 +148,8 @@ void AGREndlessSpawner::Tick(float DeltaSeconds)
 		LastTop = StartTop;
 		FurthestX = P.X;
 		Distance = 0.f;
+		AGRGasPod::SlicedThisRun = 0;
+		CaveCentres.Reset();
 	}
 	FurthestX = FMath::Max(FurthestX, static_cast<float>(P.X));
 	Distance = FMath::Max(0.f, (FurthestX - StartX) / 100.f);
@@ -243,22 +270,41 @@ void AGREndlessSpawner::BuildChunk()
 	const FVector Top(X, Y, Z);
 
 	// ---- grapple rocks along the gap, 11-21 m above the line between the islands
+	//      (every CaveEvery-th gap is a floating cave instead of open rocks)
 	const float Span = static_cast<float>(Top.X - LastTop.X);
+	++ChunkCount;
+	const bool bCave = CaveEvery > 0 && ChunkCount % CaveEvery == 0 && CaveMeshes.Num() > 0;
+	const float CaveFrom = 0.25f, CaveTo = 0.75f;   // the cave fills the middle half of the gap
 	for (float T = Rng.FRandRange(AnchorSpacing.X, AnchorSpacing.Y); T < Span - 600.f; T += Rng.FRandRange(AnchorSpacing.X, AnchorSpacing.Y))
 	{
+		if (bCave && T > Span * CaveFrom - 300.f && T < Span * CaveTo + 300.f)
+		{
+			continue;   // the cave's ceiling gives the hooks here
+		}
 		const FVector Line = FMath::Lerp(LastTop, Top, T / Span);
 		const FVector At = Line + FVector(0.f, Rng.FRandRange(-500.f, 500.f), Rng.FRandRange(AnchorHeight.X, AnchorHeight.Y));
-		if (AActor* Rock = SpawnMesh(Pick(RockMeshes), At, FRotator(Rng.FRandRange(0.f, 360.f), Rng.FRandRange(0.f, 360.f), 0.f),
-			-Rng.FRandRange(250.f, 450.f), true, C))
+		AddAnchorRock(Pick(RockMeshes), At, Rng.FRandRange(AnchorSize.X, AnchorSize.Y), C);
+		if (Rng.FRand() < SideRockChance)   // an extra rock off to one side: a choice of line
 		{
-			FVector RO, RE;                                         // rocks float: put the rock's middle on the point
-			Rock->GetActorBounds(false, RO, RE);
-			Rock->AddActorWorldOffset(At - RO);
-			Rock->Tags.Add(FName(TEXT("GrappleAnchor")));
-			if (Rig.IsValid())
-			{
-				Rig->AddAnchor(Rock);
-			}
+			const float SideWays = (Rng.FRand() < 0.5f ? -1.f : 1.f) * Rng.FRandRange(900.f, 1400.f);
+			AddAnchorRock(Pick(RockMeshes), At + FVector(Rng.FRandRange(-200.f, 200.f), SideWays, Rng.FRandRange(-300.f, 300.f)),
+				Rng.FRandRange(AnchorSize.X, AnchorSize.Y) * 0.85f, C);
+		}
+	}
+	if (bCave)
+	{
+		BuildCave(FMath::Lerp(LastTop, Top, CaveFrom), FMath::Lerp(LastTop, Top, CaveTo), C);
+	}
+
+	// ---- a gas canister to slice, at swinging height somewhere along the gap
+	if (Rng.FRand() < PodChance || bCave)
+	{
+		const float T = bCave ? 0.5f : Rng.FRandRange(0.3f, 0.75f);
+		const FVector At = FMath::Lerp(LastTop, Top, T) + FVector(0.f, Rng.FRandRange(-350.f, 350.f),
+			bCave ? 700.f : Rng.FRandRange(PodHeight.X, PodHeight.Y));
+		if (AGRGasPod* Pod = GetWorld()->SpawnActor<AGRGasPod>(At, FRotator::ZeroRotator))
+		{
+			C.Actors.Add(Pod);
 		}
 	}
 
@@ -321,6 +367,80 @@ void AGREndlessSpawner::BuildChunk()
 
 	LastTop = Top;
 	Chunks.Add(MoveTemp(C));
+}
+
+// One floating grapple rock: sized by width, its middle on At, tagged so hooks and the aim
+// assist find it.
+void AGREndlessSpawner::AddAnchorRock(UStaticMesh* Mesh, const FVector& At, float Width, FChunk& Into)
+{
+	AActor* Rock = SpawnMesh(Mesh, At, FRotator(Rng.FRandRange(0.f, 360.f), Rng.FRandRange(0.f, 360.f), 0.f), -Width, true, Into);
+	if (!Rock)
+	{
+		return;
+	}
+	FVector RO, RE;                                         // rocks float: put the rock's middle on the point
+	Rock->GetActorBounds(false, RO, RE);
+	Rock->AddActorWorldOffset(At - RO);
+	Rock->Tags.Add(FName(TEXT("GrappleAnchor")));
+	if (Rig.IsValid())
+	{
+		Rig->AddAnchor(Rock);
+	}
+}
+
+// A FLOATING CAVE: a tube of cliff rock from From to To that you swing through.
+//   - rings of big rocks every ~5 m along the tube, each ring a circle of 9 rocks
+//     (the bottom of the circle left open, so a wrong move drops you out, not into a wall)
+//   - the ceiling rocks are grapple anchors: you hook the roof as you fly through
+//   - mossy roots hang inside, and a few rocks stick out on the outside so it reads as a
+//     lump of floating mountain, not a pipe
+void AGREndlessSpawner::BuildCave(const FVector& From, const FVector& To, FChunk& Into)
+{
+	const FVector Mid = (From + To) * 0.5f + FVector(0.f, 0.f, 900.f);   // the tube runs ~9 m above the line between islands
+	const FVector Dir = (To - From).GetSafeNormal2D();
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Dir);
+	const float Length = static_cast<float>(FVector::Dist2D(From, To));
+	const float Radius = Rng.FRandRange(900.f, 1200.f);                  // 18-24 m across inside
+	CaveCentres.Add(Mid);
+	for (float S = -Length * 0.5f; S <= Length * 0.5f; S += 520.f)
+	{
+		const FVector RingCentre = Mid + Dir * S;
+		for (int32 k = 0; k < 9; ++k)
+		{
+			// Angle round the ring: 0 = straight up, going round both sides; skip the bottom gap.
+			const float A = FMath::DegreesToRadians(-150.f + k * 37.5f);
+			const FVector Out = FVector::UpVector * FMath::Cos(A) + Right * FMath::Sin(A);
+			const float Size = Rng.FRandRange(900.f, 1400.f);
+			const FVector At = RingCentre + Out * (Radius + Size * 0.35f);
+			AActor* Part = SpawnMesh(Pick(CaveMeshes), At, FRotator(Rng.FRandRange(0.f, 360.f), Rng.FRandRange(0.f, 360.f), Rng.FRandRange(0.f, 360.f)), -Size, true, Into);
+			if (!Part)
+			{
+				continue;
+			}
+			FVector PO, PE;
+			Part->GetActorBounds(false, PO, PE);
+			Part->AddActorWorldOffset(At - PO);
+			if (FMath::Abs(k - 4) <= 2)   // the 5 rocks across the top of the ring = the ceiling
+			{
+				Part->Tags.Add(FName(TEXT("GrappleAnchor")));
+				if (Rig.IsValid())
+				{
+					Rig->AddAnchor(Part);
+				}
+			}
+		}
+		// Roots hanging from the roof.
+		if (Rng.FRand() < 0.6f)
+		{
+			SpawnMesh(Pick(RootMeshes), RingCentre + FVector(0.f, 0.f, Radius - 250.f), FRotator(180.f, Rng.FRandRange(0.f, 360.f), 0.f),
+				-Rng.FRandRange(500.f, 800.f), false, Into);
+		}
+	}
+	// A canister deep inside, as a reward for going through.
+	if (AGRGasPod* Pod = GetWorld()->SpawnActor<AGRGasPod>(Mid + FVector(0.f, 0.f, -200.f), FRotator::ZeroRotator))
+	{
+		Into.Actors.Add(Pod);
+	}
 }
 
 void AGREndlessSpawner::ClearChunks()

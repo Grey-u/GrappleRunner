@@ -9,8 +9,10 @@
 //
 //  ONE CHUNK =
 //    - a floating island, 18-40 m wide, 45-70 m after the last one, a little higher or lower
-//    - grapple rocks hanging 11-21 m above the line between the islands, 7-16 m apart
-//      (the spacing tested in the 2D bench and T-01 to T-14, so every gap can be swung)
+//    - grapple rocks hanging 11-21 m above the line between the islands, 4.5-9.5 m apart and
+//      5-8.5 m wide (closer and bigger since 14 Nov), sometimes an extra one off to the side
+//    - usually a glowing gas canister to slice (your fuel), and every 3rd gap a floating
+//      cave: a tube of cliff rock you swing through, hooking its ceiling
 //    - trees, ferns and an overgrown ruin on the island's top, and a vine (that snaps)
 //  Distance score: how far past the start you've swung, and your best run this session.
 //
@@ -44,6 +46,7 @@ public:
 
 	// ---- When ----
 	UPROPERTY(EditAnywhere, Category = "Endless") bool bRunInEditorPlay = true;   // also run when Play is pressed in the editor (no menu)
+	UPROPERTY(EditAnywhere, Category = "Endless") bool bPartnerInEditorPlay = true;   // Play in the editor (no menu): bring the AI partner, for testing
 
 	// ---- How far ahead / behind ----
 	UPROPERTY(EditAnywhere, Category = "Endless") float BuildAhead = 30000.f;    // keep 300 m of world built in front of you
@@ -55,7 +58,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D Rise = FVector2D(-600.f, 900.f);            // height change per island
 	UPROPERTY(EditAnywhere, Category = "Endless") float SideDrift = 2500.f;                              // sideways wander
 	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D AnchorHeight = FVector2D(1100.f, 2100.f);
-	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D AnchorSpacing = FVector2D(700.f, 1600.f);
+	// 14 Nov (Naomi): more rocks, closer together, big enough to aim at easily.
+	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D AnchorSpacing = FVector2D(450.f, 950.f);   // was 7-16 m apart
+	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D AnchorSize = FVector2D(500.f, 850.f);      // rock width in cm (was 2.5-4.5 m)
+	UPROPERTY(EditAnywhere, Category = "Endless") float SideRockChance = 0.5f;   // chance of an extra rock off to one side, for choice
+	// Gas canisters: the fuel you slice to keep going.
+	UPROPERTY(EditAnywhere, Category = "Endless") float PodChance = 0.8f;        // chance of a canister in each gap
+	UPROPERTY(EditAnywhere, Category = "Endless") FVector2D PodHeight = FVector2D(500.f, 1100.f);   // above the island-to-island line
+	// Floating caves and tunnels: every few gaps, a tube of rock to swing through.
+	UPROPERTY(EditAnywhere, Category = "Endless") int32 CaveEvery = 3;          // one every 3 gaps
+	UPROPERTY(EditAnywhere, Category = "Endless|Assets") TArray<TSoftObjectPtr<UStaticMesh>> CaveMeshes;
 	UPROPERTY(EditAnywhere, Category = "Endless") int32 TreesPerIsland = 4;
 	UPROPERTY(EditAnywhere, Category = "Endless") int32 FernsPerIsland = 10;
 
@@ -70,6 +82,8 @@ public:
 	// Distance (metres) of this run, and the best run this session.
 	float GetDistance() const { return Distance; }
 	float GetBest() const { return Best; }
+	// Middles of the caves built so far (the AI partner calls them out as you approach).
+	const TArray<FVector>& GetCaveCentres() const { return CaveCentres; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -83,6 +97,7 @@ private:
 	TArray<FChunk> Chunks;
 	TWeakObjectPtr<AGrappleRig> Rig;
 	bool bActive = false;
+	bool bPartnerWanted = false;   // "?partner=1": spawn the AI partner
 	FVector StartTop = FVector::ZeroVector;     // top of the last hand-built island: the endless route starts after it
 	FVector LastTop = FVector::ZeroVector;      // top of the last island built
 	float StartX = 0.f;
@@ -90,6 +105,10 @@ private:
 	float Best = 0.f;
 	float FurthestX = 0.f;
 	FRandomStream Rng;
+	int32 ChunkCount = 0;
+	TArray<FVector> CaveCentres;
+	void BuildCave(const FVector& From, const FVector& To, FChunk& Into);
+	void AddAnchorRock(UStaticMesh* Mesh, const FVector& At, float Width, FChunk& Into);
 
 	void BuildChunk();
 	void ClearChunks();

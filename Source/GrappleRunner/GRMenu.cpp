@@ -21,6 +21,7 @@
 #include "GRMenu.h"
 #include "GrappleRig.h"
 #include "GRArsenal.h"
+#include "GRSettings.h"
 
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Camera/CameraComponent.h"
@@ -507,9 +508,9 @@ void AGRMenu::SelectCategory(int32 Index)
 	{
 		const float Sens = R ? R->MouseSensitivity : 0.6f;
 		Add(FText::Format(LOCTEXT("SensUp", "Mouse sensitivity  {0}   +"), FText::AsNumber(Sens)), LOCTEXT("SensUpInfo", "Look around faster with the mouse."),
-			[this] { if (AGrappleRig* Rr = Rig.Get()) { Rr->MouseSensitivity = FMath::Clamp(Rr->MouseSensitivity + 0.1f, 0.1f, 3.f); } SelectCategory(5); });
+			[this] { if (AGrappleRig* Rr = Rig.Get()) { Rr->MouseSensitivity = FMath::Clamp(Rr->MouseSensitivity + 0.1f, 0.1f, 3.f); GRSettings::SetFloat(TEXT("MouseSensitivity"), Rr->MouseSensitivity); } SelectCategory(5); });
 		Add(LOCTEXT("SensDown", "Mouse sensitivity   -"), LOCTEXT("SensDownInfo", "Look around slower with the mouse."),
-			[this] { if (AGrappleRig* Rr = Rig.Get()) { Rr->MouseSensitivity = FMath::Clamp(Rr->MouseSensitivity - 0.1f, 0.1f, 3.f); } SelectCategory(5); });
+			[this] { if (AGrappleRig* Rr = Rig.Get()) { Rr->MouseSensitivity = FMath::Clamp(Rr->MouseSensitivity - 0.1f, 0.1f, 3.f); GRSettings::SetFloat(TEXT("MouseSensitivity"), Rr->MouseSensitivity); } SelectCategory(5); });
 		break;
 	}
 	case 6:   // Log Out
