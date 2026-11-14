@@ -95,14 +95,19 @@ void AGRCompanion::BeginPlay()
 	Spawner = S ? *S : nullptr;
 	bChatter = GRSettings::PartnerChatter();
 
-	// The body: Kwang in his Rosewood outfit, playing the in-air "travel" pose on a loop.
+	// The body: Kwang in his Rosewood outfit. Two poses, each played ONCE and then held (a
+	// looping clip "popped" every time it restarted, which looked like glitching):
+	//   HookPose = the jump take-off, reaching up: used while hanging on a rope
+	//   FlyPose  = the top of a jump, tucked: used while flying free between swings
 	if (USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Meshes/KwangRosewood.KwangRosewood")))
 	{
 		Body->SetSkeletalMeshAsset(Mesh);
 	}
-	if (UAnimSequence* Air = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jump_TravelMode_Apex.Jump_TravelMode_Apex")))
+	HookPose = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jump_TravelMode_Start.Jump_TravelMode_Start"));
+	FlyPose = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jump_TravelMode_Apex.Jump_TravelMode_Apex"));
+	if (FlyPose)
 	{
-		Body->PlayAnimation(Air, true);
+		Body->PlayAnimation(FlyPose, false);
 	}
 	if (UMaterialInterface* RopeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/GrappleRunner/Materials/M_Rope.M_Rope")))
 	{
@@ -301,6 +306,62 @@ void AGRCompanion::Watch(float Dt)
 }
 
 // ---- flying beside you -------------------------------------------------------------------
+// Hook a grapple rock ahead of us and above, near where we want to be. True if one was found.
+bool AGRCompanion::TryHook(const FVector& At, const FVector& Ahead, const FVector& Target)
+{
+	TArray<AActor*> Found;
+	UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName(TEXT("GrappleAnchor")), Found);
+	const FVector Ideal = Target + Ahead * 900.f + FVector(0.f, 0.f, 900.f);   // a good rock is ahead of the spot beside you, and high
+	float Best = 1e12f;
+	AActor* Pick = nullptr;
+	for (AActor* A : Found)
+	{
+		const FVector D = A->GetActorLocation() - At;
+		if (D.Z < 300.f || D.Size() > 2400.f || FVector::DotProduct(D, Ahead) < 300.f)
+		{
+			continue;   // too low, too far, or behind
+		}
+		const float Score = FVector::DistSquared(A->GetActorLocation(), Ideal);
+		if (Score < Best)
+		{
+			Best = Score;
+			Pick = A;
+		}
+	}
+	if (!Pick)
+	{
+		return false;
+	}
+	RopeAnchor = Pick->GetActorLocation();
+	RopeLength = FVector::Dist(RopeAnchor, At) * 0.95f;   // a touch shorter, so the rope pulls tight at once
+	bSwinging = true;
+	SwingTime = 0.f;
+	RopeShoot = 0.f;
+	if (HookPose)
+	{
+		Body->PlayAnimation(HookPose, false);
+	}
+	return true;
+}
+
+// Let go of the rope with a little flick forward and up (like you do at the bottom of a swing).
+void AGRCompanion::LetGo(const FVector& Ahead)
+{
+	bSwinging = false;
+	HookCooldown = 0.35f;
+	Velocity += Ahead * 250.f + FVector(0.f, 0.f, 350.f);
+	if (FlyPose)
+	{
+		Body->PlayAnimation(FlyPose, false);
+	}
+}
+
+// How the partner flies: real swings on a rope, like you.
+//   1. Gravity pulls down; a gentle steer pulls towards a spot beside you (stronger off the rope).
+//   2. On a rope: it can't get further from the rock than the rope's length (the rope "catches"
+//      it and turns falling into swinging), and it reels in slowly. It lets go once it has
+//      swung past the rock, then hooks the next rock ahead.
+//   3. It turns smoothly to face where it's going and leans into the swing.
 void AGRCompanion::Move(float Dt)
 {
 	AGrappleRig* R = Rig.Get();
@@ -308,63 +369,83 @@ void AGRCompanion::Move(float Dt)
 	{
 		return;
 	}
+	Dt = FMath::Min(Dt, 0.05f);   // a long frame mustn't fling it
 	const FVector P = R->GetBodyPosition();
 	FVector Ahead = R->GetVelocity();
 	Ahead.Z = 0.f;
 	Ahead = Ahead.SizeSquared() > 200.f * 200.f ? Ahead.GetSafeNormal() : FVector(1.f, 0.f, 0.f);   // slow: assume the run's direction (+X)
 	const FVector Right = FVector::CrossProduct(FVector::UpVector, Ahead);
-	const FVector Target = P + Ahead * Offset.X + Right * Offset.Y + FVector(0.f, 0.f, Offset.Z + 120.f * FMath::Sin(GetGameTimeSinceCreation() * 1.3f));
-
-	// A soft spring toward the target: pulls harder the further away, damped so it doesn't wobble.
+	const FVector Target = P + Ahead * Offset.X + Right * Offset.Y + FVector(0.f, 0.f, Offset.Z);
 	const FVector Me = GetActorLocation();
-	Velocity += ((Target - Me) * 6.f - Velocity * 3.5f) * Dt;
-	Velocity = Velocity.GetClampedToMaxSize(6000.f);
-	FVector Next = Me + Velocity * Dt;
-	if (FVector::Dist(Next, Target) > 6000.f)
-	{
-		Next = Target;   // fell far behind (e.g. you respawned): catch up instantly
-	}
-	SetActorLocation(Next);
-	// Face where it's going, leaning into the motion like a swing.
-	const FVector Flat = FVector(Velocity.X, Velocity.Y, 0.f);
-	if (Flat.SizeSquared() > 100.f)
-	{
-		SetActorRotation(FRotator(FMath::Clamp(-Velocity.Z * 0.01f, -25.f, 25.f), Flat.Rotation().Yaw, 0.f));
-	}
 
-	// The rope: to the nearest grapple rock above and ahead (list refreshed twice a second).
-	AnchorRefresh -= Dt;
-	if (AnchorRefresh <= 0.f)
+	// 1. gravity and steering
+	Velocity += FVector(0.f, 0.f, -980.f) * (bSwinging ? 1.f : 0.45f) * Dt;   // off the rope it glides a bit
+	const float Steer = bSwinging ? 0.8f : 2.5f;
+	const float Drag = bSwinging ? 0.15f : 1.2f;
+	Velocity += ((Target - Me) * Steer - Velocity * Drag) * Dt;
+	Velocity = Velocity.GetClampedToMaxSize(5000.f);
+	FVector Next = Me + Velocity * Dt;
+
+	// 2. the rope
+	if (bSwinging)
 	{
-		AnchorRefresh = 0.5f;
-		TArray<AActor*> Found;
-		UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName(TEXT("GrappleAnchor")), Found);
-		float Best = 1e12f;
-		bool bAny = false;
-		for (AActor* A : Found)
+		SwingTime += Dt;
+		RopeShoot = FMath::Min(1.f, RopeShoot + Dt / 0.12f);
+		RopeLength = FMath::Max(300.f, RopeLength - 120.f * Dt);   // reel in a little
+		FVector Out = Next - RopeAnchor;
+		const float Dist = Out.Size();
+		if (Dist > RopeLength && Dist > KINDA_SMALL_NUMBER)
 		{
-			const FVector D = A->GetActorLocation() - Next;
-			if (D.Z > 200.f && D.Size() < 2500.f && FVector::DotProduct(D, Ahead) > -300.f && D.SizeSquared() < Best)
+			Out /= Dist;
+			Next = RopeAnchor + Out * RopeLength;                   // the rope catches
+			const float Outward = FVector::DotProduct(Velocity, Out);
+			if (Outward > 0.f)
 			{
-				Best = D.SizeSquared();
-				RopeAnchor = A->GetActorLocation();
-				bAny = true;
+				Velocity -= Out * Outward;                           // no more moving away from the rock
 			}
 		}
-		if (!bAny)
+		const float Past = FVector::DotProduct(Next - RopeAnchor, Ahead);
+		if ((Past > 150.f && Velocity.Z > 0.f) || Past > 900.f || SwingTime > 3.5f)
 		{
-			RopeAnchor = FVector::ZeroVector;
+			LetGo(Ahead);
 		}
 	}
-	const FVector Hand = Body->DoesSocketExist(TEXT("hand_r")) ? Body->GetSocketLocation(TEXT("hand_r")) : Next + FVector(0.f, 0.f, 60.f);
-	if (!RopeAnchor.IsZero())
+	else
 	{
-		// A cylinder 100 cm tall, stretched from hand to rock and turned to point along the line.
-		const FVector Line = RopeAnchor - Hand;
+		HookCooldown -= Dt;
+		if (HookCooldown <= 0.f && !TryHook(Next, Ahead, Target))
+		{
+			HookCooldown = 0.3f;   // nothing in reach: glide and look again soon
+		}
+	}
+	if (FVector::Dist(Next, Target) > 6000.f)
+	{
+		Next = Target;                       // fell far behind (e.g. you respawned): catch up at once
+		Velocity = R->GetVelocity();
+		if (bSwinging)
+		{
+			LetGo(Ahead);
+		}
+	}
+	SetActorLocation(Next);
+
+	// 3. face the way it's going, smoothly (snapping every frame was the "glitch")
+	const FVector Flat(Velocity.X, Velocity.Y, 0.f);
+	if (Flat.SizeSquared() > 400.f)
+	{
+		const FRotator Want(FMath::Clamp(-Velocity.Z * 0.012f, -30.f, 30.f), Flat.Rotation().Yaw, 0.f);
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), Want, Dt, 3.5f));
+	}
+
+	// The rope from the right hand to the rock, flying out over 0.12 s after each hook.
+	const FVector Hand = Body->DoesSocketExist(TEXT("hand_r")) ? Body->GetSocketLocation(TEXT("hand_r")) : Next + FVector(0.f, 0.f, 60.f);
+	if (bSwinging)
+	{
+		const FVector Line = (RopeAnchor - Hand) * RopeShoot;
 		Rope->SetVisibility(true);
 		Rope->SetWorldLocation(Hand + Line * 0.5f);
 		Rope->SetWorldRotation(FRotationMatrix::MakeFromZ(Line.GetSafeNormal()).Rotator());
-		Rope->SetWorldScale3D(FVector(0.025f, 0.025f, Line.Size() / 100.f));
+		Rope->SetWorldScale3D(FVector(0.025f, 0.025f, FMath::Max(1.f, Line.Size()) / 100.f));
 	}
 	else
 	{

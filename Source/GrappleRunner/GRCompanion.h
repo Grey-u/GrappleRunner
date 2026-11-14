@@ -19,8 +19,9 @@
 //  A writer can rewrite or add conversations without touching code (Naomi's film friend).
 //
 //  HOW IT MOVES (kept simple on purpose)
-//  It isn't a full physics swing: it follows a moving target point beside you with a soft
-//  spring, leans into the motion, and draws a rope to the nearest grapple rock above it.
+//  It swings for real: hooks a grapple rock ahead and above, swings on a rope that can't
+//  stretch, reels in a little, lets go past the rock with a flick, then hooks the next one.
+//  A gentle steer keeps it near a spot beside you, and it turns smoothly into the swing.
 //  That reads as swinging from a distance and can't fall behind or get stuck.
 //
 //  HOW TO READ THIS FILE
@@ -86,9 +87,18 @@ private:
 	int32 LastPods = 0;
 	bool bWasLow = false, bWasEmpty = false;
 	int32 CaveSaid = -1;
-	TArray<TWeakObjectPtr<AActor>> Anchors;
-	float AnchorRefresh = 0.f;
 	FVector RopeAnchor = FVector::ZeroVector;
+
+	// ---- swinging (14 Nov: real swings instead of floating on a spring, which looked glitchy) ----
+	bool bSwinging = false;          // hanging on a rope right now?
+	float RopeLength = 0.f;          // the rope can't stretch past this
+	float SwingTime = 0.f;           // seconds on this rope
+	float RopeShoot = 1.f;           // 0..1: the rope flying out to the rock after a hook
+	float HookCooldown = 0.f;        // a short gap between letting go and hooking again
+	UPROPERTY() TObjectPtr<class UAnimSequence> HookPose;    // pose held while swinging
+	UPROPERTY() TObjectPtr<class UAnimSequence> FlyPose;     // pose held while flying free
+	bool TryHook(const FVector& At, const FVector& Ahead, const FVector& Target);
+	void LetGo(const FVector& Ahead);
 
 	void LoadLines();
 	bool Say(const FString& Event);                  // start a conversation for that event (false if none)
