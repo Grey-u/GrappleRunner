@@ -111,7 +111,10 @@ AGRMenu::AGRMenu()
 	Panel->SetDrawSize(PanelPixels);
 	Panel->SetPivot(FVector2D(0.5f, 0.5f));
 	Panel->SetTwoSided(true);
-	Panel->SetBlendMode(EWidgetBlendMode::Transparent);
+	// Masked = every pixel is either solid or cut out. Panels are fully solid (a see-through
+	// dark panel looked washed-out grey against the bright sky), and the gaps between them
+	// are cut away so you still see the world around the menu.
+	Panel->SetBlendMode(EWidgetBlendMode::Masked);
 	Panel->SetCollisionProfileName(TEXT("UI"));               // the pointer's ray can hit it
 	Panel->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // ...but only while it's open
 	Panel->SetVisibility(false);
