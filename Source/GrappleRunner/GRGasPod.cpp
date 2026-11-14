@@ -163,11 +163,11 @@ void AGRGasPod::Burst(const FLinearColor& Colour)
 	}
 	for (int32 i = 0; i < LootDrops; ++i)
 	{
-		if (AGRLootOrb* Orb = GetWorld()->SpawnActor<AGRLootOrb>(Centre, FRotator::ZeroRotator))
+		if (AGRLootOrb* Loot = GetWorld()->SpawnActor<AGRLootOrb>(Centre, FRotator::ZeroRotator))
 		{
 			FVector Out = FMath::VRand();
 			Out.Z = FMath::Abs(Out.Z) * 0.8f + 0.2f;
-			Orb->Launch(Out.GetSafeNormal() * FMath::FRandRange(500.f, 900.f));
+			Loot->Launch(Out.GetSafeNormal() * FMath::FRandRange(500.f, 900.f));
 		}
 	}
 
