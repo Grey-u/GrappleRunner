@@ -8,6 +8,7 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
@@ -22,16 +23,16 @@ namespace
 {
 	// What each kind of plant is, in EKind order: the StyleHex Stylized Forest pack first, our
 	// own mesh as the fallback, and how tall it should end up (cm; negative = keep its size).
-	// Grey: grass is FOOT height and very dense, not knee-high.
+	// Grey: grass is FOOT height and very dense, not knee-high; flower heads small (17 cm, 15 Nov).
 	struct FKindSource { const TCHAR* Pack; const TCHAR* Ours; float Height; };
 	#define GR_SH(N) TEXT("/Game/StyleHex_Studio/Free_Packs/FREE_Stylized_Forest_Sample/Meshes/") TEXT(N)
 	const FKindSource KindSources[] = {
 		{ GR_SH("Foliage/SM_Fol_Grass_Clump_1"), TEXT("SM_GR_Grass"), 25.f },
 		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_GrassTall"), 38.f },
-		{ GR_SH("Foliage/SM_Fol_Flower_Clump_1"), TEXT("SM_GR_Flowers_Pink"), 30.f },
-		{ GR_SH("Foliage/SM_Fol_Flower_Clump_2"), TEXT("SM_GR_Flowers_White"), 30.f },
-		{ GR_SH("Foliage/SM_Fol_Flower_Clump_3"), TEXT("SM_GR_Flowers_Yellow"), 30.f },
-		{ nullptr, TEXT("SM_GR_Flowers_Blue"), 30.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_1"), TEXT("SM_GR_Flowers_Pink"), 17.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_2"), TEXT("SM_GR_Flowers_White"), 17.f },
+		{ GR_SH("Foliage/SM_Fol_Flower_Clump_3"), TEXT("SM_GR_Flowers_Yellow"), 17.f },
+		{ nullptr, TEXT("SM_GR_Flowers_Blue"), 17.f },
 		{ GR_SH("Foliage/SM_Fol_Bush_1"), TEXT("SM_GR_Bush"), 55.f },
 		{ GR_SH("Stones/SM_Stone_1"), TEXT("SM_GR_Rock_A"), 35.f },
 		{ GR_SH("Stones/SM_Stone_2"), TEXT("SM_GR_Rock_B"), 45.f },
@@ -217,6 +218,19 @@ UInstancedStaticMeshComponent* AGRStylizedNature::MakeInstancer(UStaticMesh* Mes
 		C->CreationMethod = EComponentCreationMethod::Instance;
 	}
 	C->SetStaticMesh(Mesh);
+	// Grass uses our Genshin-style material (made by Scripts/genshin_grass.py): bright tips,
+	// meadow colour patches, light shining through. Falls back to the pack's own if missing.
+	if (Mesh->GetName().Contains(TEXT("Grass_Clump")))
+	{
+		static TSoftObjectPtr<UMaterialInterface> GenshinGrass(FSoftObjectPath(TEXT("/Game/GrappleRunner/Nature/M_GR_GenshinGrass.M_GR_GenshinGrass")));
+		if (UMaterialInterface* GM = GenshinGrass.LoadSynchronous())
+		{
+			for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
+			{
+				C->SetMaterial(Slot, GM);
+			}
+		}
+	}
 	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // you swing through grass and clouds
 	C->SetCastShadow(bShadows);
 	C->SetMobility(bForSaving ? EComponentMobility::Static : EComponentMobility::Movable);

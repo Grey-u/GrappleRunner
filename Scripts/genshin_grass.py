@@ -67,7 +67,7 @@ float gst = 0.6 + 0.4 * sin(T * 0.35 + WP.x * 0.0007);
 return float3(sin(T * 1.8 + ph) * 6.0 * gst, cos(T * 1.3 + ph * 1.3) * 3.5 * gst, 0) * w;
 """
 
-PARAMS = [("Glow", 0.06), ("PatchSize", 1500.0), ("GreenShare", 0.62), ("FlipUV", 0.0)]
+PARAMS = [("Glow", 0.06), ("PatchSize", 800.0), ("GreenShare", 0.5), ("FlipUV", 0.0)]
 
 path = DEST + "/" + NAME
 if eal.does_asset_exist(path):
