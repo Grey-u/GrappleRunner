@@ -103,10 +103,18 @@ namespace
 		{
 			return TEXT("invisible");
 		}
+		// NOTE: "movable" is NOT a reason. Brushify's islands and the endless rocks are set as
+		// movable in Unreal, and skipping movable things is exactly why no grass ever grew (the
+		// trace went straight through every island). Only the game's own moving bits are skipped.
 		const AActor* A = C->GetOwner();
-		if (!A || A->IsA<ABrush>() || A->IsA<APawn>() || C->Mobility == EComponentMobility::Movable)
+		if (!A || A->IsA<ABrush>() || A->IsA<APawn>())
 		{
-			return TEXT("volume or moving");
+			return TEXT("volume or player");
+		}
+		const FString Cls = A->GetClass()->GetName();
+		if (Cls.Contains(TEXT("GasPod")) || Cls.Contains(TEXT("LootOrb")) || Cls.Contains(TEXT("Companion")) || Cls.Contains(TEXT("GrappleRig")))
+		{
+			return TEXT("game object");
 		}
 		const FString Name = A->GetClass()->GetName() + TEXT(" ") + A->GetName()
 			+ (Cast<UStaticMeshComponent>(C) && Cast<UStaticMeshComponent>(C)->GetStaticMesh() ? Cast<UStaticMeshComponent>(C)->GetStaticMesh()->GetName() : FString());
@@ -497,9 +505,9 @@ void AGRStylizedNature::ScatterOnLevel()
 			Params.AddIgnoredActor(A);   // see through trees and plants down to the ground
 			continue;
 		}
-		if (A->ActorHasTag(FName(TEXT("NoGrass"))) || A->GetRootComponent()->Mobility == EComponentMobility::Movable)
+		if (A->ActorHasTag(FName(TEXT("NoGrass"))))
 		{
-			continue;
+			continue;   // (movable is fine: the islands themselves are movable)
 		}
 		bool bSolid = false;
 		TArray<UPrimitiveComponent*> Prims;
