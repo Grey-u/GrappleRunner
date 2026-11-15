@@ -34,6 +34,7 @@ def _bake_step(dt):
     st = _bake
     if st["i"] >= len(LEVELS):
         unreal.unregister_slate_post_tick_callback(st["handle"])
+        unreal._gr_bake_running = False
         unreal.log("BAKE GRASS: DONE - the grass is in the levels now; look in the viewport")
         return
     lvl = LEVELS[st["i"]]
@@ -61,5 +62,9 @@ def _bake_step(dt):
     st["i"] += 1
     st["loaded"] = False
 
-_bake["handle"] = unreal.register_slate_post_tick_callback(_bake_step)
-unreal.log("BAKE GRASS: started (it runs over the next few seconds per level)")
+if getattr(unreal, "_gr_bake_running", False):
+    unreal.log("BAKE GRASS: already running, not starting a second one")
+else:
+    unreal._gr_bake_running = True     # (one bake at a time; cleared when it finishes)
+    _bake["handle"] = unreal.register_slate_post_tick_callback(_bake_step)
+    unreal.log("BAKE GRASS: started (it runs over the next few seconds per level)")
