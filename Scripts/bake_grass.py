@@ -10,7 +10,8 @@
 # =====================================================================================
 import unreal
 
-LEVELS = ["/Game/GrappleRunner/Maps/L_Endless", "/Game/GrappleRunner/Maps/L_FloatingIslands_2"]
+# L_Endless LAST: baked first, straight after the editor opens, it found no ground (15 Nov).
+LEVELS = ["/Game/GrappleRunner/Maps/L_FloatingIslands_2", "/Game/GrappleRunner/Maps/L_Endless"]
 asub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 lsub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 eal = unreal.EditorAssetLibrary

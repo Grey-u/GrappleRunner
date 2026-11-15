@@ -66,16 +66,17 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Nature") bool bBaked = false;   // true = grass already planted in the level
 
 	// ---- grass ----
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassSpacing = 40.f;       // gap between clumps (smaller = denser). Grey: very dense
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassSpacing = 30.f;       // gap between clumps (smaller = denser). Grey: very dense
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassWidth = 2.2f;         // grass clumps spread this much wider than tall: a carpet
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MinFlatness = 0.72f;       // 1 = only perfectly flat ground, 0 = walls too
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float FlowerChance = 0.14f;      // in flower meadows: chance a clump is flowers
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float TallGrassChance = 0.16f;
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float BushChance = 0.025f;
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float StoneChance = 0.02f;
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") int32 MaxClumps = 400000;        // safety cap on the whole level
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") int32 MaxClumps = 700000;        // safety cap on the whole level
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassCullStart = 4500.f;   // grass starts fading out here...
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassCullEnd = 6500.f;     // ...and is gone here
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossUnderGrass = 0.2f;     // chance of a moss cushion under each clump
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossUnderGrass = 0.f;      // chance of a moss cushion under each clump
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MossOnSides = 0.f;           // how thickly moss covers rock sides
 
 	// ---- clouds ----

@@ -279,7 +279,12 @@ FTransform AGRStylizedNature::ClumpTransform(const FVector& At, const FVector& N
 	const FQuat Spin(FVector::UpVector, Rng.FRandRange(0.f, 2.f * PI));
 	const int32 k = static_cast<int32>(Kind);
 	const float S = (KindScale.IsValidIndex(k) ? KindScale[k] : 1.f) * Rng.FRandRange(0.75f, 1.3f);   // right height, give or take
-	return FTransform(Tilt * Spin, At - Normal * 3.f, FVector(S));   // sink 3 cm so no roots float
+	// Grass is spread WIDE but kept low (foot height), so the clumps join into a carpet with no
+	// dirt showing between them (15 Nov, seen in the editor: thin tufts with bare ground).
+	const bool bGrass = Kind == EKind::Grass || Kind == EKind::Tall || Kind == EKind::Grass2 || Kind == EKind::Grass3
+		|| Kind == EKind::Grass4 || Kind == EKind::Grass5;
+	const float Wide = bGrass ? GrassWidth : 1.f;
+	return FTransform(Tilt * Spin, At - Normal * 3.f, FVector(S * Wide, S * Wide, S));   // sink 3 cm so no roots float
 }
 
 // Moss lies fully along the surface (tops, slopes and sides), unlike grass which grows up.
