@@ -26,7 +26,17 @@ for lvl in LEVELS:
     else:
         n = asub.spawn_actor_from_class(unreal.GRStylizedNature, unreal.Vector(0, 0, 0))
         n.set_actor_label("StylizedNature")
-    n.call_method("PlantGrassNow")
+    # Bake, then count. The FIRST level loaded right after the editor opens often has no
+    # collision ready yet, so it finds "no ground" and bakes almost nothing (15 Nov). If so,
+    # load it again and redo.
+    for attempt in range(3):
+        n.call_method("PlantGrassNow")
+        total = sum(c.get_instance_count() for c in n.get_components_by_class(unreal.InstancedStaticMeshComponent))
+        unreal.log("BAKE GRASS: %s attempt %d: %d clumps" % (lvl.split("/")[-1], attempt + 1, total))
+        if total > 2000:
+            break
+        lsub.load_level(lvl)
+        n = [a for a in asub.get_all_level_actors() if a.get_class().get_name() == "GRStylizedNature"][0]
     lsub.save_current_level()
     unreal.log("BAKE GRASS: %s done (see 'baked N clumps' above)" % lvl.split("/")[-1])
 unreal.log("BAKE GRASS: DONE - the grass is in the levels now; look in the viewport")
