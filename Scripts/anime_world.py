@@ -11,6 +11,7 @@
 #       - TOON LIGHT: works out how much light each pixel gets (final colour / surface colour)
 #         and snaps it to two tones, lit and shadow, with a soft edge; shadows go lilac
 #       - COLOUR: richer saturation
+#       - STONE GLOW: walls, ruins and rock get a soft warm inner glow (WallGlow)
 #       - SKY: an anime sky in place of the dull one: deep blue overhead fading to pale cyan,
 #         soft painted clouds that drift, a pale sea of cloud below the horizon; it still
 #         darkens with the day/night clock
@@ -90,6 +91,15 @@ col = lerp(col, scene, isChar);   // characters keep their own shading
 float g = dot(col, lw);
 col = lerp(float3(g, g, g), col, Saturation);
 
+// 3b. luminosity on stone: walls, ruins and rock (greyish/brownish surfaces) get the same
+//     soft inner glow as the grass and trees (Grey, 15 Nov). Colourful things (grass, leaves,
+//     flowers) are left alone, they glow by their own materials already.
+float amax = max(alb.r, max(alb.g, alb.b));
+float amin = min(alb.r, min(alb.g, alb.b));
+float sat = (amax - amin) / max(amax, 0.05);
+float stone = (1.0 - smoothstep(0.18, 0.45, sat)) * (1.0 - sky) * (1.0 - isChar) * nearW;
+col += (alb * float3(1.05, 1.0, 0.92)) * WallGlow * stone;   // a touch warm, like sunlit stone
+
 // 4. anime sky (Genshin-style: cobalt overhead, crisp puffy clouds with white tops and
 //    blue bases, a sea of clouds below the horizon). Previewed against Grey's references.
 struct GRNoise
@@ -155,7 +165,7 @@ return col;
 
 PARAMS = [  # name, kind, default
     ("Brush", "s", 1.0), ("Threshold", "s", 0.55), ("ShadowLevel", "s", 0.62), ("LitLevel", "s", 1.06),
-    ("ToonAmount", "s", 0.9), ("FadeStart", "s", 8000.0), ("FadeEnd", "s", 40000.0), ("Saturation", "s", 1.3),
+    ("ToonAmount", "s", 0.9), ("WallGlow", "s", 0.22), ("FadeStart", "s", 8000.0), ("FadeEnd", "s", 40000.0), ("Saturation", "s", 1.3),
     ("SkyAmount", "s", 1.0), ("CloudAmount", "s", 0.9), ("HazeAmount", "s", 0.55), ("HazeDistance", "s", 45000.0),
     ("Thickness", "s", 1.0), ("EdgeThreshold", "s", 0.6), ("Outline", "s", 0.55), 
     ("ShadowTint", "v", unreal.LinearColor(0.72, 0.80, 0.98, 1)),

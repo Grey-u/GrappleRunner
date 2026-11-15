@@ -105,6 +105,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float MaxFireRange = 6000.f;     // furthest a hook can reach (60 m)
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float AimAssistDegrees = 13.f;   // was 9: easier to hit rocks with a mouse    // if you miss, snap to a grapple rock within this angle
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float MinRopeLength = 250.f;     // reeling stops at 2.5 m so you don't crash into the rock
+	// When a hook bites, the rope starts this much SHORTER than the distance (0.9 = 10%
+	// shorter), so it pulls tight at once and the swing is tighter (Grey, 15 Nov: "a bit loose").
+	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float RopeTakeUp = 0.9f;
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float ReelSpeed = 900.f;         // how fast the rope shortens when reeling (9 m/s)
 	UPROPERTY(EditAnywhere, Category = "Grapple|Hooks") float ReelPullAccel = 1400.f;    // extra tug toward the hook while reeling
 	// Auto-pull (Attack on Titan style): once a hook bites, it reels you toward it by itself.
@@ -124,7 +127,7 @@ public:
 	// How strongly the rope pulls back for each cm it is stretched. Higher = stiffer, snappier.
 	// (The square root of this is how fast the rope "springs": sqrt(64) = 8, so the jolt is
 	// spread over roughly 1/8 of a second.)
-	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeStiffness = 85.f;   // was 64: Naomi found the rope a little too lax (14 Nov)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeStiffness = 110.f;  // was 85 (14 Nov), 64 before: Grey found the swing too loose (15 Nov)
 	// Stops the rope bouncing like a bungee. 0 = bouncy forever, 1 = no bounce at all.
 	UPROPERTY(EditAnywhere, Category = "Grapple|Rope Feel") float RopeDampingRatio = 0.65f;
 	// Progressive spring (fix for F6): the rope gets stiffer the more it stretches, so a hard
@@ -175,6 +178,21 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float JumpSpeed = 520.f;            // jump strength
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float WalkableNormalZ = 0.65f;      // how flat a surface must be to stand on (1 = flat floor, 0 = wall)
 	UPROPERTY(EditAnywhere, Category = "Grapple|Body") float KillDepthBelowIslands = 4000.f; // fall this far below the lowest island and you respawn
+
+	// ---- Climbing and kicking off rock (15 Nov: "90% of playing is hitting rocks") ----
+	// Touch a rock wall in the air and HOLD jump (Space / A): you scramble up it. LET GO: you
+	// kick off it, away from the wall and up, towards where you're looking. Reach the top
+	// while holding: you pull yourself over the edge. Hit a wall fast without holding: you
+	// bounce off a little instead of stopping dead.
+	UPROPERTY(EditAnywhere, Category = "Grapple|Climb") float ClimbSpeed = 380.f;      // how fast you scramble up (cm/s)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Climb") float WallKickSpeed = 950.f;   // how hard you kick off (cm/s)
+	UPROPERTY(EditAnywhere, Category = "Grapple|Climb") float WallKickUp = 650.f;      // plus this much straight up
+	UPROPERTY(EditAnywhere, Category = "Grapple|Climb") float WallBounce = 0.35f;      // 0 = stop dead on a wall, 1 = bounce right back
+	UPROPERTY(EditAnywhere, Category = "Grapple|Climb") float WallGrace = 0.25f;       // seconds after touching a wall that it still counts
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UAnimSequence> ClimbAnim =
+		TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jog_Fwd_Uphill.Jog_Fwd_Uphill")));
+	UPROPERTY(EditAnywhere, Category = "Grapple|Body") TSoftObjectPtr<UAnimSequence> KickAnim =
+		TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/LaunchPad.LaunchPad")));
 
 	// ---- Desktop testing ----
 	UPROPERTY(EditAnywhere, Category = "Grapple|Desktop") float MouseSensitivity = 0.6f;
@@ -364,6 +382,10 @@ private:
 	float Accumulator = 0.f;                       // leftover time for the fixed-step physics (explained in the .cpp)
 	float DesktopYaw = 0.f, DesktopPitch = 0.f;    // where the mouse is looking (left-right, up-down)
 	bool bGrounded = false;                        // standing on something?
+	FVector WallNormal = FVector::ZeroVector;      // which way the last wall we touched faces
+	float WallContactTime = -100.f;                // when we last touched a wall (seconds)
+	bool bClimbing = false;                        // scrambling up a wall right now?
+	float KickAnimUntil = 0.f;                     // show the kick-off animation until then
 	bool bVR = false;                              // is a VR headset being used right now?
 	bool bReel[2] = {false, false};                // is each hand reeling in?
 	bool bBoost = false;                           // is the boost button held?

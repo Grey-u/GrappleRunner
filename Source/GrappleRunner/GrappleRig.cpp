@@ -618,7 +618,7 @@ void AGrappleRig::FireHook(int32 Index)
 	H.Anchor = Point;
 	// The rope starts exactly as long as the distance to the anchor (no sudden yank),
 	// but never shorter than the minimum.
-	H.Length = FMath::Max(MinRopeLength, static_cast<float>(FVector::Dist(BodyCenter(), Point)));
+	H.Length = FMath::Max(MinRopeLength, static_cast<float>(FVector::Dist(BodyCenter(), Point)) * RopeTakeUp);   // a bit shorter: pulls tight at once
 
 	// VAULT CHECK: is the hook point well below you? Then find the top of what it bit, by
 	// looking straight down onto it from 15 m above. If there's a flat-enough top, the rope
@@ -875,6 +875,53 @@ void AGrappleRig::Simulate(float Dt)
 		}
 	}
 
+	// CLIMB AND KICK OFF (see the settings in GrappleRig.h). bBoost = the jump/boost button
+	// is held while in the air.
+	{
+		const float Now = GetWorld()->GetTimeSeconds();
+		const bool bOnWall = !bGrounded && Now - WallContactTime < WallGrace;
+		const FVector Look = Camera.IsValid() ? Camera->GetForwardVector() : Pawn->GetActorForwardVector();
+		if (bOnWall && bBoost)
+		{
+			if (!bClimbing)
+			{
+				Pulse(0, 0.35f);   // a little bump in both hands as you grab on
+				Pulse(1, 0.35f);
+			}
+			bClimbing = true;
+			// "Up the wall": straight up, flattened onto the wall's surface (so slanted rock
+			// is climbed along its slope), plus a gentle press into the rock to stay on it.
+			const FVector UpAlong = (FVector::UpVector - WallNormal * FVector::DotProduct(FVector::UpVector, WallNormal)).GetSafeNormal();
+			const FVector Sideways = MoveInput - WallNormal * FVector::DotProduct(MoveInput, WallNormal);   // A/D shuffle along it
+			Velocity = UpAlong * ClimbSpeed + Sideways * 200.f - WallNormal * 60.f;
+			bBoost = false;   // climbing uses no gas
+		}
+		else if (bClimbing)
+		{
+			bClimbing = false;
+			if (!bBoost)
+			{
+				// Let go: KICK OFF, away from the wall and up, leaning the way you look.
+				FVector LookFlat(Look.X, Look.Y, 0.f);
+				LookFlat = LookFlat.GetSafeNormal();
+				if (FVector::DotProduct(LookFlat, WallNormal) < -0.2f)
+				{
+					LookFlat = FVector::ZeroVector;   // looking INTO the wall: just kick straight out
+				}
+				const FVector Out = (WallNormal + LookFlat * 0.8f).GetSafeNormal();
+				Velocity = Out * WallKickSpeed + FVector(0.f, 0.f, WallKickUp);
+				KickAnimUntil = Now + 0.6f;
+				Pulse(0, 0.7f);
+				Pulse(1, 0.7f);
+			}
+			else
+			{
+				// Still holding but the wall ended under you: you reached the top. Pull over the edge.
+				Velocity = -WallNormal * 380.f + FVector(0.f, 0.f, 320.f);
+			}
+		}
+	}
+
 	// Gas boost: push in the direction the camera is looking, while there's gas left.
 	if (bBoost && Gas > 0.f && !bGrounded)
 	{
@@ -1075,6 +1122,17 @@ void AGrappleRig::MoveWithCollision(const FVector& From, const FVector& To)
 		if (Vn < 0.f)
 		{
 			Velocity -= N * Vn;
+		}
+		// A WALL (steep rock, not floor or ceiling): remember it for climbing / kicking off,
+		// and if we hit it fast (and aren't climbing), bounce off a little instead of stopping dead.
+		if (FMath::Abs(N.Z) < WalkableNormalZ && !bGrounded)
+		{
+			WallNormal = N;
+			WallContactTime = World->GetTimeSeconds();
+			if (!bClimbing && Vn < -500.f)
+			{
+				Velocity += N * (-Vn) * WallBounce;
+			}
 		}
 		if (N.Z > WalkableNormalZ)
 		{
@@ -1498,7 +1556,15 @@ void AGrappleRig::UpdateBody()
 
 	// Pick the animation: in the air, running, or standing.
 	UAnimSequence* Want = nullptr;
-	if (!bGrounded)
+	if (bClimbing && ClimbAnim.LoadSynchronous())
+	{
+		Want = ClimbAnim.LoadSynchronous();             // scrambling up a wall
+	}
+	else if (GetWorld()->GetTimeSeconds() < KickAnimUntil && KickAnim.LoadSynchronous())
+	{
+		Want = KickAnim.LoadSynchronous();              // just kicked off a wall
+	}
+	else if (!bGrounded)
 	{
 		Want = AirAnim.LoadSynchronous();
 	}
