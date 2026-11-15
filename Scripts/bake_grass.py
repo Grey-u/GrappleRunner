@@ -20,7 +20,7 @@ WAIT_TICKS = 120          # editor frames to wait after loading (about 2 seconds
 _asub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 _lsub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 _eal = unreal.EditorAssetLibrary
-_bake = {"i": 0, "wait": 0, "tries": 0, "loaded": False, "handle": None}
+_bake = {"i": 0, "wait": 0, "tries": 0, "loaded": False, "handle": None, "busy": False}
 
 def _nature():
     n = [a for a in _asub.get_all_level_actors() if a.get_class().get_name() == "GRStylizedNature"]
@@ -32,6 +32,17 @@ def _nature():
 
 def _bake_step(dt):
     st = _bake
+    # Loading a level makes the editor tick, which would call this again INSIDE itself, again
+    # and again until it crashed (stack overflow, 15 Nov). So: one step at a time.
+    if st["busy"]:
+        return
+    st["busy"] = True
+    try:
+        _bake_step_inner(st)
+    finally:
+        st["busy"] = False
+
+def _bake_step_inner(st):
     if st["i"] >= len(LEVELS):
         unreal.unregister_slate_post_tick_callback(st["handle"])
         unreal._gr_bake_running = False
