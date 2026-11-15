@@ -652,8 +652,8 @@ void AGRStylizedNature::ScatterOnLevel()
 					for (const FVector& O : Around)
 					{
 						FHitResult Edge;
-						const FVector From = Hit.ImpactPoint + O + FVector(0.f, 0.f, 60.f);
-						if (!GroundTrace(GetWorld(), From, From - FVector(0.f, 0.f, 100.f), Params, Edge))
+						const FVector EdgeTop = Hit.ImpactPoint + O + FVector(0.f, 0.f, 60.f);
+						if (!GroundTrace(GetWorld(), EdgeTop, EdgeTop - FVector(0.f, 0.f, 100.f), Params, Edge))
 						{
 							bSolidAround = false;
 							break;
@@ -791,8 +791,8 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 				for (const FVector& O : { FVector(Reach, 0, 0), FVector(-Reach, 0, 0), FVector(0, Reach, 0), FVector(0, -Reach, 0) })
 				{
 					FHitResult Edge;
-					const FVector From = Hit.ImpactPoint + O + FVector(0.f, 0.f, 60.f);
-					if (!GroundTrace(GetWorld(), From, From - FVector(0.f, 0.f, 100.f), Params, Edge))
+					const FVector EdgeTop = Hit.ImpactPoint + O + FVector(0.f, 0.f, 60.f);
+					if (!GroundTrace(GetWorld(), EdgeTop, EdgeTop - FVector(0.f, 0.f, 100.f), Params, Edge))
 					{
 						bSolidAround = false;
 						break;
