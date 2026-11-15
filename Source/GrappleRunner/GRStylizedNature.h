@@ -79,7 +79,7 @@ public:
 	// ---- grass ----
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassSpacing = 30.f;       // gap between clumps (smaller = denser). Grey: very dense
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassWidth = 2.2f;         // grass clumps spread this much wider than tall: a carpet
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MinFlatness = 0.72f;       // 1 = only perfectly flat ground, 0 = walls too
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MinFlatness = 0.8f;        // 1 = only perfectly flat ground, 0 = walls too
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float FlowerChance = 0.14f;      // in flower meadows: chance a clump is flowers
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float TallGrassChance = 0.3f; 
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float BushChance = 0.025f;

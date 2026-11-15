@@ -2,41 +2,64 @@
 #  bake_grass.py  -  run inside the Unreal editor (paste into the Python box at the bottom):
 #     exec(open("C:/Users/User/Documents/Unreal Projects/GrappleRunner/Scripts/bake_grass.py").read())
 # =====================================================================================
-#  WHY (Grey, 14 Nov: "still no grass"): the grass used to be planted only while the game was
-#  running, so the editor never showed it, and the island you start on was skipped. This puts
-#  a "StylizedNature" actor in each level and tells it to PLANT THE GRASS NOW (StyleHex grass,
-#  flowers, bushes and stones, knee-high), saved into the level: you see it in the editor,
-#  and the game uses the same grass. Run it again after you move islands around.
+#  WHAT IT DOES: puts a "StylizedNature" actor in each level and tells it to PLANT THE GRASS
+#  NOW (StyleHex grass, flowers, bushes, pebbles and trees), saved into the level: you see it
+#  in the editor, and the game uses the same grass. Run it again after moving islands.
+#
+#  WHY IT WAITS (15 Nov): straight after a level is loaded, Unreal hasn't built its collision
+#  yet, so the planter found "no ground" and planted almost nothing. So this works step by
+#  step, a little each editor frame: load a level, wait ~2 seconds, plant, count; if it
+#  planted almost nothing, wait and try again (up to 3 times); save; next level.
+#  Watch the Output Log for "BAKE GRASS" lines; the last one says DONE.
 # =====================================================================================
 import unreal
 
-# L_Endless LAST: baked first, straight after the editor opens, it found no ground (15 Nov).
-LEVELS = ["/Game/GrappleRunner/Maps/L_FloatingIslands_2", "/Game/GrappleRunner/Maps/L_Endless"]
-asub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-lsub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
-eal = unreal.EditorAssetLibrary
+LEVELS = ["/Game/GrappleRunner/Maps/L_Endless", "/Game/GrappleRunner/Maps/L_FloatingIslands_2"]
+WAIT_TICKS = 120          # editor frames to wait after loading (about 2 seconds)
 
-for lvl in LEVELS:
-    if not eal.does_asset_exist(lvl):
-        continue
-    lsub.load_level(lvl)
-    nature = [a for a in asub.get_all_level_actors() if a.get_class().get_name() == "GRStylizedNature"]
-    if nature:
-        n = nature[0]
-    else:
-        n = asub.spawn_actor_from_class(unreal.GRStylizedNature, unreal.Vector(0, 0, 0))
-        n.set_actor_label("StylizedNature")
-    # Bake, then count. The FIRST level loaded right after the editor opens often has no
-    # collision ready yet, so it finds "no ground" and bakes almost nothing (15 Nov). If so,
-    # load it again and redo.
-    for attempt in range(3):
-        n.call_method("PlantGrassNow")
-        total = sum(c.get_instance_count() for c in n.get_components_by_class(unreal.InstancedStaticMeshComponent))
-        unreal.log("BAKE GRASS: %s attempt %d: %d clumps" % (lvl.split("/")[-1], attempt + 1, total))
-        if total > 2000:
-            break
-        lsub.load_level(lvl)
-        n = [a for a in asub.get_all_level_actors() if a.get_class().get_name() == "GRStylizedNature"][0]
-    lsub.save_current_level()
-    unreal.log("BAKE GRASS: %s done (see 'baked N clumps' above)" % lvl.split("/")[-1])
-unreal.log("BAKE GRASS: DONE - the grass is in the levels now; look in the viewport")
+_asub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+_lsub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+_eal = unreal.EditorAssetLibrary
+_bake = {"i": 0, "wait": 0, "tries": 0, "loaded": False, "handle": None}
+
+def _nature():
+    n = [a for a in _asub.get_all_level_actors() if a.get_class().get_name() == "GRStylizedNature"]
+    if n:
+        return n[0]
+    a = _asub.spawn_actor_from_class(unreal.GRStylizedNature, unreal.Vector(0, 0, 0))
+    a.set_actor_label("StylizedNature")
+    return a
+
+def _bake_step(dt):
+    st = _bake
+    if st["i"] >= len(LEVELS):
+        unreal.unregister_slate_post_tick_callback(st["handle"])
+        unreal.log("BAKE GRASS: DONE - the grass is in the levels now; look in the viewport")
+        return
+    lvl = LEVELS[st["i"]]
+    name = lvl.split("/")[-1]
+    if not st["loaded"]:
+        if not _eal.does_asset_exist(lvl):
+            st["i"] += 1
+            return
+        _lsub.load_level(lvl)
+        st["loaded"], st["wait"], st["tries"] = True, WAIT_TICKS, 0
+        return
+    if st["wait"] > 0:
+        st["wait"] -= 1
+        return
+    n = _nature()
+    n.call_method("PlantGrassNow")
+    total = sum(c.get_instance_count() for c in n.get_components_by_class(unreal.InstancedStaticMeshComponent))
+    st["tries"] += 1
+    unreal.log("BAKE GRASS: %s try %d: %d clumps" % (name, st["tries"], total))
+    if total < 2000 and st["tries"] < 3:
+        st["wait"] = WAIT_TICKS            # collision not ready yet: wait and try again
+        return
+    _lsub.save_current_level()
+    unreal.log("BAKE GRASS: %s saved" % name)
+    st["i"] += 1
+    st["loaded"] = False
+
+_bake["handle"] = unreal.register_slate_post_tick_callback(_bake_step)
+unreal.log("BAKE GRASS: started (it runs over the next few seconds per level)")

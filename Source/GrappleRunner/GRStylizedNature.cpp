@@ -604,7 +604,7 @@ void AGRStylizedNature::ScatterOnLevel()
 		Ground.Add(T.Actor);
 	}
 	TSet<FIntPoint> Done;                  // one clump per 40 cm square, even where islands overlap
-	int32 NoGround = 0, TooSteep = 0;      // for the log: why traces didn't plant
+	int32 NoGround = 0, TooSteep = 0, Overhang = 0;   // for the log: why traces didn't plant
 	TSet<FIntPoint> TreeCells;             // one tree per TreeGap square
 	TArray<TArray<FTransform>> TreesBy;
 	TreesBy.SetNum(LevelTrees.Num());
@@ -641,6 +641,29 @@ void AGRStylizedNature::ScatterOnLevel()
 				{
 					++TooSteep;
 					continue;
+				}
+				// No overhang: a wide grass clump needs ground under its EDGES too, not just its
+				// middle, or it sticks out into the air off narrow ledges (Grey's screenshot,
+				// 15 Nov). Check four points round it; any drop of more than 40 cm = skip.
+				{
+					const float Reach = 45.f * GrassWidth;
+					bool bSolidAround = true;
+					const FVector Around[4] = { FVector(Reach, 0, 0), FVector(-Reach, 0, 0), FVector(0, Reach, 0), FVector(0, -Reach, 0) };
+					for (const FVector& O : Around)
+					{
+						FHitResult Edge;
+						const FVector From = Hit.ImpactPoint + O + FVector(0.f, 0.f, 60.f);
+						if (!GroundTrace(GetWorld(), From, From - FVector(0.f, 0.f, 100.f), Params, Edge))
+						{
+							bSolidAround = false;
+							break;
+						}
+					}
+					if (!bSolidAround)
+					{
+						++Overhang;
+						continue;
+					}
 				}
 				const FIntPoint Cell(FMath::FloorToInt(Hit.ImpactPoint.X / GrassSpacing), FMath::FloorToInt(Hit.ImpactPoint.Y / GrassSpacing));
 				if (Done.Contains(Cell))
@@ -703,8 +726,8 @@ void AGRStylizedNature::ScatterOnLevel()
 			LevelTrees[t]->AddInstances(TreesBy[t], false, true);
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("Stylized nature: %d actors looked at, %d traces, %d clumps, %d trees (no ground below: %d, too steep: %d)"),
-		Targets.Num(), Traces, Planted, Trees, NoGround, TooSteep);
+	UE_LOG(LogTemp, Log, TEXT("Stylized nature: %d actors looked at, %d traces, %d clumps, %d trees (no ground below: %d, too steep: %d, would overhang: %d)"),
+		Targets.Num(), Traces, Planted, Trees, NoGround, TooSteep, Overhang);
 	GSkipped.ValueSort([](int32 L, int32 R) { return L > R; });
 	int32 Shown = 0;
 	for (const TPair<FString, int32>& P : GSkipped)
@@ -761,6 +784,24 @@ void AGRStylizedNature::DressRock(AActor* Rock, int32 MaxOnIt)
 				|| Hit.GetActor() != Rock || Hit.ImpactNormal.Z < MinFlatness)
 			{
 				continue;
+			}
+			{
+				const float Reach = 45.f * GrassWidth;   // no overhang off the rock's edge (see ScatterOnLevel)
+				bool bSolidAround = true;
+				for (const FVector& O : { FVector(Reach, 0, 0), FVector(-Reach, 0, 0), FVector(0, Reach, 0), FVector(0, -Reach, 0) })
+				{
+					FHitResult Edge;
+					const FVector From = Hit.ImpactPoint + O + FVector(0.f, 0.f, 60.f);
+					if (!GroundTrace(GetWorld(), From, From - FVector(0.f, 0.f, 100.f), Params, Edge))
+					{
+						bSolidAround = false;
+						break;
+					}
+				}
+				if (!bSolidAround)
+				{
+					continue;
+				}
 			}
 			EKind K = PickKind(Hit.ImpactPoint);
 			if (MaxOnIt < 1000 && (K == EKind::StoneA || K == EKind::StoneB || K == EKind::Bush))
