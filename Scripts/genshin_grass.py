@@ -13,6 +13,10 @@
 #      the blades ("two-sided foliage" shading), like the sunlit grass in Genshin
 #    - it sways in the wind (tips most)
 #  The blade SHAPES still come from the pack's grass texture (T_Grass_Opacity).
+#  It also makes M_GR_GenshinLeaves for the StyleHex trees: each tree picks one colour from
+#  where it stands (mostly lime green, some golden, orange-red and autumn-red trees, like
+#  the references), lighter towards the top of the crown, with the same glow and light
+#  shining through the leaves.
 #
 #  TWEAKING: open M_GR_GenshinGrass (Content/GrappleRunner/Nature) and change the green
 #  parameter nodes: Glow (how much the tips glow), PatchSize, GreenShare (how much of the
@@ -150,3 +154,87 @@ for a in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_
                 c.set_material(slot, mat)
             n_done += 1
 unreal.log("GENSHIN GRASS: material made, put on %d grass groups" % n_done)
+
+
+# =============================== leaves for the trees ===============================
+LEAF_OPACITY = "/Game/StyleHex_Studio/Free_Packs/FREE_Stylized_Forest_Sample/Textures/Trees/T_Tree_Leaf_Opacity"
+LEAVES = r"""
+float t = frac(sin(dot(floor(OP.xy / 100.0), float2(127.1, 311.7))) * 43758.5453);   // one value per tree
+float hgt = saturate((WP.z - OP.z) / 1200.0);                                         // up the crown
+float3 lime = float3(0.48, 0.86, 0.16), gold = float3(0.95, 0.74, 0.16), orng = float3(1.0, 0.42, 0.10), red = float3(0.85, 0.16, 0.10);
+float3 c = t < GreenShare ? lime : (t < GreenShare + 0.15 ? gold : (t < GreenShare + 0.27 ? orng : red));
+float v = frac(sin(dot(floor(WP.xyz / 40.0), float3(12.9, 78.2, 37.7))) * 43758.5);    // leaf-clump light/dark
+c *= lerp(0.55, 1.1, hgt) * lerp(0.85, 1.1, v);
+return c;
+"""
+lpath = DEST + "/M_GR_GenshinLeaves"
+if eal.does_asset_exist(lpath):
+    eal.delete_asset(lpath)
+leaf = tools.create_asset("M_GR_GenshinLeaves", DEST, unreal.Material, unreal.MaterialFactoryNew())
+leaf.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+leaf.set_editor_property("two_sided", True)
+leaf.set_editor_property("used_with_instanced_static_meshes", True)
+leaf.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_TWO_SIDED_FOLIAGE)
+luv = mel.create_material_expression(leaf, unreal.MaterialExpressionTextureCoordinate, -1100, 0)
+lwp = mel.create_material_expression(leaf, unreal.MaterialExpressionWorldPosition, -1100, 120)
+lop = mel.create_material_expression(leaf, unreal.MaterialExpressionObjectPositionWS, -1100, 240)
+ltm = mel.create_material_expression(leaf, unreal.MaterialExpressionTime, -1100, 360)
+lgl = mel.create_material_expression(leaf, unreal.MaterialExpressionScalarParameter, -1100, 480)
+lgl.set_editor_property("parameter_name", "Glow"); lgl.set_editor_property("default_value", 0.06)
+lgs = mel.create_material_expression(leaf, unreal.MaterialExpressionScalarParameter, -1100, 580)
+lgs.set_editor_property("parameter_name", "GreenShare"); lgs.set_editor_property("default_value", 0.6)
+lc = mel.create_material_expression(leaf, unreal.MaterialExpressionCustom, -600, 0)
+lc.set_editor_property("code", LEAVES)
+lc.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+li = []
+for nme in ("WP", "OP", "GreenShare"):
+    ci = unreal.CustomInput(); ci.set_editor_property("input_name", nme); li.append(ci)
+lc.set_editor_property("inputs", li)
+mel.connect_material_expressions(lwp, "", lc, "WP")
+mel.connect_material_expressions(lop, "", lc, "OP")
+mel.connect_material_expressions(lgs, "", lc, "GreenShare")
+mel.connect_material_property(lc, "", unreal.MaterialProperty.MP_BASE_COLOR)
+lss = mel.create_material_expression(leaf, unreal.MaterialExpressionMultiply, -300, 150)
+lss.set_editor_property("const_b", 0.8)
+mel.connect_material_expressions(lc, "", lss, "A")
+mel.connect_material_property(lss, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+lgw = mel.create_material_expression(leaf, unreal.MaterialExpressionMultiply, -300, 260)
+mel.connect_material_expressions(lc, "", lgw, "A")
+mel.connect_material_expressions(lgl, "", lgw, "B")
+mel.connect_material_property(lgw, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+lr = mel.create_material_expression(leaf, unreal.MaterialExpressionConstant, -300, 380)
+lr.set_editor_property("r", 0.8)
+mel.connect_material_property(lr, "", unreal.MaterialProperty.MP_ROUGHNESS)
+ltex = unreal.load_asset(LEAF_OPACITY)
+if ltex:
+    lts = mel.create_material_expression(leaf, unreal.MaterialExpressionTextureSample, -600, 400)
+    lts.set_editor_property("texture", ltex)
+    lts.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    mel.connect_material_expressions(luv, "", lts, "UVs")
+    mel.connect_material_property(lts, "R", unreal.MaterialProperty.MP_OPACITY_MASK)
+lwd = mel.create_material_expression(leaf, unreal.MaterialExpressionCustom, -600, 600)
+lwd.set_editor_property("code", "float h = saturate((WP.z - OP.z) / 1200.0); float ph = (WP.x + WP.y) * 0.003; return float3(sin(T * 1.2 + ph) * 8.0, cos(T * 0.9 + ph) * 5.0, 0) * h * h;")
+lwd.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+wi = []
+for nme in ("WP", "OP", "T"):
+    ci = unreal.CustomInput(); ci.set_editor_property("input_name", nme); wi.append(ci)
+lwd.set_editor_property("inputs", wi)
+mel.connect_material_expressions(lwp, "", lwd, "WP")
+mel.connect_material_expressions(lop, "", lwd, "OP")
+mel.connect_material_expressions(ltm, "", lwd, "T")
+mel.connect_material_property(lwd, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+mel.recompile_material(leaf)
+eal.save_loaded_asset(leaf)
+
+# put it on the StyleHex trees' leaves in the open level (baked trees and placed trees)
+n_tree = 0
+for a in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors():
+    for c in a.get_components_by_class(unreal.StaticMeshComponent):
+        m = c.static_mesh
+        if not m or not m.get_name().startswith("SM_Tree_"):
+            continue
+        for slot, sm in enumerate(m.static_materials):
+            if sm.material_interface and "Leaves" in sm.material_interface.get_name():
+                c.set_material(slot, leaf)
+                n_tree += 1
+unreal.log("GENSHIN GRASS: leaves made, put on %d tree groups" % n_tree)

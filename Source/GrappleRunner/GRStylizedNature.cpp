@@ -218,19 +218,7 @@ UInstancedStaticMeshComponent* AGRStylizedNature::MakeInstancer(UStaticMesh* Mes
 		C->CreationMethod = EComponentCreationMethod::Instance;
 	}
 	C->SetStaticMesh(Mesh);
-	// Grass uses our Genshin-style material (made by Scripts/genshin_grass.py): bright tips,
-	// meadow colour patches, light shining through. Falls back to the pack's own if missing.
-	if (Mesh->GetName().Contains(TEXT("Grass_Clump")))
-	{
-		static TSoftObjectPtr<UMaterialInterface> GenshinGrass(FSoftObjectPath(TEXT("/Game/GrappleRunner/Nature/M_GR_GenshinGrass.M_GR_GenshinGrass")));
-		if (UMaterialInterface* GM = GenshinGrass.LoadSynchronous())
-		{
-			for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
-			{
-				C->SetMaterial(Slot, GM);
-			}
-		}
-	}
+	ApplyGenshinLook(C, Mesh);
 	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // you swing through grass and clouds
 	C->SetCastShadow(bShadows);
 	C->SetMobility(bForSaving ? EComponentMobility::Static : EComponentMobility::Movable);
@@ -245,6 +233,42 @@ UInstancedStaticMeshComponent* AGRStylizedNature::MakeInstancer(UStaticMesh* Mes
 	C->AttachToComponent(AttachTo, FAttachmentTransformRules::KeepWorldTransform);
 	Holder->AddInstanceComponent(C);
 	return C;
+}
+
+void AGRStylizedNature::ApplyGenshinLook(UMeshComponent* C, UStaticMesh* Mesh)
+{
+	if (!C || !Mesh)
+	{
+		return;
+	}
+	static TSoftObjectPtr<UMaterialInterface> GrassMat(FSoftObjectPath(TEXT("/Game/GrappleRunner/Nature/M_GR_GenshinGrass.M_GR_GenshinGrass")));
+	static TSoftObjectPtr<UMaterialInterface> LeafMat(FSoftObjectPath(TEXT("/Game/GrappleRunner/Nature/M_GR_GenshinLeaves.M_GR_GenshinLeaves")));
+	const FString Name = Mesh->GetName();
+	if (Name.Contains(TEXT("Grass_Clump")))
+	{
+		if (UMaterialInterface* M = GrassMat.LoadSynchronous())
+		{
+			for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
+			{
+				C->SetMaterial(Slot, M);
+			}
+		}
+	}
+	else if (Name.StartsWith(TEXT("SM_Tree_")))
+	{
+		// StyleHex trees: the leaf slot is the one whose material name says "Leaves".
+		if (UMaterialInterface* M = LeafMat.LoadSynchronous())
+		{
+			const TArray<FStaticMaterial>& Mats = Mesh->GetStaticMaterials();
+			for (int32 Slot = 0; Slot < Mats.Num(); ++Slot)
+			{
+				if (Mats[Slot].MaterialInterface && Mats[Slot].MaterialInterface->GetName().Contains(TEXT("Leaves")))
+				{
+					C->SetMaterial(Slot, M);
+				}
+			}
+		}
+	}
 }
 
 UStaticMesh* AGRStylizedNature::MeshFor(EKind Kind) const
@@ -331,6 +355,15 @@ bool AGRStylizedNature::LoadMeshes()
 		}
 		KindScale.Add(Scale);
 	}
+	TreeMeshes.Reset();
+	for (const TCHAR* T : { TEXT("SM_Tree_Birch_1"), TEXT("SM_Tree_Birch_2"), TEXT("SM_Tree_Broadleaf_1"), TEXT("SM_Tree_Broadleaf_2") })
+	{
+		const FString Path = FString::Printf(TEXT("/Game/StyleHex_Studio/Free_Packs/FREE_Stylized_Forest_Sample/Meshes/Trees/%s.%s"), T, T);
+		if (UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *Path))
+		{
+			TreeMeshes.Add(M);
+		}
+	}
 	return Meshes.Num() > 0 && Meshes[0] != nullptr;
 }
 
@@ -348,6 +381,19 @@ void AGRStylizedNature::PlantLevelGrass(bool bForSaving)
 		}
 	}
 	LevelGrass.Reset();
+	for (UInstancedStaticMeshComponent* Old : LevelTrees)
+	{
+		if (Old)
+		{
+			RemoveInstanceComponent(Old);
+			Old->DestroyComponent();
+		}
+	}
+	LevelTrees.Reset();
+	for (UStaticMesh* T : TreeMeshes)
+	{
+		LevelTrees.Add(MakeInstancer(T, RootComponent, true, true, 25000.f, 35000.f, bForSaving));   // trees: shadows on, seen from far
+	}
 	Spots.Reset();
 	Planted = 0;
 	Rng.Initialize(1234);   // same grass every time on the same level
@@ -559,6 +605,10 @@ void AGRStylizedNature::ScatterOnLevel()
 	}
 	TSet<FIntPoint> Done;                  // one clump per 40 cm square, even where islands overlap
 	int32 NoGround = 0, TooSteep = 0;      // for the log: why traces didn't plant
+	TSet<FIntPoint> TreeCells;             // one tree per TreeGap square
+	TArray<TArray<FTransform>> TreesBy;
+	TreesBy.SetNum(LevelTrees.Num());
+	int32 Trees = 0;
 	GSkipped.Reset();
 
 	int32 Traces = 0;
@@ -609,6 +659,28 @@ void AGRStylizedNature::ScatterOnLevel()
 					Spots.Add(Hit.ImpactPoint);
 					++Planted;
 				}
+				// Now and then a tree (StyleHex birch / broadleaf), never two close together, on fairly flat ground.
+				if (LevelTrees.Num() > 0 && Hit.ImpactNormal.Z > 0.85f && Rng.FRand() < TreeChance)
+				{
+					const FIntPoint TC(FMath::FloorToInt(Hit.ImpactPoint.X / TreeGap), FMath::FloorToInt(Hit.ImpactPoint.Y / TreeGap));
+					bool bFree = true;
+					for (int32 dx = -1; dx <= 1 && bFree; ++dx)
+					{
+						for (int32 dy = -1; dy <= 1 && bFree; ++dy)
+						{
+							bFree = !TreeCells.Contains(TC + FIntPoint(dx, dy));
+						}
+					}
+					const int32 Ti = Rng.RandRange(0, LevelTrees.Num() - 1);
+					if (bFree && LevelTrees[Ti] && TreeMeshes.IsValidIndex(Ti))
+					{
+						TreeCells.Add(TC);
+						const float H = FMath::Max(1.f, static_cast<float>(TreeMeshes[Ti]->GetBounds().BoxExtent.Z) * 2.f);
+						const float TS = Rng.FRandRange(TreeHeight.X, TreeHeight.Y) / H;
+						TreesBy[Ti].Add(FTransform(FRotator(0.f, Rng.FRandRange(0.f, 360.f), 0.f), Hit.ImpactPoint - FVector(0.f, 0.f, 10.f), FVector(TS)));
+						++Trees;
+					}
+				}
 				if (Rng.FRand() < MossUnderGrass)
 				{
 					const int32 M = static_cast<int32>(Rng.FRand() < 0.5f ? EKind::MossA : EKind::MossB);
@@ -624,8 +696,15 @@ void AGRStylizedNature::ScatterOnLevel()
 			LevelGrass[k]->AddInstances(ByKind[k], false, true);   // (transforms, don't need the numbers back, world space)
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("Stylized nature: %d actors looked at, %d traces, %d clumps (no ground below: %d, too steep: %d)"),
-		Targets.Num(), Traces, Planted, NoGround, TooSteep);
+	for (int32 t = 0; t < TreesBy.Num(); ++t)
+	{
+		if (LevelTrees[t] && TreesBy[t].Num() > 0)
+		{
+			LevelTrees[t]->AddInstances(TreesBy[t], false, true);
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("Stylized nature: %d actors looked at, %d traces, %d clumps, %d trees (no ground below: %d, too steep: %d)"),
+		Targets.Num(), Traces, Planted, Trees, NoGround, TooSteep);
 	GSkipped.ValueSort([](int32 L, int32 R) { return L > R; });
 	int32 Shown = 0;
 	for (const TPair<FString, int32>& P : GSkipped)

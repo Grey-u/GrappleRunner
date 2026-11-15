@@ -70,7 +70,7 @@ public:
 	// Floating caves and tunnels: every few gaps, a tube of rock to swing through.
 	UPROPERTY(EditAnywhere, Category = "Endless") int32 CaveEvery = 3;          // one every 3 gaps
 	UPROPERTY(EditAnywhere, Category = "Endless|Assets") TArray<TSoftObjectPtr<UStaticMesh>> CaveMeshes;
-	UPROPERTY(EditAnywhere, Category = "Endless") int32 TreesPerIsland = 4;
+	UPROPERTY(EditAnywhere, Category = "Endless") int32 TreesPerIsland = 8;   // Grey: more trees
 	UPROPERTY(EditAnywhere, Category = "Endless") int32 FernsPerIsland = 10;
 
 	// ---- What it's built from (all from the packs already in the project) ----

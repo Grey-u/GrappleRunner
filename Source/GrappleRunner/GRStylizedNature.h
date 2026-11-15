@@ -42,6 +42,7 @@ class UHierarchicalInstancedStaticMeshComponent;
 class UInstancedStaticMeshComponent;
 class UPrimitiveComponent;
 class UStaticMesh;
+class UMeshComponent;
 
 UCLASS()
 class GRAPPLERUNNER_API AGRStylizedNature : public AActor
@@ -63,6 +64,16 @@ public:
 	// EDITOR: plant the grass into the level now, so it's saved with it and visible in the
 	// editor too (Scripts/bake_grass.py calls this). Run it again after changing the level.
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Nature") void PlantGrassNow();
+
+	// Give a mesh our Genshin look: grass blades get M_GR_GenshinGrass, StyleHex tree leaves
+	// get M_GR_GenshinLeaves (both made by Scripts/genshin_grass.py). Used for everything we
+	// plant and for the trees the endless spawner places.
+	static void ApplyGenshinLook(UMeshComponent* C, UStaticMesh* Mesh);
+
+	// Trees baked onto the islands with the grass (StyleHex birch and broadleaf).
+	UPROPERTY(EditAnywhere, Category = "Nature|Trees") float TreeChance = 0.015f;   // chance a grass spot also gets a tree...
+	UPROPERTY(EditAnywhere, Category = "Nature|Trees") float TreeGap = 900.f;       // ...if no other tree is this close (cm)
+	UPROPERTY(EditAnywhere, Category = "Nature|Trees") FVector2D TreeHeight = FVector2D(700.f, 1300.f);
 	UPROPERTY(VisibleAnywhere, Category = "Nature") bool bBaked = false;   // true = grass already planted in the level
 
 	// ---- grass ----
@@ -120,6 +131,8 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMesh>> Meshes;                          // by EKind
 	TArray<float> KindScale;                                                             // by EKind: size so it's the right height
 	UPROPERTY() TArray<TObjectPtr<UInstancedStaticMeshComponent>> LevelGrass;              // by EKind (saved when baked)
+	UPROPERTY() TArray<TObjectPtr<UInstancedStaticMeshComponent>> LevelTrees;              // one per tree mesh (saved when baked)
+	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMesh>> TreeMeshes;
 	TArray<FVector> Spots;                                            // where grass was planted (butterflies visit)
 	int32 Planted = 0;
 	FRandomStream Rng;

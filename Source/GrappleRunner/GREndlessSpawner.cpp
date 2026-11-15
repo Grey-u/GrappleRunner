@@ -404,7 +404,13 @@ void AGREndlessSpawner::BuildChunk()
 	FVector Spot;
 	for (int32 i = 0; i < TreesPerIsland; ++i)
 	{
-		if (RandomTop(Spot) && SpawnMesh(Pick(TreeMeshes), Spot, FRotator(0.f, Rng.FRandRange(0.f, 360.f), 0.f), Rng.FRandRange(800.f, 1400.f), true, C))
+		UStaticMesh* TreeMesh = Pick(TreeMeshes);
+		AActor* Tree = RandomTop(Spot) ? SpawnMesh(TreeMesh, Spot, FRotator(0.f, Rng.FRandRange(0.f, 360.f), 0.f), Rng.FRandRange(800.f, 1400.f), true, C) : nullptr;
+		if (AStaticMeshActor* TreeActor = Cast<AStaticMeshActor>(Tree))
+		{
+			AGRStylizedNature::ApplyGenshinLook(TreeActor->GetStaticMeshComponent(), TreeMesh);   // glowing Genshin leaves
+		}
+		if (Tree)
 		{
 			TreeSpots.Add(Spot);
 		}
