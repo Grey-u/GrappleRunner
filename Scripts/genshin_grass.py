@@ -6,8 +6,9 @@
 #  WHAT IT DOES (Grey's Genshin references, 15 Nov)
 #  Makes M_GR_GenshinGrass and puts it on the StyleHex grass in the open level. The look:
 #    - each blade runs from a deeper colour at the root to a bright tip
-#    - the meadow changes colour in big soft PATCHES: mostly fresh green, with golden-yellow,
-#      orange-red and brown patches (worked out from where the grass is in the world, so
+#    - the meadow is nearly all fresh green (GreenShare 0.78, Grey asked for "more green,
+#      only minimal brown"), with a few golden and orange patches and the odd small brown
+#      one (worked out from where the grass is in the world, so
 #      neighbouring clumps match and the patches are 10-20 m across)
 #    - slight LUMINOSITY: the tips glow faintly, and light coming from behind shines through
 #      the blades ("two-sided foliage" shading), like the sunlit grass in Genshin
@@ -55,7 +56,7 @@ float3 brwnR  = float3(0.22, 0.14, 0.07), brwnT  = float3(0.66, 0.48, 0.28);
 // which palette here: mostly green, then gold, orange-red, brown
 float g1 = smoothstep(GreenShare - 0.05, GreenShare + 0.05, n);            // leaving green
 float g2 = smoothstep(GreenShare + 0.12, GreenShare + 0.20, n);            // into orange
-float g3 = smoothstep(0.88, 0.95, n);                                      // brown at the very top
+float g3 = smoothstep(0.95, 0.99, n);                                      // brown only at the very, very top: a few small patches
 float3 root = lerp(lerp(lerp(greenR, goldR, g1), orngR, g2), brwnR, g3);
 float3 tip  = lerp(lerp(lerp(greenT, goldT, g1), orngT, g2), brwnT, g3);
 tip *= lerp(0.85, 1.12, n2);                                               // clumps a little lighter/darker
@@ -71,7 +72,7 @@ float gst = 0.6 + 0.4 * sin(T * 0.35 + WP.x * 0.0007);
 return float3(sin(T * 1.8 + ph) * 6.0 * gst, cos(T * 1.3 + ph * 1.3) * 3.5 * gst, 0) * w;
 """
 
-PARAMS = [("Glow", 0.06), ("PatchSize", 800.0), ("GreenShare", 0.5), ("FlipUV", 0.0)]
+PARAMS = [("Glow", 0.06), ("PatchSize", 800.0), ("GreenShare", 0.78), ("FlipUV", 0.0)]
 
 path = DEST + "/" + NAME
 if eal.does_asset_exist(path):

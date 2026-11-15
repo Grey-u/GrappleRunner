@@ -313,3 +313,8 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - **Rope:** a hook's rope now starts 10% shorter than the distance (`RopeTakeUp` 0.9) so it pulls tight at once, and is stiffer (`RopeStiffness` 110, was 85). Grey: "the swing is a bit loose".
 - **Climb and kick off** (Grey: "90% of playing is hitting rocks"): touching a rock wall in the air and holding jump/boost (Space, A/X) scrambles up it (along its slope, A/D to shuffle sideways, no gas); letting go kicks off away from the wall and up, leaning the way you look; reaching the top while holding pulls you over the edge. Hitting a wall fast without holding bounces you off (`WallBounce` 0.35) instead of stopping dead. Haptic bumps on grab and kick. Animations: Kwang's own `Jog_Fwd_Uphill` while climbing and `LaunchPad` on the kick (already rigged to his skeleton, nothing to download).
 - **Stone glow:** M_AnimeWorld gives greyish/brownish surfaces (walls, ruins, rock) a soft warm inner glow (`WallGlow` 0.22); colourful grass and leaves are left to their own glow.
+
+### 15 Nov 2026 (evening): greener ground
+- Grey asked for the ground to be more green with only minimal brown patches.
+- `Scripts/genshin_grass.py`: GreenShare 0.5 -> 0.78 (about four fifths of the meadow is now green) and brown only appears at the very top of the patch noise (0.95+), so it is a few small patches.
+- To apply: run the script in the editor's Python box. No C++ rebuild needed for this one.
