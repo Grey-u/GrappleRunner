@@ -11,6 +11,7 @@
 #       - TOON LIGHT: works out how much light each pixel gets (final colour / surface colour)
 #         and snaps it to two tones, lit and shadow, with a soft edge; shadows go lilac
 #       - COLOUR: richer saturation
+#       - GREEN GROUND: bare brown earth that faces up is re-coloured grass green (GroundGreen)
 #       - STONE GLOW: walls, ruins and rock get a soft warm inner glow (WallGlow)
 #       - SKY: an anime sky in place of the dull one: deep blue overhead fading to pale cyan,
 #         soft painted clouds that drift, a pale sea of cloud below the horizon; it still
@@ -80,6 +81,23 @@ float best = 1e9;
 // 2. toon light: light = what you see / the surface's own colour, snapped to two tones
 float3 alb = pow(max(SceneTextureLookup(uvB, 5, false).rgb, 0.0001), 1.0 / 2.2);
 float shade = dot(pick, lw) / max(dot(alb, lw), 0.04);
+
+// 2b. GREEN GROUND (Grey, 15 Nov: "more green, only minimal brown patches"). The islands'
+//     own material is bare brown earth between the grass clumps. Wherever a surface faces UP
+//     (its normal points at the sky) and its own colour is earthy brown, swap that colour for
+//     grass green of the same brightness. Walls and trunks face sideways so they stay as they
+//     are; grey stone floors are not brown so they stay too. GroundGreen 0 = off, 1 = all green.
+float3 nrm = SceneTextureLookup(GetDefaultSceneTextureUV(Parameters, 8), 8, false).rgb + WN.rgb * 0.0;
+float bmax = max(alb.r, max(alb.g, alb.b));
+float bmin = min(alb.r, min(alb.g, alb.b));
+float bsat = (bmax - bmin) / max(bmax, 0.05);
+float earthy = smoothstep(0.0, 0.05, alb.r - alb.g) * step(alb.b, alb.g)      // red > green > blue = brown
+             * smoothstep(0.12, 0.25, bsat) * (1.0 - smoothstep(0.62, 0.75, bsat));  // not grey stone, not vivid petals
+float ground = smoothstep(0.70, 0.86, nrm.z) * earthy * GroundGreen * (1.0 - sky) * (1.0 - isChar);
+float3 grassCol = float3(0.30, 0.52, 0.14) * (dot(alb, lw) / 0.411) * 1.15;   // same brightness, grass hue
+float3 pickG = grassCol * (dot(pick, lw) / max(dot(alb, lw), 0.04));         // the lit picture, re-coloured
+alb  = lerp(alb, grassCol, ground);
+pick = lerp(pick, pickG, ground);
 float band = smoothstep(Threshold - 0.04, Threshold + 0.04, shade);   // crisp cel edge
 float3 toon = alb * lerp(ShadowTint.rgb * ShadowLevel, float3(LitLevel, LitLevel, LitLevel), band);
 toon = lerp(toon, pick, 0.2);                       // keep a little real light so shapes read
@@ -165,7 +183,7 @@ return col;
 
 PARAMS = [  # name, kind, default
     ("Brush", "s", 1.0), ("Threshold", "s", 0.55), ("ShadowLevel", "s", 0.62), ("LitLevel", "s", 1.06),
-    ("ToonAmount", "s", 0.9), ("WallGlow", "s", 0.22), ("FadeStart", "s", 8000.0), ("FadeEnd", "s", 40000.0), ("Saturation", "s", 1.3),
+    ("ToonAmount", "s", 0.9), ("WallGlow", "s", 0.22), ("GroundGreen", "s", 0.9), ("FadeStart", "s", 8000.0), ("FadeEnd", "s", 40000.0), ("Saturation", "s", 1.3),
     ("SkyAmount", "s", 1.0), ("CloudAmount", "s", 0.9), ("HazeAmount", "s", 0.55), ("HazeDistance", "s", 45000.0),
     ("Thickness", "s", 1.0), ("EdgeThreshold", "s", 0.6), ("Outline", "s", 0.55), 
     ("ShadowTint", "v", unreal.LinearColor(0.72, 0.80, 0.98, 1)),
@@ -201,13 +219,13 @@ for name in ("BL_SCENE_COLOR_AFTER_TONEMAPPING", "BL_AFTER_TONEMAPPING"):
 custom = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -350, 0)
 custom.set_editor_property("code", CODE)
 custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-names = ["Scene", "CD", "BC", "SD", "V", "T", "VP", "GW"] + [p[0] for p in PARAMS]
+names = ["Scene", "CD", "BC", "SD", "WN", "V", "T", "VP", "GW"] + [p[0] for p in PARAMS]
 ins = []
 for n in names:
     ci = unreal.CustomInput(); ci.set_editor_property("input_name", n); ins.append(ci)
 custom.set_editor_property("inputs", ins)
 y = 0
-for pin, tex in (("Scene", "PPI_POST_PROCESS_INPUT0"), ("CD", "PPI_CUSTOM_DEPTH"), ("BC", "PPI_BASE_COLOR"), ("SD", "PPI_SCENE_DEPTH")):
+for pin, tex in (("Scene", "PPI_POST_PROCESS_INPUT0"), ("CD", "PPI_CUSTOM_DEPTH"), ("BC", "PPI_BASE_COLOR"), ("SD", "PPI_SCENE_DEPTH"), ("WN", "PPI_WORLD_NORMAL")):
     st = mel.create_material_expression(mat, unreal.MaterialExpressionSceneTexture, -900, y)
     st.set_editor_property("scene_texture_id", getattr(unreal.SceneTextureId, tex))
     mel.connect_material_expressions(st, "Color", custom, pin); y += 120

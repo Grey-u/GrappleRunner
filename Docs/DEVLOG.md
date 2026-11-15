@@ -318,3 +318,4 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - Grey asked for the ground to be more green with only minimal brown patches.
 - `Scripts/genshin_grass.py`: GreenShare 0.5 -> 0.78 (about four fifths of the meadow is now green) and brown only appears at the very top of the patch noise (0.95+), so it is a few small patches.
 - To apply: run the script in the editor's Python box. No C++ rebuild needed for this one.
+- The brown Grey meant was mostly the islands' bare earth showing between clumps (Brushify's own material, which we don't edit). `Scripts/anime_world.py` step 2b now re-colours up-facing earthy-brown surfaces grass green in the post-process (param `GroundGreen`, 0.9; 0 turns it off). Walls, trunks and grey stone are untouched.
