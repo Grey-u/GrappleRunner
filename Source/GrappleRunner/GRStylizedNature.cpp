@@ -28,7 +28,7 @@ namespace
 	#define GR_SH(N) TEXT("/Game/StyleHex_Studio/Free_Packs/FREE_Stylized_Forest_Sample/Meshes/") TEXT(N)
 	const FKindSource KindSources[] = {
 		{ GR_SH("Foliage/SM_Fol_Grass_Clump_1"), TEXT("SM_GR_Grass"), 25.f },
-		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_GrassTall"), 38.f },
+		{ GR_SH("Foliage/SM_Fol_Grass_Clump_3"), TEXT("SM_GR_GrassTall"), 70.f },   // clumps of taller grass (Grey, 15 Nov)
 		{ GR_SH("Foliage/SM_Fol_Flower_Clump_1"), TEXT("SM_GR_Flowers_Pink"), 17.f },
 		{ GR_SH("Foliage/SM_Fol_Flower_Clump_2"), TEXT("SM_GR_Flowers_White"), 17.f },
 		{ GR_SH("Foliage/SM_Fol_Flower_Clump_3"), TEXT("SM_GR_Flowers_Yellow"), 17.f },

@@ -70,7 +70,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float GrassWidth = 2.2f;         // grass clumps spread this much wider than tall: a carpet
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float MinFlatness = 0.72f;       // 1 = only perfectly flat ground, 0 = walls too
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float FlowerChance = 0.14f;      // in flower meadows: chance a clump is flowers
-	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float TallGrassChance = 0.16f;
+	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float TallGrassChance = 0.3f; 
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float BushChance = 0.025f;
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") float StoneChance = 0.02f;
 	UPROPERTY(EditAnywhere, Category = "Nature|Grass") int32 MaxClumps = 700000;        // safety cap on the whole level
