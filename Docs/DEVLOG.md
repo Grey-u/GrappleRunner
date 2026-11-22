@@ -319,3 +319,8 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - `Scripts/genshin_grass.py`: GreenShare 0.5 -> 0.78 (about four fifths of the meadow is now green) and brown only appears at the very top of the patch noise (0.95+), so it is a few small patches.
 - To apply: run the script in the editor's Python box. No C++ rebuild needed for this one.
 - The brown Grey meant was mostly the islands' bare earth showing between clumps (Brushify's own material, which we don't edit). `Scripts/anime_world.py` step 2b now re-colours up-facing earthy-brown surfaces grass green in the post-process (param `GroundGreen`, 0.9; 0 turns it off). Walls, trunks and grey stone are untouched.
+
+### 22 Nov 2026: our own base body for the agents
+- Grey wants the agents to share a semi-realistic base but not look like Final Fantasy characters. The downloaded FF models (Cloud, Tifa, Sephiroth) are Square Enix's work, so they stay out of the game and the repo, even as a base.
+- New `Art/Agents/make_base.py` builds an original base in Blender from MakeHuman's CC0 base mesh and shape targets (gender, build, ancestry, height), plus our own gentle "animated film hero" touch: legs 6% longer, head 5% smaller. Runs headless, no screen needed.
+- First render: `Art/Agents/base_bodies.png` (male and female base). Next: the ten agents built on it (faces, hair, outfits), then a rig for Unreal.
