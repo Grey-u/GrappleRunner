@@ -278,8 +278,8 @@ void AGRArsenal::SetDefaultWeapons()
 	// Ready stance (changed 28 Nov: the old one pointed both blades up and in, making an "A"
 	// across the middle of the view). Now: fists low at the sides, blades pointing forward,
 	// a little down and a little outwards, edge down, like the ready stance of a dual-wielder.
-	Blades.HipOffset = FVector(46.f, 24.f, -17.f);   // lined up live with gr.Blades, 28 Nov
-	Blades.HipTurn = FRotator(-6.f, 8.f, 0.f);
+	Blades.HipOffset = FVector(42.f, 22.f, -14.f);   // lined up live with gr.Blades, 28 Nov (evening)
+	Blades.HipTurn = FRotator(22.f, 6.f, 0.f);       // blades rise forward out of the top of each fist
 	Blades.Reach = 190.f;
 	Weapons.Add(Blades);                                                                        // key 1
 
