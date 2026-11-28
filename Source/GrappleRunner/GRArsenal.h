@@ -205,7 +205,7 @@ public:
 	// ---- Twin blades: how the hands hold them, and how fast a VR swing must be to cut ----
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float GripSlide = 0.f;      // move both hands along the grip (cm, + = toward the blade); 0 = fist centred on the grip
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float GripTwist = 70.f;     // turn the hands round the grip (degrees; the left hand turns the opposite way). 70 = back of the hand up, wrist down and back, lined up live 28 Nov
-	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") FRotator GripFix = FRotator::ZeroRotator;   // extra turn of the fists on the grips (pitch, yaw, roll in the grip frame)
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") FRotator GripFix = FRotator(90.f, 0.f, 0.f);   // extra turn of the fists on the grips (pitch, yaw, roll in the grip frame); 90 pitch = grip runs through the fist, lined up live 28 Nov
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float MinCutSpeed = 250.f;  // VR: the blade tip must move this fast (cm/s) to cut
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") FVector VRGripOffset = FVector(2.f, 0.f, -3.f);   // VR: where the grip sits in the controller
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") FRotator VRGripTurn = FRotator(-55.f, 0.f, 0.f);  // VR: blade tilted forward out of the fist
