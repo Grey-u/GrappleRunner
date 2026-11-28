@@ -28,3 +28,24 @@ if os.path.exists(_FLAG):
         exec(open(os.path.join(_project, "Scripts", "bake_grass.py")).read(), {})
 
     _state["handle"] = unreal.register_slate_post_tick_callback(_gr_bake_when_ready)
+
+
+# ---- second job: fix floating objects once (flag: Saved/fix_floating_on_start.flag) ----
+#  Waits a little longer than the grass bake so the two never run at the same time.
+_FIX_FLAG = os.path.join(_saved, "fix_floating_on_start.flag")
+if os.path.exists(_FIX_FLAG) and not os.path.exists(_FLAG):
+    _fx = {"ticks": 0, "handle": None}
+
+    def _gr_fix_when_ready(dt):
+        _fx["ticks"] += 1
+        if _fx["ticks"] < 400:
+            return
+        unreal.unregister_slate_post_tick_callback(_fx["handle"])
+        try:
+            os.remove(_FIX_FLAG)
+        except OSError:
+            pass
+        unreal.log("FIX FLOATING: starting automatically (flag found)")
+        exec(open(os.path.join(_project, "Scripts", "fix_floating.py")).read(), {})
+
+    _fx["handle"] = unreal.register_slate_post_tick_callback(_gr_fix_when_ready)
