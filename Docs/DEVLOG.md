@@ -340,3 +340,4 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - Ready stance changed: fists low at the sides, blades forward, a bit down and a bit outwards, edge down (`HipOffset 34,25,-34`, `HipTurn -14,12,0`). Fists now centred on the grip (`GripSlide 0`, was 4 cm toward the guard).
 - New console command `gr.Blades X Y Z Pitch Yaw Roll [Slide Twist]` to line the stance and fists up live while playing.
 - `Scripts/blade_look.py`: satin brushed steel for the blade flat and a brighter honed edge, instead of near-white mirror metal.
+- Seen in Play after the first pass: blades too low, and the hands holding them were the template's grey mannequin hands, which read as chrome robot hands. Stance tuned live to `48,24,-24 / -4,8,0`; the hands now wear a dark leather glove material (`M_GR_Glove`, `HandMaterial` on GRArsenal); brushing made finer (it looked blotchy).

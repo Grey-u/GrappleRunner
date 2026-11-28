@@ -8,6 +8,7 @@
 #  This builds two materials and puts them on SM_ODMSword:
 #    M_GR_BladeSteel  satin steel with fine lengthwise brushing (the flat of the blade)
 #    M_GR_BladeEdge   brighter, smoother steel (the sharpened edge strip)
+#    M_GR_Glove       dark leather for the hands that hold the blades (GRArsenal uses it)
 #  The handle keeps its dark materials.
 #
 #  HOW TO RUN (Python box at the bottom of the editor):
@@ -21,7 +22,7 @@ mel = unreal.MaterialEditingLibrary
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 
 
-def make(name, base, rough_lo, rough_hi, streak_scale):
+def make(name, base, rough_lo, rough_hi, streak_scale, metal=1.0):
     path = DEST + "/" + name
     if unreal.EditorAssetLibrary.does_asset_exist(path):
         unreal.EditorAssetLibrary.delete_asset(path)
@@ -31,7 +32,7 @@ def make(name, base, rough_lo, rough_hi, streak_scale):
     col.set_editor_property("constant", unreal.LinearColor(base[0], base[1], base[2], 1))
     mel.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
     met = mel.create_material_expression(m, unreal.MaterialExpressionConstant, -600, -50)
-    met.set_editor_property("r", 1.0)
+    met.set_editor_property("r", metal)
     mel.connect_material_property(met, "", unreal.MaterialProperty.MP_METALLIC)
     # brushing: noise stretched hugely along the blade (UV U) and tight across it (UV V),
     # which gives fine parallel polishing lines; it varies the roughness between lo and hi
@@ -62,8 +63,12 @@ def make(name, base, rough_lo, rough_hi, streak_scale):
     return m
 
 
-steel = make("M_GR_BladeSteel", (0.42, 0.44, 0.47), 0.22, 0.42, 160.0)
-edge = make("M_GR_BladeEdge", (0.80, 0.82, 0.85), 0.08, 0.16, 300.0)
+steel = make("M_GR_BladeSteel", (0.46, 0.48, 0.51), 0.26, 0.33, 600.0)
+edge = make("M_GR_BladeEdge", (0.80, 0.82, 0.85), 0.10, 0.14, 900.0)
+
+# Gloves for the hands holding the blades: dark brown leather, not mannequin plastic.
+glove = make("M_GR_Glove", (0.035, 0.025, 0.02), 0.55, 0.75, 40.0, metal=0.0)
+
 
 mesh = unreal.load_asset(SWORD)
 done = []

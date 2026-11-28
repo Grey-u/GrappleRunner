@@ -274,8 +274,8 @@ void AGRArsenal::SetDefaultWeapons()
 	// Ready stance (changed 28 Nov: the old one pointed both blades up and in, making an "A"
 	// across the middle of the view). Now: fists low at the sides, blades pointing forward,
 	// a little down and a little outwards, edge down, like the ready stance of a dual-wielder.
-	Blades.HipOffset = FVector(34.f, 25.f, -34.f);
-	Blades.HipTurn = FRotator(-14.f, 12.f, 0.f);
+	Blades.HipOffset = FVector(48.f, 24.f, -24.f);   // lined up live with gr.Blades, 28 Nov
+	Blades.HipTurn = FRotator(-4.f, 8.f, 0.f);
 	Blades.Reach = 190.f;
 	Weapons.Add(Blades);                                                                        // key 1
 
@@ -1194,6 +1194,15 @@ void AGRArsenal::UpdateHands(float Dt)
 		}
 		Hand = NewObject<USkeletalMeshComponent>(this);
 		Hand->SetSkeletalMesh(Mesh);
+		// The template hands are grey mannequin plastic, which read as chrome robot hands in
+		// game. Dress them in our dark leather glove material instead (Scripts/blade_look.py).
+		if (UMaterialInterface* Glove = HandMaterial.LoadSynchronous())
+		{
+			for (int32 i = 0; i < Hand->GetNumMaterials(); ++i)
+			{
+				Hand->SetMaterial(i, Glove);
+			}
+		}
 		Hand->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Hand->SetCastShadow(false);
 		Hand->RegisterComponent();
