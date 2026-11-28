@@ -334,3 +334,9 @@ One entry per work session: what was built, what broke, and what was learned. Ne
 - **Ran it (28 Nov, 13:17).** Floating Islands: 11,895 objects checked, 544 dropped onto the ground, 271 removed (mid-air or over a ledge), 51 floating rock "tiers" left alone and listed; 290 baked grass/tree instances removed out of ~435k. Endless: 378 checked, 13 dropped, 35 removed. Both levels saved. Full list: `Saved/fix_floating_report.txt`.
 - **Problem found:** the first Play straight after the fix crashed the editor, "out of video memory" (the editor still had the 435k-clump Floating Islands level in memory). After a fresh editor start, Play in L_Endless worked. To watch: video memory with all that grass, especially for VR.
 - Also seen in the log during Play: two engine "ensure" warnings about a far-away transform (origin too large). Not fixed yet.
+
+### 28 Nov 2026: blades and hands
+- Grey: the swords and the hand placement look awful (asked several times). Seen in Play: both blades pointed up and inwards, making an "A" across the middle of the view, and they rendered as flat white planks.
+- Ready stance changed: fists low at the sides, blades forward, a bit down and a bit outwards, edge down (`HipOffset 34,25,-34`, `HipTurn -14,12,0`). Fists now centred on the grip (`GripSlide 0`, was 4 cm toward the guard).
+- New console command `gr.Blades X Y Z Pitch Yaw Roll [Slide Twist]` to line the stance and fists up live while playing.
+- `Scripts/blade_look.py`: satin brushed steel for the blade flat and a brighter honed edge, instead of near-white mirror metal.

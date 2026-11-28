@@ -100,6 +100,39 @@ static FAutoConsoleCommandWithWorldAndArgs GRArmsCmd(TEXT("gr.Arms"), TEXT("gr.A
 static FAutoConsoleCommandWithWorldAndArgs GRGunCmd(TEXT("gr.Gun"), TEXT("gr.Gun X Y Z Pitch Yaw Roll"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W) { GRTuneTransform(A, W, false); }));
 
+//    gr.Blades X Y Z Pitch Yaw Roll [Slide Twist] - the twin blades' ready stance (from the
+//    eyes, right hand; the left is mirrored), plus where the fists sit on the grips.
+//    Example: gr.Blades 36 24 -32 -12 10 0 0 0
+static FAutoConsoleCommandWithWorldAndArgs GRBladesCmd(TEXT("gr.Blades"), TEXT("gr.Blades X Y Z Pitch Yaw Roll [GripSlide GripTwist]"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+	{
+		if (!W || A.Num() < 6)
+		{
+			return;
+		}
+		const FVector L(FCString::Atof(*A[0]), FCString::Atof(*A[1]), FCString::Atof(*A[2]));
+		const FRotator T(FCString::Atof(*A[3]), FCString::Atof(*A[4]), FCString::Atof(*A[5]));
+		for (TActorIterator<AGRArsenal> It(W); It; ++It)
+		{
+			It->TuneBlades(L, T, A.Num() > 6 ? FCString::Atof(*A[6]) : It->GripSlide, A.Num() > 7 ? FCString::Atof(*A[7]) : It->GripTwist);
+		}
+	}));
+
+void AGRArsenal::TuneBlades(const FVector& L, const FRotator& T, float Slide, float Twist)
+{
+	for (FGRWeapon& W : Weapons)
+	{
+		if (W.Kind == EGRWeaponKind::Swords)
+		{
+			W.HipOffset = L;
+			W.HipTurn = T;
+		}
+	}
+	GripSlide = Slide;
+	GripTwist = Twist;
+	UE_LOG(LogTemp, Log, TEXT("Grapple Runner tuning: blades %s %s slide %.1f twist %.1f"), *L.ToString(), *T.ToString(), Slide, Twist);
+}
+
 void AGRArsenal::ApplyTuning(bool bArms, const FVector& L, const FRotator& T)
 {
 	if (bArms)
@@ -238,8 +271,11 @@ void AGRArsenal::SetDefaultWeapons()
 	Blades.Mesh = Sword;
 	Blades.LeftMesh = Sword;
 	Blades.Scale = 1.f;                                   // modelled at real size: 95 cm of blade
-	Blades.HipOffset = FVector(40.f, 21.f, -17.f);         // ready stance: fists in view, chest height...
-	Blades.HipTurn = FRotator(38.f, -14.f, 0.f);           // ...blades angled up and slightly in, edge forward
+	// Ready stance (changed 28 Nov: the old one pointed both blades up and in, making an "A"
+	// across the middle of the view). Now: fists low at the sides, blades pointing forward,
+	// a little down and a little outwards, edge down, like the ready stance of a dual-wielder.
+	Blades.HipOffset = FVector(34.f, 25.f, -34.f);
+	Blades.HipTurn = FRotator(-14.f, 12.f, 0.f);
 	Blades.Reach = 190.f;
 	Weapons.Add(Blades);                                                                        // key 1
 

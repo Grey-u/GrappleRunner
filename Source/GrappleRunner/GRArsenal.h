@@ -149,6 +149,7 @@ public:
 
 	AGRArsenal();
 	void ApplyTuning(bool bArms, const FVector& Location, const FRotator& Turn);   // gr.Arms / gr.Gun console commands
+	void TuneBlades(const FVector& Location, const FRotator& Turn, float Slide, float Twist);   // gr.Blades console command
 	virtual void Tick(float DeltaSeconds) override;
 
 	// The slots. Keys 1-9 and 0 pick the first ten; the mouse wheel steps through all of them.
@@ -199,7 +200,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Arms") TMap<FName, TSoftObjectPtr<class UAnimSequenceBase>> GunAnims;     // Idle, Fire, Reload, ReloadEmpty
 
 	// ---- Twin blades: how the hands hold them, and how fast a VR swing must be to cut ----
-	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float GripSlide = 4.f;      // move both hands along the grip (cm, + = toward the blade)
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float GripSlide = 0.f;      // move both hands along the grip (cm, + = toward the blade); 0 = fist centred on the grip
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float GripTwist = 0.f;      // turn the hands round the grip (degrees)
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") float MinCutSpeed = 250.f;  // VR: the blade tip must move this fast (cm/s) to cut
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Blades") FVector VRGripOffset = FVector(2.f, 0.f, -3.f);   // VR: where the grip sits in the controller
