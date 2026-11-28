@@ -103,7 +103,7 @@ static FAutoConsoleCommandWithWorldAndArgs GRGunCmd(TEXT("gr.Gun"), TEXT("gr.Gun
 //    gr.Blades X Y Z Pitch Yaw Roll [Slide Twist] - the twin blades' ready stance (from the
 //    eyes, right hand; the left is mirrored), plus where the fists sit on the grips.
 //    Example: gr.Blades 36 24 -32 -12 10 0 0 0
-static FAutoConsoleCommandWithWorldAndArgs GRBladesCmd(TEXT("gr.Blades"), TEXT("gr.Blades X Y Z Pitch Yaw Roll [GripSlide GripTwist]"),
+static FAutoConsoleCommandWithWorldAndArgs GRBladesCmd(TEXT("gr.Blades"), TEXT("gr.Blades X Y Z Pitch Yaw Roll [GripSlide GripTwist [FixPitch FixYaw FixRoll]]"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 	{
 		if (!W || A.Num() < 6)
@@ -114,6 +114,10 @@ static FAutoConsoleCommandWithWorldAndArgs GRBladesCmd(TEXT("gr.Blades"), TEXT("
 		const FRotator T(FCString::Atof(*A[3]), FCString::Atof(*A[4]), FCString::Atof(*A[5]));
 		for (TActorIterator<AGRArsenal> It(W); It; ++It)
 		{
+			if (A.Num() > 10)
+			{
+				It->GripFix = FRotator(FCString::Atof(*A[8]), FCString::Atof(*A[9]), FCString::Atof(*A[10]));
+			}
 			It->TuneBlades(L, T, A.Num() > 6 ? FCString::Atof(*A[6]) : It->GripSlide, A.Num() > 7 ? FCString::Atof(*A[7]) : It->GripTwist);
 		}
 	}));
@@ -274,8 +278,8 @@ void AGRArsenal::SetDefaultWeapons()
 	// Ready stance (changed 28 Nov: the old one pointed both blades up and in, making an "A"
 	// across the middle of the view). Now: fists low at the sides, blades pointing forward,
 	// a little down and a little outwards, edge down, like the ready stance of a dual-wielder.
-	Blades.HipOffset = FVector(48.f, 24.f, -24.f);   // lined up live with gr.Blades, 28 Nov
-	Blades.HipTurn = FRotator(-4.f, 8.f, 0.f);
+	Blades.HipOffset = FVector(46.f, 24.f, -17.f);   // lined up live with gr.Blades, 28 Nov
+	Blades.HipTurn = FRotator(-6.f, 8.f, 0.f);
 	Blades.Reach = 190.f;
 	Weapons.Add(Blades);                                                                        // key 1
 
@@ -1780,7 +1784,15 @@ void AGRArsenal::FitHandToBlade(USkeletalMeshComponent* Hand, const UStaticMeshC
 	const float Twist = S.Y < 0.f ? GripTwist : -GripTwist;
 	const FQuat Grip = Blade->GetComponentQuat() * SwordFrame(Blade) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(Twist));
 	const FVector GripAt = Blade->GetComponentLocation() + Grip.GetAxisX() * GripSlide;
-	const FQuat HandRot = Grip * Fist.Inverse();
+	// GripFix: a last correction, in the grip's own frame, for when the fist the fingers
+	// describe doesn't sit square on the grip (mirrored for the left hand). Lined up live.
+	FRotator Fix = GripFix;
+	if (S.Y < 0.f)
+	{
+		Fix.Yaw = -Fix.Yaw;
+		Fix.Roll = -Fix.Roll;
+	}
+	const FQuat HandRot = Grip * Fix.Quaternion() * Fist.Inverse();
 	Hand->SetWorldLocationAndRotation(GripAt - HandRot.RotateVector(Origin), HandRot);
 }
 
