@@ -27,6 +27,7 @@ def make(name, base, rough_lo, rough_hi, streak_scale, metal=1.0):
     if unreal.EditorAssetLibrary.does_asset_exist(path):
         unreal.EditorAssetLibrary.delete_asset(path)
     m = tools.create_asset(name, DEST, unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("used_with_skeletal_mesh", True)   # the gloves go on skeletal (animated) hands
     # colour: steel grey with the faintest cool tint
     col = mel.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -600, -200)
     col.set_editor_property("constant", unreal.LinearColor(base[0], base[1], base[2], 1))

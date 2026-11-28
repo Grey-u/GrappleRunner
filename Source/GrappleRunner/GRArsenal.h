@@ -173,6 +173,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") TSoftObjectPtr<class UAnimationAsset> GraspPose =
 		TSoftObjectPtr<class UAnimationAsset>(FSoftObjectPath(TEXT("/Game/XRMannequins/Animations/A_MannequinsXR_Grasp_Right.A_MannequinsXR_Grasp_Right")));
 	// How a hand model sits on a grip point (tune these if a hand looks twisted).
+	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") float GraspAmount = 1.f;   // how closed the fists are (0 open .. 1 fist)
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") TSoftObjectPtr<class UMaterialInterface> HandMaterial =
 		TSoftObjectPtr<class UMaterialInterface>(FSoftObjectPath(TEXT("/Game/GrappleRunner/Weapons/Materials/M_GR_Glove.M_GR_Glove")));   // dark leather gloves
 	UPROPERTY(EditAnywhere, Category = "Arsenal|Hands") FVector RightHandOffset = FVector(-3.f, -3.5f, 4.5f);

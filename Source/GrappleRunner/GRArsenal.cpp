@@ -1211,7 +1211,16 @@ void AGRArsenal::UpdateHands(float Dt)
 		Hand->SetUsingAbsoluteRotation(true);
 		if (UAnimationAsset* Pose = GraspPose.LoadSynchronous())
 		{
-			Hand->PlayAnimation(Pose, true);   // fingers curled round the grip (if this hand's skeleton accepts it)
+			// The template's grasp animation runs from an open hand (start) to a closed fist (end).
+			// Looping it (as before) left the hands open most of the time, so the fit below had no
+			// fist to work with and the hands floated beside the grips. Now: jump to the closed end
+			// (GraspAmount of the way through) and hold it there.
+			Hand->PlayAnimation(Pose, false);
+			if (const UAnimSequenceBase* Seq = Cast<UAnimSequenceBase>(Pose))
+			{
+				Hand->SetPosition(Seq->GetPlayLength() * GraspAmount, false);
+			}
+			Hand->Stop();
 		}
 	};
 	// ---- Twin blades: a hand closed round each grip (desktop AND headset) ----
