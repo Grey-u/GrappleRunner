@@ -1776,7 +1776,9 @@ void AGRArsenal::FitHandToBlade(USkeletalMeshComponent* Hand, const UStaticMeshC
 	const FQuat Fist = FRotationMatrix::MakeFromXZ(Axis, -Edge).ToQuat();             // same layout as SwordFrame
 
 	// The sword's grip in the world, with the tuning knobs (slide along it, twist round it).
-	const FQuat Grip = Blade->GetComponentQuat() * SwordFrame(Blade) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(GripTwist));
+	// The left hand is the right hand mirrored, so it turns round the grip the opposite way.
+	const float Twist = S.Y < 0.f ? GripTwist : -GripTwist;
+	const FQuat Grip = Blade->GetComponentQuat() * SwordFrame(Blade) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(Twist));
 	const FVector GripAt = Blade->GetComponentLocation() + Grip.GetAxisX() * GripSlide;
 	const FQuat HandRot = Grip * Fist.Inverse();
 	Hand->SetWorldLocationAndRotation(GripAt - HandRot.RotateVector(Origin), HandRot);
